@@ -782,7 +782,7 @@ class _DriveScrollBody extends StatelessWidget {
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: cardWidth,
-                  mainAxisExtent: 310,
+                  mainAxisExtent: 242,
                   crossAxisSpacing: AppSpacing.md,
                   mainAxisSpacing: AppSpacing.md,
                 ),

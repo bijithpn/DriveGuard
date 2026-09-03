@@ -27,13 +27,27 @@ class LocalNotifierService implements NotificationService {
   Future<void> _show(String title, String body, String deviceId) async {
     if (!_initialized) return;
     try {
-      final notification = LocalNotification(title: title, body: body);
+      // Sanitize text to ensure WinRT XML doesn't reject control characters
+      final cleanTitle = title.trim();
+      final cleanBody = body.replaceAll('\r', '').trim();
+
+      final notification = LocalNotification(
+        title: cleanTitle,
+        body: cleanBody,
+      );
       notification.onClick = () {
         if (!_clicksController.isClosed) _clicksController.add(deviceId);
       };
-      await notification.show();
+      // Schedule presentation asynchronously so WinRT toast callback doesn't block polling thread
+      scheduleMicrotask(() async {
+        try {
+          await notification.show();
+        } catch (e) {
+          AppLogger.instance.warning(_tag, 'Failed to display notification: $e');
+        }
+      });
     } catch (e) {
-      AppLogger.instance.error(_tag, 'Failed to show notification', e);
+      AppLogger.instance.error(_tag, 'Failed to prepare notification', e);
     }
   }
 
