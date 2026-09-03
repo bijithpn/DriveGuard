@@ -10,7 +10,23 @@ class StorageNativeChannel {
   static const MethodChannel _channel = MethodChannel(
     'driveguard/storage_native',
   );
+  static const EventChannel _deviceEventsChannel = EventChannel(
+    'driveguard/storage_device_events',
+  );
   static const _tag = 'StorageNativeChannel';
+
+  /// Native hot-plug push notifications, one map per event
+  /// (`{"kind": "added"|"removed", "deviceId": "..."}`). Native backends
+  /// that don't implement this EventChannel simply never register a
+  /// stream handler for it, so `receiveBroadcastStream` completes with a
+  /// [MissingPluginException] on first listen on those platforms - callers
+  /// must handle that rather than assuming the stream always works.
+  Stream<Map<String, dynamic>> deviceEvents() {
+    return _deviceEventsChannel.receiveBroadcastStream().map((raw) {
+      final map = _asMap(raw);
+      return map ?? const <String, dynamic>{};
+    });
+  }
 
   Future<Map<String, dynamic>> getCapabilities() async {
     final raw = await _invoke('getCapabilities', null);

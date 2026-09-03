@@ -5,6 +5,7 @@ import '../../core/utils/temperature_utils.dart';
 import '../../domain/entities/device_health.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
+import '../../domain/entities/storage_device_event.dart';
 import '../../domain/entities/storage_volume.dart';
 import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
@@ -287,5 +288,36 @@ class NativeStorageMonitor extends StorageMonitor {
       usedBytes: (m['usedBytes'] as num?)?.toInt(),
       freeBytes: (m['freeBytes'] as num?)?.toInt(),
     );
+  }
+
+  @override
+  Stream<StorageDeviceEvent> watchDeviceEvents() {
+    return _channel
+        .deviceEvents()
+        .map(_deviceEventFromMap)
+        .where((e) => e != null)
+        .cast<StorageDeviceEvent>()
+        // A platform with no native hot-plug support (EventChannel never
+        // registered) fails the stream with MissingPluginException on
+        // first listen; callers (MonitoringService) fall back to polled
+        // discovery, so swallow it here rather than propagating an error
+        // event.
+        .handleError((Object e) {
+          if (e is! MissingPluginException) {
+            AppLogger.instance.debug(_tag, 'Device event stream error: $e');
+          }
+        });
+  }
+
+  StorageDeviceEvent? _deviceEventFromMap(Map<String, dynamic> m) {
+    final deviceId = m['deviceId']?.toString();
+    if (deviceId == null || deviceId.isEmpty) return null;
+    final kind = switch (m['kind']?.toString()) {
+      'added' => StorageDeviceEventKind.added,
+      'removed' => StorageDeviceEventKind.removed,
+      _ => null,
+    };
+    if (kind == null) return null;
+    return StorageDeviceEvent(kind: kind, deviceId: deviceId);
   }
 }

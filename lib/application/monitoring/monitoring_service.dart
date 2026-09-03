@@ -6,6 +6,7 @@ import '../../core/logging/app_logger.dart';
 import '../../core/utils/temperature_utils.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
+import '../../domain/entities/storage_device_event.dart';
 import '../../domain/entities/storage_volume.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
@@ -40,6 +41,7 @@ class MonitoringService {
 
   Timer? _pollTimer;
   Timer? _discoveryTimer;
+  StreamSubscription<StorageDeviceEvent>? _deviceEventsSub;
   AppSettings _settings = const AppSettings();
   bool _paused = false;
   bool _started = false;
@@ -51,8 +53,29 @@ class MonitoringService {
     await _notifications.initialize();
     await _discoverDevices();
     _rescheduleTimers();
+    _listenForHotplugEvents();
     _started = true;
     AppLogger.instance.info(_tag, 'Monitoring started');
+  }
+
+  /// Native hot-plug push notifications (see STORAGE_MONITORING.md Phase 7)
+  /// are a *hint* to rediscover immediately, not a replacement for polled
+  /// discovery - not every platform/driver combination reliably fires
+  /// them, and [watchDeviceEvents] is an empty stream wherever a backend
+  /// doesn't support it, so this simply does nothing extra there.
+  void _listenForHotplugEvents() {
+    _deviceEventsSub = _backend.watchDeviceEvents().listen(
+      (event) {
+        AppLogger.instance.info(
+          _tag,
+          'Hot-plug event: ${event.kind.name} ${event.deviceId}',
+        );
+        unawaited(_discoverDevices());
+      },
+      onError: (Object e) {
+        AppLogger.instance.debug(_tag, 'Device event stream error: $e');
+      },
+    );
   }
 
   void updateSettings(AppSettings settings) {
@@ -326,6 +349,7 @@ class MonitoringService {
   Future<void> dispose() async {
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
+    await _deviceEventsSub?.cancel();
     await _devicesController.close();
   }
 }

@@ -53,6 +53,11 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # System-level dependencies.
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
+# libudev: storage hot-plug notifications (native_storage/storage_native_channel.cc).
+# Part of systemd-udev, present on essentially every Linux desktop; the
+# dev package is typically named libudev-dev (Debian/Ubuntu) or
+# systemd-devel (Fedora).
+pkg_check_modules(UDEV REQUIRED IMPORTED_TARGET libudev)
 
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")

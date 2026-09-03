@@ -1,8 +1,86 @@
 #include "storage_native_channel.h"
 
+#include <libudev.h>
+
 #include "storage_backend.h"
 
 namespace {
+
+// Hot-plug push notifications (Phase 7, STORAGE_MONITORING.md) via a udev
+// monitor on the "block"/"disk" subsystem - the same kernel uevent source
+// `udevadm monitor` reads, integrated into the GLib main loop the Flutter
+// GTK embedder already runs (no extra thread). Only whole-disk ("disk"
+// devtype, not "partition") add/remove uevents are forwarded; like the
+// macOS/Windows equivalents this only carries a hint deviceId telling
+// `MonitoringService` to re-run discovery, not a resolved "linux-<name>" id
+// - matching a uevent's sysname back to our id scheme isn't necessary
+// when discovery re-enumerates and diffs against the authoritative list
+// either way.
+struct udev* g_udev = nullptr;
+struct udev_monitor* g_udev_monitor = nullptr;
+guint g_udev_watch_id = 0;
+FlEventChannel* g_device_events_channel = nullptr;
+
+gboolean OnUdevReadable(GIOChannel* source, GIOCondition condition, gpointer user_data) {
+  if (g_udev_monitor == nullptr) return TRUE;
+  struct udev_device* dev = udev_monitor_receive_device(g_udev_monitor);
+  if (dev == nullptr) return TRUE;
+
+  const char* action = udev_device_get_action(dev);
+  const char* kind = nullptr;
+  if (g_strcmp0(action, "add") == 0) {
+    kind = "added";
+  } else if (g_strcmp0(action, "remove") == 0) {
+    kind = "removed";
+  }
+
+  if (kind != nullptr && g_device_events_channel != nullptr) {
+    FlValue* m = fl_value_new_map();
+    fl_value_set_string_take(m, "kind", fl_value_new_string(kind));
+    fl_value_set_string_take(m, "deviceId", fl_value_new_string("linux-hint"));
+    g_autoptr(GError) error = nullptr;
+    if (!fl_event_channel_send(g_device_events_channel, m, nullptr, &error)) {
+      g_warning("Failed to send storage device event: %s", error->message);
+    }
+  }
+
+  udev_device_unref(dev);
+  return TRUE;
+}
+
+FlMethodErrorResponse* OnDeviceEventsListen(FlEventChannel* channel, FlValue* args, gpointer user_data) {
+  g_udev = udev_new();
+  if (g_udev == nullptr) return nullptr;  // no udev - stream just never emits, not an error.
+
+  g_udev_monitor = udev_monitor_new_from_netlink(g_udev, "udev");
+  if (g_udev_monitor == nullptr) return nullptr;
+
+  udev_monitor_filter_add_match_subsystem_devtype(g_udev_monitor, "block", "disk");
+  udev_monitor_enable_receiving(g_udev_monitor);
+
+  GIOChannel* io = g_io_channel_unix_new(udev_monitor_get_fd(g_udev_monitor));
+  g_udev_watch_id = g_io_add_watch(io, G_IO_IN, OnUdevReadable, nullptr);
+  // g_io_add_watch's GSource holds its own reference to the channel; this
+  // drops the caller's initial reference now that the watch owns one.
+  g_io_channel_unref(io);
+  return nullptr;
+}
+
+FlMethodErrorResponse* OnDeviceEventsCancel(FlEventChannel* channel, FlValue* args, gpointer user_data) {
+  if (g_udev_watch_id != 0) {
+    g_source_remove(g_udev_watch_id);
+    g_udev_watch_id = 0;
+  }
+  if (g_udev_monitor != nullptr) {
+    udev_monitor_unref(g_udev_monitor);
+    g_udev_monitor = nullptr;
+  }
+  if (g_udev != nullptr) {
+    udev_unref(g_udev);
+    g_udev = nullptr;
+  }
+  return nullptr;
+}
 
 using driveguard::NativeDeviceInfo;
 using driveguard::NativeHealthInfo;
@@ -202,4 +280,11 @@ void storage_native_channel_register(FlBinaryMessenger* messenger) {
   FlMethodChannel* channel =
       fl_method_channel_new(messenger, "driveguard/storage_native", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(channel, HandleMethodCall, nullptr, nullptr);
+
+  // Intentionally leaked for the process lifetime, same rationale as
+  // `channel` above.
+  g_device_events_channel =
+      fl_event_channel_new(messenger, "driveguard/storage_device_events", FL_METHOD_CODEC(codec));
+  fl_event_channel_set_stream_handlers(g_device_events_channel, OnDeviceEventsListen,
+                                        OnDeviceEventsCancel, nullptr, nullptr);
 }

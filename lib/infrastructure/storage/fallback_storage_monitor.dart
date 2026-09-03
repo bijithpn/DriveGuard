@@ -2,6 +2,7 @@ import '../../core/logging/app_logger.dart';
 import '../../domain/entities/device_health.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
+import '../../domain/entities/storage_device_event.dart';
 import '../../domain/entities/storage_volume.dart';
 import '../../domain/entities/temperature_reading.dart';
 import '../../domain/repositories/storage_monitor.dart';
@@ -115,4 +116,11 @@ class FallbackStorageMonitor extends StorageMonitor {
     }
     return legacy.getVolumes(deviceId);
   }
+
+  /// The legacy CLI-shelling backends never push hot-plug events (nothing
+  /// to fall back to); this only ever reflects native's stream, which is
+  /// itself an empty stream on a platform/build without native hot-plug
+  /// support.
+  @override
+  Stream<StorageDeviceEvent> watchDeviceEvents() => native.watchDeviceEvents();
 }

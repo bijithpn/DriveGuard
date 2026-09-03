@@ -1,10 +1,21 @@
 #include "storage_native_channel.h"
 
+#include <dbt.h>
+
 #include "storage_backend.h"
 
 namespace driveguard {
 
 namespace {
+
+// GUID_DEVINTERFACE_DISK, defined locally by value (rather than pulling in
+// ntddstor.h's INITGUID/link dependency) so RegisterDeviceNotification can
+// filter to disk device interfaces specifically instead of every device
+// class change.
+constexpr GUID kGuidDevInterfaceDisk = {
+    0x53f56307, 0xb6bf, 0x11d0, {0x94, 0xf2, 0x00, 0xa0, 0xc9, 0x1e, 0xfb, 0x8b}};
+
+constexpr wchar_t kNotifyWindowClassName[] = L"DriveGuardStorageDeviceNotifyWindow";
 
 using flutter::EncodableList;
 using flutter::EncodableMap;
@@ -53,9 +64,91 @@ StorageNativeChannel::StorageNativeChannel(flutter::BinaryMessenger* messenger) 
 
   channel_->SetMethodCallHandler(
       [](const auto& call, auto result) { StorageNativeChannel::HandleMethodCallStatic(call, std::move(result)); });
+
+  SetupDeviceEvents(messenger);
 }
 
-StorageNativeChannel::~StorageNativeChannel() = default;
+StorageNativeChannel::~StorageNativeChannel() { TeardownDeviceEvents(); }
+
+void StorageNativeChannel::SetupDeviceEvents(flutter::BinaryMessenger* messenger) {
+  WNDCLASSW wc = {};
+  wc.lpfnWndProc = &StorageNativeChannel::WndProcStatic;
+  wc.hInstance = GetModuleHandleW(nullptr);
+  wc.lpszClassName = kNotifyWindowClassName;
+  // RegisterClassW fails harmlessly if already registered (e.g. a second
+  // StorageNativeChannel instance, which doesn't happen in practice but
+  // shouldn't crash if it did) - ignore the return value.
+  RegisterClassW(&wc);
+
+  notify_window_ = CreateWindowExW(0, kNotifyWindowClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
+                                    GetModuleHandleW(nullptr), this);
+  if (notify_window_ != nullptr) {
+    DEV_BROADCAST_DEVICEINTERFACE filter = {};
+    filter.dbcc_size = sizeof(filter);
+    filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+    filter.dbcc_classguid = kGuidDevInterfaceDisk;
+    device_notify_ = RegisterDeviceNotificationW(notify_window_, &filter, DEVICE_NOTIFY_WINDOW_HANDLE);
+  }
+
+  event_channel_ = std::make_unique<flutter::EventChannel<EncodableValue>>(
+      messenger, "driveguard/storage_device_events", &flutter::StandardMethodCodec::GetInstance());
+  event_channel_->SetStreamHandler(
+      std::make_unique<flutter::StreamHandlerFunctions<EncodableValue>>(
+          [this](const EncodableValue* arguments,
+                 std::unique_ptr<flutter::EventSink<EncodableValue>>&& events)
+              -> std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> {
+            event_sink_ = std::move(events);
+            return nullptr;
+          },
+          [this](const EncodableValue* arguments)
+              -> std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> {
+            event_sink_.reset();
+            return nullptr;
+          }));
+}
+
+void StorageNativeChannel::TeardownDeviceEvents() {
+  if (device_notify_ != nullptr) {
+    UnregisterDeviceNotification(device_notify_);
+    device_notify_ = nullptr;
+  }
+  if (notify_window_ != nullptr) {
+    DestroyWindow(notify_window_);
+    notify_window_ = nullptr;
+  }
+  event_sink_.reset();
+}
+
+LRESULT CALLBACK StorageNativeChannel::WndProcStatic(HWND hwnd, UINT message, WPARAM wparam,
+                                                       LPARAM lparam) {
+  if (message == WM_NCCREATE) {
+    auto* createStruct = reinterpret_cast<CREATESTRUCTW*>(lparam);
+    SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(createStruct->lpCreateParams));
+  }
+  auto* self = reinterpret_cast<StorageNativeChannel*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+  if (self != nullptr) {
+    return self->HandleWindowMessage(hwnd, message, wparam, lparam);
+  }
+  return DefWindowProcW(hwnd, message, wparam, lparam);
+}
+
+LRESULT StorageNativeChannel::HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+  if (message == WM_DEVICECHANGE &&
+      (wparam == DBT_DEVICEARRIVAL || wparam == DBT_DEVICEREMOVECOMPLETE)) {
+    auto* header = reinterpret_cast<DEV_BROADCAST_HDR*>(lparam);
+    if (header != nullptr && header->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE && event_sink_) {
+      EncodableMap event;
+      event[EncodableValue("kind")] =
+          EncodableValue(std::string(wparam == DBT_DEVICEARRIVAL ? "added" : "removed"));
+      // No reliable PhysicalDriveN index in a disk-interface arrival/removal
+      // broadcast - this is a rediscovery hint, see the header comment.
+      event[EncodableValue("deviceId")] = EncodableValue(std::string("windows-hint"));
+      event_sink_->Success(EncodableValue(event));
+    }
+    return TRUE;
+  }
+  return DefWindowProcW(hwnd, message, wparam, lparam);
+}
 
 // static-equivalent dispatcher kept as a free function bound via lambda
 // above so the channel can be cheaply constructed without exposing a

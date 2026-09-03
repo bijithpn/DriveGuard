@@ -1,3 +1,4 @@
+import DiskArbitration
 import FlutterMacOS
 import Foundation
 
@@ -11,6 +12,10 @@ import Foundation
 /// "fall through to the smartctl CLI backend", exactly as the contract
 /// intends.
 enum StorageNativeChannel {
+  // Retained for the process lifetime - FlutterEventChannel does not keep a
+  // strong reference to the handler passed to setStreamHandler.
+  private static let deviceEventHandler = DeviceEventStreamHandler()
+
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
       name: "driveguard/storage_native",
@@ -19,6 +24,12 @@ enum StorageNativeChannel {
     channel.setMethodCallHandler { call, result in
       handle(call, result: result)
     }
+
+    let eventChannel = FlutterEventChannel(
+      name: "driveguard/storage_device_events",
+      binaryMessenger: registrar.messenger
+    )
+    eventChannel.setStreamHandler(deviceEventHandler)
   }
 
   private static func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -104,5 +115,67 @@ enum StorageNativeChannel {
       deviceId.hasPrefix("macos-")
     else { return nil }
     return String(deviceId.dropFirst("macos-".count))
+  }
+}
+
+/// Pushes `{"kind": "added"|"removed", "deviceId": "macos-<bsdName>"}` over
+/// the `driveguard/storage_device_events` EventChannel via DiskArbitration's
+/// `DARegisterDiskAppearedCallback`/`DARegisterDiskDisappearedCallback` -
+/// the public API Disk Utility itself uses for hot-plug notifications.
+///
+/// The match dictionary restricts callbacks to whole-disk appearances
+/// (`kDADiskDescriptionMediaWholeKey = true`), which also fires for
+/// non-physical whole media (e.g. a mounted .dmg) that
+/// [IOKitStorageBackend.enumerateDevices] would filter out. That's
+/// deliberately not filtered again here: this event only carries a
+/// `deviceId` hint telling `MonitoringService` to re-run discovery
+/// immediately - the authoritative filtered device list still comes from
+/// `getDevices`, so an extra rediscovery triggered by a disk image is
+/// harmless, just a no-op diff.
+private final class DeviceEventStreamHandler: NSObject, FlutterStreamHandler {
+  private var session: DASession?
+  private var eventSink: FlutterEventSink?
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    eventSink = events
+    guard let session = DASessionCreate(kCFAllocatorDefault) else {
+      return FlutterError(
+        code: "UNSUPPORTED", message: "DiskArbitration session could not be created", details: nil)
+    }
+    self.session = session
+
+    let matchDict = [kDADiskDescriptionMediaWholeKey: true] as CFDictionary
+    let context = Unmanaged.passUnretained(self).toOpaque()
+
+    DARegisterDiskAppearedCallback(session, matchDict, { disk, ctx in
+      DeviceEventStreamHandler.fromContext(ctx).emit(disk: disk, kind: "added")
+    }, context)
+    DARegisterDiskDisappearedCallback(session, matchDict, { disk, ctx in
+      DeviceEventStreamHandler.fromContext(ctx).emit(disk: disk, kind: "removed")
+    }, context)
+
+    DASessionScheduleWithRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    if let session {
+      DASessionUnscheduleFromRunLoop(session, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+    }
+    session = nil
+    eventSink = nil
+    return nil
+  }
+
+  private static func fromContext(_ ctx: UnsafeMutableRawPointer?) -> DeviceEventStreamHandler {
+    Unmanaged<DeviceEventStreamHandler>.fromOpaque(ctx!).takeUnretainedValue()
+  }
+
+  private func emit(disk: DADisk, kind: String) {
+    guard let bsdNamePtr = DADiskGetBSDName(disk) else { return }
+    let bsdName = String(cString: bsdNamePtr)
+    DispatchQueue.main.async { [weak self] in
+      self?.eventSink?(["kind": kind, "deviceId": "macos-\(bsdName)"])
+    }
   }
 }
