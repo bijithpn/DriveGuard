@@ -377,7 +377,7 @@ class _Footer extends StatelessWidget {
       case TemperatureSeverity.warm:
         return 'Normal';
       case TemperatureSeverity.unavailable:
-        return 'Unavailable';
+        return 'N/A';
     }
   }
 

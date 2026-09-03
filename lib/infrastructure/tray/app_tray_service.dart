@@ -200,7 +200,7 @@ class AppTrayService {
       case TemperatureSeverity.critical:
         return 'Critical';
       case TemperatureSeverity.unavailable:
-        return 'Unavailable';
+        return 'N/A';
     }
   }
 

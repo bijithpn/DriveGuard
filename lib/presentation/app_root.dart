@@ -208,7 +208,6 @@ class _AppRootState extends ConsumerState<AppRoot>
         ref.read(widgetModeActiveProvider.notifier).state = true;
 
         await _pushSnapshotToMiniWindowIfActive();
-        await windowManager.hide();
       } else {
         final restored = await widget.windowController.exitWidgetMode(
           settings.widget,

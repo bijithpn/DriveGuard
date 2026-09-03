@@ -127,7 +127,7 @@ class SeverityStyle {
         return SeverityStyle(
           color: Theme.of(context).colorScheme.outline,
           dimColor: Theme.of(context).colorScheme.outlineVariant,
-          label: 'Unavailable',
+          label: 'N/A',
           icon: Icons.help_outline_rounded,
         );
     }

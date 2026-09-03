@@ -58,7 +58,7 @@ class DevicePresentation {
     if (isUnavailableStatus) {
       return DevicePresentation._(
         severity: TemperatureSeverity.unavailable,
-        valueText: 'Unavailable',
+        valueText: 'N/A',
         fraction: 0,
         statusText:
             device.lastError ??
@@ -101,7 +101,7 @@ class DevicePresentation {
       case TemperatureSeverity.critical:
         return 'Exceeded configured critical limit';
       case TemperatureSeverity.unavailable:
-        return 'Unavailable';
+        return 'N/A';
     }
   }
 }

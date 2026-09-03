@@ -7,6 +7,7 @@ import 'fallback_storage_monitor.dart';
 import 'linux_storage_monitor.dart';
 import 'macos_storage_monitor.dart';
 import 'mock_storage_monitor.dart';
+import 'unavailable_storage_monitor.dart';
 import 'windows_storage_monitor.dart';
 
 class StorageMonitorFactory {
@@ -31,9 +32,11 @@ class StorageMonitorFactory {
     } else {
       AppLogger.instance.warning(
         'StorageMonitorFactory',
-        'Unsupported OS (${Platform.operatingSystem}); using mock backend',
+        'Unsupported OS (${Platform.operatingSystem}); no real backend available',
       );
-      return MockStorageMonitor();
+      return UnavailableStorageMonitor(
+        reason: 'Unsupported OS (${Platform.operatingSystem})',
+      );
     }
 
     final candidate = FallbackStorageMonitor(
@@ -48,10 +51,13 @@ class StorageMonitorFactory {
       );
       return candidate;
     }
+
     AppLogger.instance.warning(
       'StorageMonitorFactory',
-      '${legacy.runtimeType} reported unavailable; falling back to mock backend',
+      '${legacy.runtimeType} reported unavailable; no real backend available',
     );
-    return MockStorageMonitor();
+    return UnavailableStorageMonitor(
+      reason: '${legacy.runtimeType} reported unavailable',
+    );
   }
 }

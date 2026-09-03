@@ -77,6 +77,12 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
 
     await windowManager.ensureInitialized();
     await windowManager.setAsFrameless();
+
+    await windowManager.setTitleBarStyle(
+      TitleBarStyle.hidden,
+      windowButtonVisibility: false,
+    );
+    await windowManager.setBackgroundColor(Colors.transparent);
     await windowManager.setAlwaysOnTop(alwaysOnTop);
     await windowManager.setHasShadow(false);
     await windowManager.setOpacity(opacity);

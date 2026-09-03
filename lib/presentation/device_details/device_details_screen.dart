@@ -199,7 +199,7 @@ class _DeviceInfoPanel extends StatelessWidget {
       case DeviceHealthStatus.unknown:
         return 'Unknown';
       case DeviceHealthStatus.unavailable:
-        return 'Unavailable';
+        return 'N/A';
     }
   }
 
@@ -343,6 +343,7 @@ class _DeviceInfoPanel extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _InfoRow(label: 'Type', value: _typeLabel(), isDark: isDark),
                 const SizedBox(height: 10),
@@ -502,7 +503,7 @@ class _TemperatureTab extends ConsumerWidget {
                               device.primaryTemperature!.celsius,
                               unit,
                             )
-                          : 'Unavailable',
+                          : 'N/A',
                       icon: Icons.thermostat_rounded,
                       isDark: isDark,
                       color:
