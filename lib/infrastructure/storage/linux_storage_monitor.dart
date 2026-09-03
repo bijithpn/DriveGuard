@@ -11,7 +11,7 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class LinuxStorageMonitor implements StorageMonitor {
+class LinuxStorageMonitor extends StorageMonitor {
   static const _tag = 'LinuxStorageMonitor';
 
   @override

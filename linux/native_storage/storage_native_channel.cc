@@ -121,6 +121,36 @@ void HandleMethodCall(FlMethodChannel* channel, FlMethodCall* method_call, gpoin
           fl_method_error_response_new(StatusToErrorCode(r.status), r.message.c_str(), nullptr));
     }
 
+  } else if (g_strcmp0(method, "getCapacity") == 0) {
+    std::string deviceId = ArgDeviceId(args);
+    auto cap = backend.GetCapacity(deviceId);
+    if (!cap.total_bytes.has_value() && !cap.used_bytes.has_value()) {
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(fl_value_new_null()));
+    } else {
+      FlValue* m = fl_value_new_map();
+      fl_value_set_string_take(m, "totalBytes", OptInt(cap.total_bytes));
+      fl_value_set_string_take(m, "usedBytes", OptInt(cap.used_bytes));
+      fl_value_set_string_take(m, "freeBytes", OptInt(cap.free_bytes));
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(m));
+    }
+
+  } else if (g_strcmp0(method, "getVolumes") == 0) {
+    std::string deviceId = ArgDeviceId(args);
+    FlValue* list = fl_value_new_list();
+    for (const auto& v : backend.EnumerateVolumes(deviceId)) {
+      FlValue* m = fl_value_new_map();
+      fl_value_set_string_take(m, "id", fl_value_new_string(v.id.c_str()));
+      fl_value_set_string_take(m, "mountPoint", OptString(v.mount_point));
+      fl_value_set_string_take(m, "filesystem", OptString(v.filesystem));
+      fl_value_set_string_take(m, "isReadOnly", fl_value_new_bool(v.is_read_only));
+      fl_value_set_string_take(m, "isBootVolume", fl_value_new_bool(v.is_boot_volume));
+      fl_value_set_string_take(m, "totalBytes", OptInt(v.total_bytes));
+      fl_value_set_string_take(m, "usedBytes", OptInt(v.used_bytes));
+      fl_value_set_string_take(m, "freeBytes", OptInt(v.free_bytes));
+      fl_value_append_take(list, m);
+    }
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(list));
+
   } else if (g_strcmp0(method, "getHealth") == 0) {
     std::string deviceId = ArgDeviceId(args);
     auto r = backend.ReadHealth(deviceId);

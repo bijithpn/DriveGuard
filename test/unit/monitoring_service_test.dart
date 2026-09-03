@@ -14,7 +14,7 @@ import '../mocks/fake_notification_service.dart';
 /// A tiny scriptable [StorageMonitor] so monitoring-service behaviour
 /// (failure isolation, discovery, alerts) can be tested without spinning
 /// up real timers or touching the OS.
-class _ScriptedMonitor implements StorageMonitor {
+class _ScriptedMonitor extends StorageMonitor {
   List<StorageDevice> devices;
   final Map<String, Object> nextReadingOrError = {};
 

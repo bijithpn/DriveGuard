@@ -4,7 +4,9 @@ import '../../core/constants/app_constants.dart';
 import '../../core/errors/storage_exceptions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/utils/temperature_utils.dart';
+import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
+import '../../domain/entities/storage_volume.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 import '../alerts/alert_engine.dart';
@@ -138,6 +140,45 @@ class MonitoringService {
       }
     }
 
+    _emit();
+    unawaited(_refreshCapacity());
+  }
+
+  /// Refreshes capacity/usage and volume enumeration for every tracked
+  /// device. Deliberately run on the (slower) discovery cadence rather than
+  /// the temperature-polling cadence - see STORAGE_MONITORING.md section 6
+  /// ("medium" metrics, 5-10s) - since a full volume/statfs walk is more
+  /// expensive than a single temperature read.
+  Future<void> _refreshCapacity() async {
+    final ids = _devices.keys
+        .where(
+          (id) =>
+              _devices[id]!.monitoringStatus != MonitoringStatus.disconnected,
+        )
+        .toList();
+    await Future.wait(
+      ids.map((id) async {
+        final device = _devices[id];
+        if (device == null) return;
+        try {
+          final results = await Future.wait([
+            _backend.getCapacity(id),
+            _backend.getVolumes(id),
+          ]);
+          final current = _devices[id];
+          if (current == null) return;
+          _devices[id] = current.copyWith(
+            capacity: results[0] as StorageCapacity,
+            volumes: results[1] as List<StorageVolume>,
+          );
+        } catch (e) {
+          AppLogger.instance.debug(
+            _tag,
+            'Capacity/volume refresh failed for $id: $e',
+          );
+        }
+      }),
+    );
     _emit();
   }
 

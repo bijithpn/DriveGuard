@@ -3,8 +3,10 @@
 #include <winioctl.h>
 #include <ntddscsi.h>
 
+#include <algorithm>
 #include <cstring>
 #include <sstream>
+#include <string>
 
 // Native Windows storage telemetry.
 //
@@ -559,6 +561,152 @@ NativeResult<std::vector<NativeTemperatureInfo>> StorageBackend::ReadSensors(
     result.status = NativeStorageStatus::kUnsupported;
   }
   return result;
+}
+
+namespace {
+
+// Volume GUID paths from FindFirstVolumeW/FindNextVolumeW come back as
+// "\\?\Volume{guid}\" - DeviceIoControl needs the same string with the
+// trailing backslash stripped.
+std::wstring TrimTrailingBackslash(const std::wstring& s) {
+  if (!s.empty() && s.back() == L'\\') return s.substr(0, s.size() - 1);
+  return s;
+}
+
+std::string Narrow(const std::wstring& s) {
+  if (s.empty()) return "";
+  int len = WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0, nullptr,
+                                 nullptr);
+  std::string out(len, '\0');
+  WideCharToMultiByte(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), len, nullptr,
+                       nullptr);
+  return out;
+}
+
+// Which physical drive indices a volume spans, via
+// IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS against the volume's own handle -
+// public, documented API (winioctl.h), no WMI. A volume can span multiple
+// physical disks (RAID/spanned volumes); this returns all of them so the
+// caller can match against any target index.
+std::vector<int> VolumeDiskIndices(const std::wstring& volumeGuidPath) {
+  std::vector<int> indices;
+  HANDLE h = CreateFileW(TrimTrailingBackslash(volumeGuidPath).c_str(), 0,
+                          FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+  if (h == INVALID_HANDLE_VALUE) return indices;
+
+  BYTE buffer[sizeof(VOLUME_DISK_EXTENTS) + 8 * sizeof(DISK_EXTENT)] = {};
+  DWORD bytesReturned = 0;
+  BOOL ok = DeviceIoControl(h, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, nullptr, 0, buffer, sizeof(buffer),
+                             &bytesReturned, nullptr);
+  CloseHandle(h);
+  if (!ok) return indices;
+
+  auto* extents = reinterpret_cast<VOLUME_DISK_EXTENTS*>(buffer);
+  for (DWORD i = 0; i < extents->NumberOfDiskExtents; i++) {
+    indices.push_back(static_cast<int>(extents->Extents[i].DiskNumber));
+  }
+  return indices;
+}
+
+// First mount point ("C:\", or a mounted-folder path) for a volume GUID
+// path, via GetVolumePathNamesForVolumeNameW - empty if the volume isn't
+// mounted anywhere (still a real, enumerable volume, just not browsable).
+std::optional<std::wstring> FirstMountPoint(const std::wstring& volumeGuidPath) {
+  wchar_t buffer[4096] = {};
+  DWORD needed = 0;
+  if (!GetVolumePathNamesForVolumeNameW(volumeGuidPath.c_str(), buffer, ARRAYSIZE(buffer), &needed)) {
+    return std::nullopt;
+  }
+  if (buffer[0] == L'\0') return std::nullopt;
+  return std::wstring(buffer);
+}
+
+}  // namespace
+
+std::vector<NativeVolumeInfo> StorageBackend::EnumerateVolumes(const std::string& device_id) {
+  std::vector<NativeVolumeInfo> result;
+  int targetIndex = ParseDriveIndex(device_id);
+  if (targetIndex < 0) return result;
+
+  wchar_t volumeName[MAX_PATH] = {};
+  HANDLE findHandle = FindFirstVolumeW(volumeName, ARRAYSIZE(volumeName));
+  if (findHandle == INVALID_HANDLE_VALUE) return result;
+
+  do {
+    std::wstring guidPath(volumeName);
+    auto indices = VolumeDiskIndices(guidPath);
+    if (std::find(indices.begin(), indices.end(), targetIndex) == indices.end()) continue;
+
+    NativeVolumeInfo info;
+    info.id = Narrow(guidPath);
+
+    auto mount = FirstMountPoint(guidPath);
+    if (mount.has_value()) {
+      info.mount_point = Narrow(*mount);
+      info.is_boot_volume = (_wcsicmp(mount->c_str(), L"C:\\") == 0);
+    }
+
+    wchar_t nameBuf[MAX_PATH + 1] = {};
+    wchar_t fsBuf[MAX_PATH + 1] = {};
+    DWORD serial = 0, maxComponentLen = 0, fsFlags = 0;
+    // GetVolumeInformationW needs a path (mount point or trimmed GUID path)
+    // - the trailing-backslash GUID path itself works even when unmounted.
+    if (GetVolumeInformationW(guidPath.c_str(), nameBuf, ARRAYSIZE(nameBuf), &serial, &maxComponentLen,
+                               &fsFlags, fsBuf, ARRAYSIZE(fsBuf))) {
+      if (nameBuf[0] != L'\0') info.volume_name = Narrow(nameBuf);
+      if (fsBuf[0] != L'\0') info.filesystem = Narrow(fsBuf);
+      info.is_read_only = (fsFlags & FILE_READ_ONLY_VOLUME) != 0;
+    }
+
+    if (info.mount_point.has_value()) {
+      ULARGE_INTEGER freeAvail, total, freeTotal;
+      if (GetDiskFreeSpaceExW(mount->c_str(), &freeAvail, &total, &freeTotal)) {
+        info.total_bytes = static_cast<int64_t>(total.QuadPart);
+        info.free_bytes = static_cast<int64_t>(freeAvail.QuadPart);
+        info.used_bytes = static_cast<int64_t>(total.QuadPart - freeTotal.QuadPart);
+      }
+    }
+
+    result.push_back(std::move(info));
+  } while (FindNextVolumeW(findHandle, volumeName, ARRAYSIZE(volumeName)));
+  FindVolumeClose(findHandle);
+
+  return result;
+}
+
+NativeCapacityInfo StorageBackend::GetCapacity(const std::string& device_id) {
+  NativeCapacityInfo capacity;
+  int index = ParseDriveIndex(device_id);
+  if (index < 0) return capacity;
+
+  HANDLE h = OpenDrive(index, 0);
+  if (h != INVALID_HANDLE_VALUE) {
+    GET_LENGTH_INFORMATION lengthInfo = {};
+    DWORD bytesReturned = 0;
+    if (DeviceIoControl(h, IOCTL_DISK_GET_LENGTH_INFO, nullptr, 0, &lengthInfo, sizeof(lengthInfo),
+                         &bytesReturned, nullptr)) {
+      capacity.total_bytes = lengthInfo.Length.QuadPart;
+    }
+    CloseHandle(h);
+  }
+
+  int64_t usedSum = 0, freeSum = 0;
+  bool haveAny = false;
+  for (const auto& v : EnumerateVolumes(device_id)) {
+    if (v.used_bytes.has_value()) {
+      usedSum += *v.used_bytes;
+      haveAny = true;
+    }
+    if (v.free_bytes.has_value()) {
+      freeSum += *v.free_bytes;
+      haveAny = true;
+    }
+  }
+  if (haveAny) {
+    capacity.used_bytes = usedSum;
+    capacity.free_bytes = freeSum;
+  }
+  return capacity;
 }
 
 }  // namespace driveguard

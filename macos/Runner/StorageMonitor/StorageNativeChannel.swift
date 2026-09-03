@@ -54,8 +54,55 @@ enum StorageNativeChannel {
     case "readTemperature", "getHealth":
       result(nil)
 
+    case "getCapacity":
+      guard let bsdName = bsdName(from: call) else {
+        result(nil)
+        return
+      }
+      let cap = IOKitStorageBackend.shared.capacity(forWholeBsdName: bsdName)
+      if cap.totalBytes == nil && cap.usedBytes == nil {
+        result(nil)
+        return
+      }
+      result([
+        "totalBytes": cap.totalBytes.map { NSNumber(value: $0) },
+        "usedBytes": cap.usedBytes.map { NSNumber(value: $0) },
+        "freeBytes": cap.freeBytes.map { NSNumber(value: $0) },
+      ] as [String: Any?])
+
+    case "getVolumes":
+      guard let bsdName = bsdName(from: call) else {
+        result([Any]())
+        return
+      }
+      let volumes = IOKitStorageBackend.shared.volumes(forWholeBsdName: bsdName).map { v -> [String: Any?] in
+        [
+          "id": v.id,
+          "mountPoint": v.mountPoint,
+          "volumeName": v.volumeName,
+          "filesystem": v.filesystem,
+          "volumeUuid": v.volumeUuid,
+          "isReadOnly": v.isReadOnly,
+          "isBootVolume": v.isBootVolume,
+          "totalBytes": v.totalBytes.map { NSNumber(value: $0) },
+          "usedBytes": v.usedBytes.map { NSNumber(value: $0) },
+          "freeBytes": v.freeBytes.map { NSNumber(value: $0) },
+        ]
+      }
+      result(volumes)
+
     default:
       result(FlutterMethodNotImplemented)
     }
+  }
+
+  /// Device ids from [IOKitStorageBackend] are always "macos-<bsdName>" -
+  /// strip the prefix rather than keeping a separate id->bsdName cache.
+  private static func bsdName(from call: FlutterMethodCall) -> String? {
+    guard let args = call.arguments as? [String: Any],
+      let deviceId = args["deviceId"] as? String,
+      deviceId.hasPrefix("macos-")
+    else { return nil }
+    return String(deviceId.dropFirst("macos-".count))
   }
 }

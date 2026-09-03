@@ -26,6 +26,23 @@ struct NativeTemperatureInfo {
   bool is_primary = true;
 };
 
+struct NativeVolumeInfo {
+  std::string id;  // the partition's block device path, e.g. "/dev/nvme0n1p1".
+  std::optional<std::string> mount_point;
+  std::optional<std::string> filesystem;
+  bool is_read_only = false;
+  bool is_boot_volume = false;
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
+struct NativeCapacityInfo {
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
 struct NativeHealthInfo {
   std::string status;
   std::optional<int> percentage_used;
@@ -92,6 +109,19 @@ class StorageBackend {
   // device only has the single composite/hwmon reading already covered by
   // [ReadTemperature].
   NativeResult<std::vector<NativeTemperatureInfo>> ReadSensors(const std::string& device_id);
+
+  // Partitions of this block device (/sys/block/<name>/<name>N or
+  // <name>pN for NVMe), matched against /proc/mounts for mount
+  // point/filesystem/read-only, and statvfs() on the mount point for
+  // capacity - the PhysicalDisk -> Partition -> Volume split the Dart
+  // model expects. A partition that exists but isn't mounted is still
+  // returned, with capacity fields unset.
+  std::vector<NativeVolumeInfo> EnumerateVolumes(const std::string& device_id);
+
+  // Aggregate capacity for the whole block device: total from
+  // /sys/block/<name>/size (authoritative), used/free summed across
+  // EnumerateVolumes().
+  NativeCapacityInfo GetCapacity(const std::string& device_id);
 
  private:
   StorageBackend() = default;

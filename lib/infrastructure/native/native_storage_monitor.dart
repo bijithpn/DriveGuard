@@ -3,13 +3,15 @@ import 'package:flutter/services.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/utils/temperature_utils.dart';
 import '../../domain/entities/device_health.dart';
+import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
+import '../../domain/entities/storage_volume.dart';
 import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 import 'storage_native_channel.dart';
 
-class NativeStorageMonitor implements StorageMonitor {
+class NativeStorageMonitor extends StorageMonitor {
   static const _tag = 'NativeStorageMonitor';
   final _channel = StorageNativeChannel.instance;
 
@@ -227,4 +229,63 @@ class NativeStorageMonitor implements StorageMonitor {
     'unavailable' => DeviceHealthStatus.unavailable,
     _ => DeviceHealthStatus.unknown,
   };
+
+  @override
+  Future<StorageCapacity> getCapacity(String deviceId) async {
+    Map<String, dynamic>? raw;
+    try {
+      raw = await _channel.getCapacity(deviceId);
+    } on MissingPluginException {
+      return StorageCapacity.unavailable;
+    } catch (e) {
+      AppLogger.instance.debug(
+        _tag,
+        'Native capacity read failed for $deviceId: $e',
+      );
+      return StorageCapacity.unavailable;
+    }
+    if (raw == null) return StorageCapacity.unavailable;
+    return StorageCapacity(
+      availability: SensorAvailability.available,
+      totalBytes: (raw['totalBytes'] as num?)?.toInt(),
+      usedBytes: (raw['usedBytes'] as num?)?.toInt(),
+      freeBytes: (raw['freeBytes'] as num?)?.toInt(),
+      allocatedBytes: (raw['allocatedBytes'] as num?)?.toInt(),
+      unallocatedBytes: (raw['unallocatedBytes'] as num?)?.toInt(),
+    );
+  }
+
+  @override
+  Future<List<StorageVolume>> getVolumes(String deviceId) async {
+    try {
+      final raw = await _channel.getVolumes(deviceId);
+      return raw.map(_volumeFromMap).whereType<StorageVolume>().toList();
+    } on MissingPluginException {
+      return const [];
+    } catch (e) {
+      AppLogger.instance.debug(
+        _tag,
+        'Native volume enumeration failed for $deviceId: $e',
+      );
+      return const [];
+    }
+  }
+
+  StorageVolume? _volumeFromMap(Map<String, dynamic> m) {
+    final id = m['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return StorageVolume(
+      id: id,
+      mountPoint: m['mountPoint']?.toString(),
+      volumeName: m['volumeName']?.toString(),
+      filesystem: m['filesystem']?.toString(),
+      volumeUuid: m['volumeUuid']?.toString(),
+      isReadOnly: m['isReadOnly'] == true,
+      isBootVolume: m['isBootVolume'] == true,
+      isEncrypted: m['isEncrypted'] as bool?,
+      totalBytes: (m['totalBytes'] as num?)?.toInt(),
+      usedBytes: (m['usedBytes'] as num?)?.toInt(),
+      freeBytes: (m['freeBytes'] as num?)?.toInt(),
+    );
+  }
 }

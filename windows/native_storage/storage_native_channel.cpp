@@ -143,6 +143,39 @@ void DispatchMethodCall(
     return;
   }
 
+  if (call.method_name() == "getCapacity") {
+    auto cap = backend.GetCapacity(deviceId);
+    if (!cap.total_bytes.has_value() && !cap.used_bytes.has_value()) {
+      result->Success(EncodableValue());
+      return;
+    }
+    EncodableMap m;
+    m[EncodableValue("totalBytes")] = OptInt(cap.total_bytes);
+    m[EncodableValue("usedBytes")] = OptInt(cap.used_bytes);
+    m[EncodableValue("freeBytes")] = OptInt(cap.free_bytes);
+    result->Success(EncodableValue(m));
+    return;
+  }
+
+  if (call.method_name() == "getVolumes") {
+    EncodableList list;
+    for (const auto& v : backend.EnumerateVolumes(deviceId)) {
+      EncodableMap m;
+      m[EncodableValue("id")] = EncodableValue(v.id);
+      m[EncodableValue("mountPoint")] = OptString(v.mount_point);
+      m[EncodableValue("volumeName")] = OptString(v.volume_name);
+      m[EncodableValue("filesystem")] = OptString(v.filesystem);
+      m[EncodableValue("isReadOnly")] = EncodableValue(v.is_read_only);
+      m[EncodableValue("isBootVolume")] = EncodableValue(v.is_boot_volume);
+      m[EncodableValue("totalBytes")] = OptInt(v.total_bytes);
+      m[EncodableValue("usedBytes")] = OptInt(v.used_bytes);
+      m[EncodableValue("freeBytes")] = OptInt(v.free_bytes);
+      list.push_back(EncodableValue(m));
+    }
+    result->Success(EncodableValue(list));
+    return;
+  }
+
   if (call.method_name() == "getHealth") {
     auto r = backend.ReadHealth(deviceId);
     if (r.status == NativeStorageStatus::kOk && r.value.has_value()) {

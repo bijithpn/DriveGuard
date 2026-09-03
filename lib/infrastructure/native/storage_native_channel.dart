@@ -47,6 +47,21 @@ class StorageNativeChannel {
         .toList();
   }
 
+  Future<Map<String, dynamic>?> getCapacity(String deviceId) async {
+    final raw = await _invoke('getCapacity', {'deviceId': deviceId});
+    return _asMap(raw);
+  }
+
+  Future<List<Map<String, dynamic>>> getVolumes(String deviceId) async {
+    final raw = await _invoke('getVolumes', {'deviceId': deviceId});
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Object>()
+        .map(_asMap)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
   Future<Object?> _invoke(String method, Map<String, dynamic>? args) async {
     try {
       return await _channel.invokeMethod<Object?>(method, args);

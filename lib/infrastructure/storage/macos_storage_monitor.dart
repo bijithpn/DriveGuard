@@ -10,7 +10,7 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class MacOSStorageMonitor implements StorageMonitor {
+class MacOSStorageMonitor extends StorageMonitor {
   static const _tag = 'MacOSStorageMonitor';
   static const _smartctl = 'smartctl';
 

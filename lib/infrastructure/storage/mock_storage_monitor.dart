@@ -8,7 +8,7 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class MockStorageMonitor implements StorageMonitor {
+class MockStorageMonitor extends StorageMonitor {
   MockStorageMonitor({Random? random}) : _random = random ?? Random(7);
 
   final Random _random;

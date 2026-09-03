@@ -30,6 +30,24 @@ struct NativeTemperatureInfo {
   bool is_primary = true;
 };
 
+struct NativeVolumeInfo {
+  std::string id;  // volume GUID path, e.g. "\\?\Volume{...}\" - stable across reboots.
+  std::optional<std::string> mount_point;
+  std::optional<std::string> volume_name;
+  std::optional<std::string> filesystem;
+  bool is_read_only = false;
+  bool is_boot_volume = false;
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
+struct NativeCapacityInfo {
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
 struct NativeHealthInfo {
   std::string status;  // "healthy" | "warning" | "critical" | "unknown"
   std::optional<int> percentage_used;
@@ -86,6 +104,19 @@ class StorageBackend {
   // (not an error) when the device exposes only the single composite/194
   // reading already covered by [ReadTemperature].
   NativeResult<std::vector<NativeTemperatureInfo>> ReadSensors(const std::string& device_id);
+
+  // Every mounted volume whose disk extent (IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS)
+  // reports this physical drive index - the PhysicalDisk -> Partition ->
+  // Volume split the Dart model expects. A raw/unformatted partition with
+  // no volume GUID is not returned (Windows doesn't expose it as a volume
+  // at all without a filesystem).
+  std::vector<NativeVolumeInfo> EnumerateVolumes(const std::string& device_id);
+
+  // Aggregate capacity for the physical disk: total from
+  // IOCTL_DISK_GET_LENGTH_INFO (authoritative), used/free summed across
+  // EnumerateVolumes() - not necessarily reconciling to the physical total
+  // when unallocated space exists between partitions.
+  NativeCapacityInfo GetCapacity(const std::string& device_id);
 
  private:
   StorageBackend() = default;
