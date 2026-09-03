@@ -106,8 +106,12 @@ class AppTrayService {
       await trayManager.setIcon(path);
       await trayManager.setToolTip('DriveGuard - ${_tooltipSummary(severity)}');
 
-      final displayed = _displayedDevice;
-      await trayManager.setTitle(displayed == null ? '' : displayed.valueText);
+      if (Platform.isMacOS) {
+        final displayed = _displayedDevice;
+        await trayManager.setTitle(
+          displayed == null ? '' : displayed.valueText,
+        );
+      }
     } catch (e) {
       AppLogger.instance.warning(_tag, 'Failed to apply tray icon: $e');
     }

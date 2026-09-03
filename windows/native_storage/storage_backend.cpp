@@ -113,32 +113,62 @@ constexpr DWORD kNvmeLogPageSize = 512;
 // file header comment) and returns the raw log page bytes on success -
 // shared by ReadTemperature, ReadHealth and ReadSensors so the three don't
 // each hand-roll the STORAGE_PROTOCOL_SPECIFIC_DATA request separately.
+//
+// Buffer layout (STORAGE_PROPERTY_QUERY has a trailing AdditionalParameters[1]
+// flexible member, so the struct overlaps with the first byte of the
+// STORAGE_PROTOCOL_SPECIFIC_DATA that follows it).  The correct input size is
+// therefore FIELD_OFFSET(STORAGE_PROPERTY_QUERY, AdditionalParameters) +
+// sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA), NOT the two sizeof()s added together.
+//
+// ProtocolDataOffset is the byte offset FROM the start of
+// STORAGE_PROTOCOL_SPECIFIC_DATA to the returned data - that is
+// sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA), not sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR).
 bool FetchNvmeHealthLog(HANDLE h, std::vector<BYTE>* log_out) {
-  std::vector<BYTE> buffer(sizeof(STORAGE_PROPERTY_QUERY) + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) +
-                            kNvmeLogPageSize);
+  // Allocate: header (query + protocol-specific) + room for the log page.
+  const DWORD kInputSize =
+      FIELD_OFFSET(STORAGE_PROPERTY_QUERY, AdditionalParameters) +
+      sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
+  const DWORD kOutputSize = kInputSize + kNvmeLogPageSize;
+  std::vector<BYTE> buffer(kOutputSize, 0);
 
   auto* query = reinterpret_cast<STORAGE_PROPERTY_QUERY*>(buffer.data());
   query->PropertyId = StorageDeviceProtocolSpecificProperty;
   query->QueryType = PropertyStandardQuery;
 
-  auto* protocolData = reinterpret_cast<STORAGE_PROTOCOL_SPECIFIC_DATA*>(query->AdditionalParameters);
+  auto* protocolData =
+      reinterpret_cast<STORAGE_PROTOCOL_SPECIFIC_DATA*>(query->AdditionalParameters);
   protocolData->ProtocolType = ProtocolTypeNvme;
   protocolData->DataType = NVMeDataTypeLogPage;
   protocolData->ProtocolDataRequestValue = 0x02;  // NVME_LOG_PAGE_HEALTH_INFO
   protocolData->ProtocolDataRequestSubValue = 0;
-  protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR);
+  // ProtocolDataOffset: offset from the start of STORAGE_PROTOCOL_SPECIFIC_DATA
+  // to the data payload in the output buffer.
+  protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA);
   protocolData->ProtocolDataLength = kNvmeLogPageSize;
 
   DWORD bytesReturned = 0;
-  BOOL ok = DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY, buffer.data(),
-                             static_cast<DWORD>(sizeof(STORAGE_PROPERTY_QUERY) +
-                                                 sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)),
-                             buffer.data(), static_cast<DWORD>(buffer.size()), &bytesReturned,
-                             nullptr);
+  BOOL ok = DeviceIoControl(
+      h, IOCTL_STORAGE_QUERY_PROPERTY,
+      buffer.data(), kInputSize,
+      buffer.data(), kOutputSize,
+      &bytesReturned, nullptr);
   if (!ok) return false;
 
+  // The driver fills the output buffer starting at the STORAGE_PROPERTY_QUERY
+  // offset, then STORAGE_PROTOCOL_SPECIFIC_DATA, then the raw log page at
+  // ProtocolSpecificData.ProtocolDataOffset bytes into that struct.
   auto* returned = reinterpret_cast<STORAGE_PROTOCOL_DATA_DESCRIPTOR*>(buffer.data());
-  const BYTE* logPage = buffer.data() + returned->ProtocolSpecificData.ProtocolDataOffset;
+  // Guard against a bad/truncated response.
+  const DWORD dataOffset = returned->ProtocolSpecificData.ProtocolDataOffset;
+  const DWORD dataLength = returned->ProtocolSpecificData.ProtocolDataLength;
+  const BYTE* protBase =
+      reinterpret_cast<const BYTE*>(&returned->ProtocolSpecificData);
+  if (dataOffset < sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) ||
+      dataLength < kNvmeLogPageSize ||
+      protBase + dataOffset + kNvmeLogPageSize > buffer.data() + buffer.size()) {
+    return false;
+  }
+  const BYTE* logPage = protBase + dataOffset;
   log_out->assign(logPage, logPage + kNvmeLogPageSize);
   return true;
 }
@@ -225,32 +255,11 @@ NativeResult<NativeTemperatureInfo> StorageBackend::ReadTemperature(const std::s
   }
 
   if (bus == BusTypeNvme) {
-    // STORAGE_PROTOCOL_DATA_DESCRIPTOR header followed by the raw NVMe
-    // "SMART / Health Information" log page (512 bytes per spec).
-    constexpr DWORD kLogPageSize = 512;
-    std::vector<BYTE> buffer(sizeof(STORAGE_PROPERTY_QUERY) + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) +
-                              kLogPageSize);
-
-    auto* query = reinterpret_cast<STORAGE_PROPERTY_QUERY*>(buffer.data());
-    query->PropertyId = StorageDeviceProtocolSpecificProperty;
-    query->QueryType = PropertyStandardQuery;
-
-    auto* protocolData = reinterpret_cast<STORAGE_PROTOCOL_SPECIFIC_DATA*>(query->AdditionalParameters);
-    protocolData->ProtocolType = ProtocolTypeNvme;
-    protocolData->DataType = NVMeDataTypeLogPage;
-    protocolData->ProtocolDataRequestValue = 0x02;  // NVME_LOG_PAGE_HEALTH_INFO
-    protocolData->ProtocolDataRequestSubValue = 0;
-    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR);
-    protocolData->ProtocolDataLength = kLogPageSize;
-
-    DWORD bytesReturned = 0;
-    BOOL ok = DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY, buffer.data(),
-                               static_cast<DWORD>(sizeof(STORAGE_PROPERTY_QUERY) +
-                                                   sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)),
-                               buffer.data(), static_cast<DWORD>(buffer.size()), &bytesReturned,
-                               nullptr);
+    // Use the shared FetchNvmeHealthLog helper which uses the correct buffer
+    // layout (proper input size and ProtocolDataOffset).
+    std::vector<BYTE> log;
+    bool ok = FetchNvmeHealthLog(h, &log);
     CloseHandle(h);
-
     if (!ok) {
       // Some third-party NVMe controllers (RAID HBAs, certain USB-NVMe
       // bridges) reject this IOCTL entirely - structurally unsupported,
@@ -259,10 +268,9 @@ NativeResult<NativeTemperatureInfo> StorageBackend::ReadTemperature(const std::s
       return result;
     }
 
-    auto* returned = reinterpret_cast<STORAGE_PROTOCOL_DATA_DESCRIPTOR*>(buffer.data());
-    const BYTE* logPage = buffer.data() + returned->ProtocolSpecificData.ProtocolDataOffset;
-
-    uint16_t kelvin = ReadU16LE(logPage + 1);
+    // NVMe SMART/Health log page: bytes 1-2 are the composite temperature
+    // in Kelvin (little-endian). A value of 0 means not reported.
+    uint16_t kelvin = ReadU16LE(log.data() + 1);
     if (kelvin == 0) {
       result.status = NativeStorageStatus::kUnsupported;  // composite sensor not reported
       return result;
@@ -271,6 +279,7 @@ NativeResult<NativeTemperatureInfo> StorageBackend::ReadTemperature(const std::s
     NativeTemperatureInfo temp;
     temp.celsius = static_cast<double>(kelvin) - 273.15;
     temp.sensor_id = "composite";
+    temp.sensor_name = "Composite";
     result.value = temp;
     return result;
   }
@@ -349,44 +358,26 @@ NativeResult<NativeHealthInfo> StorageBackend::ReadHealth(const std::string& dev
   }
 
   if (bus == BusTypeNvme) {
-    constexpr DWORD kLogPageSize = 512;
-    std::vector<BYTE> buffer(sizeof(STORAGE_PROPERTY_QUERY) + sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA) +
-                              kLogPageSize);
-    auto* query = reinterpret_cast<STORAGE_PROPERTY_QUERY*>(buffer.data());
-    query->PropertyId = StorageDeviceProtocolSpecificProperty;
-    query->QueryType = PropertyStandardQuery;
-    auto* protocolData = reinterpret_cast<STORAGE_PROTOCOL_SPECIFIC_DATA*>(query->AdditionalParameters);
-    protocolData->ProtocolType = ProtocolTypeNvme;
-    protocolData->DataType = NVMeDataTypeLogPage;
-    protocolData->ProtocolDataRequestValue = 0x02;
-    protocolData->ProtocolDataOffset = sizeof(STORAGE_PROTOCOL_DATA_DESCRIPTOR);
-    protocolData->ProtocolDataLength = kLogPageSize;
-
-    DWORD bytesReturned = 0;
-    BOOL ok = DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY, buffer.data(),
-                               static_cast<DWORD>(sizeof(STORAGE_PROPERTY_QUERY) +
-                                                   sizeof(STORAGE_PROTOCOL_SPECIFIC_DATA)),
-                               buffer.data(), static_cast<DWORD>(buffer.size()), &bytesReturned,
-                               nullptr);
+    // Use the shared FetchNvmeHealthLog helper which uses the correct buffer
+    // layout (proper input size, ProtocolDataOffset, and SubValue).
+    std::vector<BYTE> log;
+    bool ok = FetchNvmeHealthLog(h, &log);
     CloseHandle(h);
     if (!ok) {
       result.status = NativeStorageStatus::kUnsupported;
       return result;
     }
 
-    auto* returned = reinterpret_cast<STORAGE_PROTOCOL_DATA_DESCRIPTOR*>(buffer.data());
-    const BYTE* log = buffer.data() + returned->ProtocolSpecificData.ProtocolDataOffset;
-
     BYTE criticalWarning = log[0];
     BYTE availableSpare = log[3];
     BYTE availableSpareThreshold = log[4];
     BYTE percentageUsed = log[5];
-    uint64_t dataUnitsRead = ReadU64LE(log + 32);
-    uint64_t dataUnitsWritten = ReadU64LE(log + 48);
-    uint64_t powerCycles = ReadU64LE(log + 112);
-    uint64_t powerOnHours = ReadU64LE(log + 128);
-    uint64_t unsafeShutdowns = ReadU64LE(log + 144);
-    uint64_t mediaErrors = ReadU64LE(log + 160);
+    uint64_t dataUnitsRead = ReadU64LE(log.data() + 32);
+    uint64_t dataUnitsWritten = ReadU64LE(log.data() + 48);
+    uint64_t powerCycles = ReadU64LE(log.data() + 112);
+    uint64_t powerOnHours = ReadU64LE(log.data() + 128);
+    uint64_t unsafeShutdowns = ReadU64LE(log.data() + 144);
+    uint64_t mediaErrors = ReadU64LE(log.data() + 160);
 
     NativeHealthInfo health;
     health.status = criticalWarning != 0 ? "warning" : "healthy";

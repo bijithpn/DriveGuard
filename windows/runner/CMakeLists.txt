@@ -32,6 +32,15 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTT
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 
+# Request administrator elevation so SMART/NVMe DeviceIoControl calls succeed.
+# /MANIFESTUAC sets the UAC level in the linker-generated manifest fragment,
+# which is then merged with runner.exe.manifest by mt.exe at link time.
+# The trustInfo block must NOT also appear in runner.exe.manifest or mt.exe
+# will fail with LNK1327 (duplicate requestedExecutionLevel).
+target_link_options(${BINARY_NAME} PRIVATE
+  "/MANIFESTUAC:level='requireAdministrator' uiAccess='false'"
+)
+
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
