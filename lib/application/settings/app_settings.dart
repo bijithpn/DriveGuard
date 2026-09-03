@@ -90,6 +90,9 @@ class AppSettings {
     this.perDeviceThresholds = const {},
     this.storageThresholds = StorageThresholds.defaults,
     this.storageAlertsEnabled = true,
+    this.rapidRiseAlertsEnabled = true,
+    this.rapidRiseDeltaCelsius = AppConstants.defaultRapidRiseDeltaCelsius,
+    this.rapidRiseWindow = AppConstants.defaultRapidRiseWindow,
     this.themeMode = ThemeMode.system,
     this.uiDensity = 1.0,
     this.startWithOS = false,
@@ -116,6 +119,15 @@ class AppSettings {
 
   final StorageThresholds storageThresholds;
   final bool storageAlertsEnabled;
+
+  /// Rapid-rise ("temperature hike") detection: notifies when a device's
+  /// temperature climbs by [rapidRiseDeltaCelsius] or more within
+  /// [rapidRiseWindow], independent of the absolute warning/critical
+  /// thresholds above - catches a sudden spike (failing fan, runaway
+  /// workload) even while still nominally under the warning threshold.
+  final bool rapidRiseAlertsEnabled;
+  final double rapidRiseDeltaCelsius;
+  final Duration rapidRiseWindow;
 
   final ThemeMode themeMode;
   final double uiDensity;
@@ -147,6 +159,9 @@ class AppSettings {
     Map<String, TemperatureThresholds>? perDeviceThresholds,
     StorageThresholds? storageThresholds,
     bool? storageAlertsEnabled,
+    bool? rapidRiseAlertsEnabled,
+    double? rapidRiseDeltaCelsius,
+    Duration? rapidRiseWindow,
     ThemeMode? themeMode,
     double? uiDensity,
     bool? startWithOS,
@@ -172,6 +187,11 @@ class AppSettings {
       perDeviceThresholds: perDeviceThresholds ?? this.perDeviceThresholds,
       storageThresholds: storageThresholds ?? this.storageThresholds,
       storageAlertsEnabled: storageAlertsEnabled ?? this.storageAlertsEnabled,
+      rapidRiseAlertsEnabled:
+          rapidRiseAlertsEnabled ?? this.rapidRiseAlertsEnabled,
+      rapidRiseDeltaCelsius:
+          rapidRiseDeltaCelsius ?? this.rapidRiseDeltaCelsius,
+      rapidRiseWindow: rapidRiseWindow ?? this.rapidRiseWindow,
       themeMode: themeMode ?? this.themeMode,
       uiDensity: uiDensity ?? this.uiDensity,
       startWithOS: startWithOS ?? this.startWithOS,
@@ -200,6 +220,9 @@ class AppSettings {
     ),
     'storageThresholds': storageThresholds.toJson(),
     'storageAlertsEnabled': storageAlertsEnabled,
+    'rapidRiseAlertsEnabled': rapidRiseAlertsEnabled,
+    'rapidRiseDeltaCelsius': rapidRiseDeltaCelsius,
+    'rapidRiseWindowMs': rapidRiseWindow.inMilliseconds,
     'themeMode': themeMode.name,
     'uiDensity': uiDensity,
     'startWithOS': startWithOS,
@@ -258,6 +281,15 @@ class AppSettings {
             )
           : StorageThresholds.defaults,
       storageAlertsEnabled: json['storageAlertsEnabled'] as bool? ?? true,
+      rapidRiseAlertsEnabled: json['rapidRiseAlertsEnabled'] as bool? ?? true,
+      rapidRiseDeltaCelsius:
+          (json['rapidRiseDeltaCelsius'] as num?)?.toDouble() ??
+          AppConstants.defaultRapidRiseDeltaCelsius,
+      rapidRiseWindow: Duration(
+        milliseconds:
+            json['rapidRiseWindowMs'] as int? ??
+            AppConstants.defaultRapidRiseWindow.inMilliseconds,
+      ),
       themeMode: ThemeMode.values.firstWhere(
         (m) => m.name == json['themeMode'],
         orElse: () => ThemeMode.system,

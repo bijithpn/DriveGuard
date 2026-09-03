@@ -7,6 +7,7 @@ import 'package:driveguard/domain/entities/storage_capacity.dart';
 import 'package:driveguard/domain/entities/storage_device.dart';
 import 'package:driveguard/domain/entities/storage_volume.dart';
 import 'package:driveguard/domain/entities/temperature_reading.dart';
+import 'package:driveguard/domain/entities/temperature_thresholds.dart';
 import 'package:driveguard/domain/enums/storage_enums.dart';
 import 'package:driveguard/domain/repositories/storage_monitor.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -254,6 +255,55 @@ void main() {
       expect(result.capacity.isValid, isFalse);
       expect(result.capacity.availability, SensorAvailability.unavailable);
       expect(result.volumes, isEmpty);
+
+      await service.dispose();
+    },
+  );
+
+  test(
+    'a rapid temperature rise triggers a rapid-rise notification, independent of the warning threshold',
+    () async {
+      final backend = _ScriptedMonitor([_device('spiking')]);
+      backend.nextReadingOrError['spiking'] = 30.0;
+      final notifications = FakeNotificationService();
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: notifications,
+        historyStore: TemperatureHistoryStore(),
+      );
+
+      await service.start(
+        const AppSettings(
+          pollingInterval: Duration(milliseconds: 15),
+          rapidRiseWindow: Duration(milliseconds: 80),
+          rapidRiseDeltaCelsius: 5,
+          notificationCooldown: Duration(seconds: 30),
+          // Keep this well above 30°C so the ordinary warning/critical path
+          // never fires - this test is only about the rise-rate path.
+          globalThresholds: TemperatureThresholds(
+            warningCelsius: 90,
+            criticalCelsius: 100,
+          ),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+
+      backend.nextReadingOrError['spiking'] = 45.0; // +15°C jump
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      expect(
+        notifications.shown.any((s) => s.startsWith('rapid-rise:spiking:')),
+        isTrue,
+      );
+      // The absolute-threshold path must not have fired for this jump -
+      // 45°C is still well under the 90°C warning threshold configured above.
+      expect(
+        notifications.shown.any(
+          (s) => s.startsWith('warning:') || s.startsWith('critical:'),
+        ),
+        isFalse,
+      );
 
       await service.dispose();
     },

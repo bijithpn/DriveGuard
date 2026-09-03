@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show min;
 
 import '../../core/constants/app_constants.dart';
 import '../../core/errors/storage_exceptions.dart';
@@ -35,6 +36,8 @@ class MonitoringService {
   final Map<String, StorageDevice> _devices = {};
   final Map<String, DeviceAlertState> _alertStates = {};
   final Map<String, StorageAlertState> _capacityAlertStates = {};
+  final Map<String, bool> _rapidRiseArmed = {};
+  final Map<String, DateTime> _lastRapidRiseNotifiedAt = {};
   final Set<String> _disconnectedOnce = {};
 
   final _devicesController = StreamController<List<StorageDevice>>.broadcast();
@@ -185,6 +188,8 @@ class MonitoringService {
         _devices.remove(id);
         _alertStates.remove(id);
         _capacityAlertStates.remove(id);
+        _rapidRiseArmed.remove(id);
+        _lastRapidRiseNotifiedAt.remove(id);
         _historyStore.clearDevice(id);
         _latestActivity.remove(id);
         _disconnectedOnce.remove(id);
@@ -344,14 +349,16 @@ class MonitoringService {
           );
         } else {
           _historyStore.record(id, reading);
-          _devices[id] = device.copyWith(
+          final updated = device.copyWith(
             primaryTemperature: reading,
             sensorAvailability: SensorAvailability.available,
             monitoringStatus: MonitoringStatus.active,
             lastUpdated: DateTime.now(),
             clearLastError: true,
           );
-          await _evaluateAlert(id, reading.celsius, device);
+          _devices[id] = updated;
+          await _evaluateAlert(id, reading.celsius, updated);
+          await _evaluateRapidRise(id, reading.celsius, updated);
         }
       }
     } on PermissionDeniedException catch (e) {
@@ -409,22 +416,135 @@ class MonitoringService {
       celsius,
       _settings.temperatureUnit,
     );
+    final details = _detailsFor(device);
     if (result.isRecoveryNotification) {
       await _notifications.showRecovered(
         deviceName: device.displayName,
         temperatureText: tempText,
+        detailsText: details,
       );
     } else if (result.severity == TemperatureSeverity.critical) {
       await _notifications.showCritical(
         deviceName: device.displayName,
         temperatureText: tempText,
+        detailsText: details,
       );
     } else if (result.severity == TemperatureSeverity.warning) {
       await _notifications.showWarning(
         deviceName: device.displayName,
         temperatureText: tempText,
+        detailsText: details,
       );
     }
+  }
+
+  /// Rapid-rise ("hike") detection - independent of the absolute
+  /// warning/critical thresholds in [_evaluateAlert]. Uses the same
+  /// [TemperatureHistoryStore] the history chart already reads, so no
+  /// separate sample buffer is needed. Armed/disarmed with hysteresis (drop
+  /// below half the configured delta to re-arm) so a sustained high delta
+  /// doesn't notify every poll, mirroring [DeviceAlertState]'s pattern.
+  Future<void> _evaluateRapidRise(
+    String id,
+    double celsius,
+    StorageDevice device,
+  ) async {
+    if (!_settings.rapidRiseAlertsEnabled) return;
+
+    final points = _historyStore.pointsFor(id, _settings.rapidRiseWindow);
+    // Need at least one earlier sample spanning close to the full window -
+    // otherwise a device that just connected would appear to have "risen"
+    // from its very first reading.
+    if (points.length < 2) return;
+    final windowStart = DateTime.now().subtract(_settings.rapidRiseWindow);
+    if (points.first.timestamp.isAfter(
+      windowStart.add(_settings.rapidRiseWindow ~/ 2),
+    )) {
+      return;
+    }
+
+    final baseline = points.map((p) => p.celsius).reduce(min);
+    final delta = celsius - baseline;
+    final threshold = _settings.rapidRiseDeltaCelsius;
+    final armed = _rapidRiseArmed[id] ?? false;
+
+    if (delta >= threshold) {
+      final lastAt = _lastRapidRiseNotifiedAt[id];
+      final cooldownElapsed =
+          lastAt == null ||
+          DateTime.now().difference(lastAt) >= _settings.notificationCooldown;
+      if (!armed || cooldownElapsed) {
+        _rapidRiseArmed[id] = true;
+        _lastRapidRiseNotifiedAt[id] = DateTime.now();
+        AppLogger.instance.warning(
+          _tag,
+          'Rapid temperature rise for $id: +${delta.toStringAsFixed(1)}C '
+          'in ${_settings.rapidRiseWindow.inMinutes}min',
+        );
+        if (_settings.notificationsEnabled) {
+          final tempText = TemperatureUtils.format(
+            celsius,
+            _settings.temperatureUnit,
+          );
+          final displayDelta = TemperatureUtils.convertDelta(
+            delta,
+            _settings.temperatureUnit,
+          );
+          final unitSuffix = TemperatureUtils.unitSuffix(
+            _settings.temperatureUnit,
+          );
+          await _notifications.showRapidRise(
+            deviceName: device.displayName,
+            temperatureText: tempText,
+            riseText:
+                '+${displayDelta.toStringAsFixed(0)}$unitSuffix in '
+                '${_settings.rapidRiseWindow.inMinutes} min',
+            detailsText: _detailsFor(device),
+          );
+        }
+      }
+    } else if (delta < threshold / 2) {
+      _rapidRiseArmed[id] = false;
+    }
+  }
+
+  /// A short, human-readable line of other currently-available metrics for
+  /// a device, appended to notification bodies - built only from fields
+  /// that are actually available; a metric this device can't report is
+  /// omitted entirely, never shown as "N/A" or a placeholder.
+  String? _detailsFor(StorageDevice device) {
+    final parts = <String>[];
+    switch (device.health.status) {
+      case DeviceHealthStatus.healthy:
+        parts.add('Health: Healthy');
+      case DeviceHealthStatus.warning:
+        parts.add('Health: Warning');
+      case DeviceHealthStatus.critical:
+        parts.add('Health: Critical');
+      case DeviceHealthStatus.unknown:
+      case DeviceHealthStatus.unavailable:
+        break;
+    }
+    if (device.capacity.isValid && device.capacity.freeBytes != null) {
+      final usagePercent = device.capacity.usagePercent;
+      parts.add(
+        '${_formatBytes(device.capacity.freeBytes!)} free'
+        '${usagePercent != null ? ' (${usagePercent.toStringAsFixed(0)}% used)' : ''}',
+      );
+    }
+    if (parts.isEmpty) return null;
+    return parts.join(' · ');
+  }
+
+  String _formatBytes(int bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    double size = bytes.toDouble();
+    var unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    return '${size.toStringAsFixed(1)} ${units[unitIndex]}';
   }
 
   TemperatureSeverity severityFor(String deviceId) =>

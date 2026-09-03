@@ -635,6 +635,27 @@ class _AlertsSection extends ConsumerWidget {
         ),
       ),
       _SettingRow(
+        label: 'Rapid temperature rise alerts',
+        subtitle: 'Notify on a sudden spike, even below the warning threshold',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.rapidRiseAlertsEnabled,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(rapidRiseAlertsEnabled: v)),
+        ),
+      ),
+      _SettingRow(
+        label: 'Rapid rise delta',
+        subtitle: 'Degrees within the rise window to trigger an alert',
+        isDark: isDark,
+        trailing: _ThresholdField(
+          key: ValueKey('rapid-rise-${settings.rapidRiseDeltaCelsius}'),
+          value: settings.rapidRiseDeltaCelsius,
+          color: AppColors.warning,
+          onSubmit: (v) => _submitRapidRiseDelta(context, notifier, v),
+        ),
+      ),
+      _SettingRow(
         label: 'Notification cooldown',
         isDark: isDark,
         trailing: _NativeDropdown<Duration>(
@@ -1346,6 +1367,23 @@ void _submitStorageThreshold(
   }
 
   notifier.updateWith((s) => s.copyWith(storageThresholds: updated));
+}
+
+void _submitRapidRiseDelta(
+  BuildContext context,
+  SettingsNotifier notifier,
+  String rawValue,
+) {
+  final value = double.tryParse(rawValue.trim());
+  if (value == null) {
+    _showThresholdError(context, 'Enter a numeric temperature delta.');
+    return;
+  }
+  if (value <= 0 || !value.isFinite) {
+    _showThresholdError(context, 'Delta must be a positive temperature.');
+    return;
+  }
+  notifier.updateWith((s) => s.copyWith(rapidRiseDeltaCelsius: value));
 }
 
 void _showThresholdError(BuildContext context, String message) {

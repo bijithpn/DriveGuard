@@ -28,14 +28,23 @@ class LocalNotifierService implements NotificationService {
     }
   }
 
+  String _withDetails(String body, String? detailsText) {
+    if (detailsText == null || detailsText.isEmpty) return body;
+    return '$body\n$detailsText';
+  }
+
   @override
   Future<void> showWarning({
     required String deviceName,
     required String temperatureText,
+    String? detailsText,
   }) {
     return _show(
       'Storage Temperature Warning',
-      '$deviceName\nTemperature: $temperatureText\n\nThe drive is approaching its configured temperature limit.',
+      _withDetails(
+        '$deviceName\nTemperature: $temperatureText\n\nThe drive is approaching its configured temperature limit.',
+        detailsText,
+      ),
     );
   }
 
@@ -43,10 +52,14 @@ class LocalNotifierService implements NotificationService {
   Future<void> showCritical({
     required String deviceName,
     required String temperatureText,
+    String? detailsText,
   }) {
     return _show(
       'Critical Storage Temperature',
-      '$deviceName\nTemperature: $temperatureText\n\nThe drive has exceeded your configured critical temperature limit.',
+      _withDetails(
+        '$deviceName\nTemperature: $temperatureText\n\nThe drive has exceeded your configured critical temperature limit.',
+        detailsText,
+      ),
     );
   }
 
@@ -54,10 +67,34 @@ class LocalNotifierService implements NotificationService {
   Future<void> showRecovered({
     required String deviceName,
     required String temperatureText,
+    String? detailsText,
   }) {
     return _show(
       'Storage Temperature Normal',
-      '$deviceName\nTemperature: $temperatureText\n\nThe drive has returned to a normal temperature range.',
+      _withDetails(
+        '$deviceName\nTemperature: $temperatureText\n\nThe drive has returned to a normal temperature range.',
+        detailsText,
+      ),
+    );
+  }
+
+  @override
+  Future<void> showRapidRise({
+    required String deviceName,
+    required String temperatureText,
+    required String riseText,
+    String? detailsText,
+  }) {
+    return _show(
+      'Rapid Temperature Rise Detected',
+      _withDetails(
+        '$deviceName\nTemperature: $temperatureText ($riseText)\n\n'
+        'This drive heated up unusually fast. Check airflow, cooling, and '
+        'whether a heavy workload is running - this may indicate a cooling '
+        'or fan problem even if the temperature is still below your '
+        'critical threshold.',
+        detailsText,
+      ),
     );
   }
 
