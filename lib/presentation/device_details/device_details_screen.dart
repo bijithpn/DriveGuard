@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/providers.dart';
@@ -39,6 +40,7 @@ const _historyWindows = <String, Duration>{
   '1 hour': Duration(hours: 1),
   '6 hours': Duration(hours: 6),
   '24 hours': Duration(hours: 24),
+  '7 days': Duration(days: 7),
 };
 
 class DeviceDetailsScreen extends ConsumerStatefulWidget {
@@ -231,6 +233,56 @@ class _DeviceInfoPanel extends StatelessWidget {
     return '${diff.inHours}h ago';
   }
 
+  void _exportReport(BuildContext context) {
+    final health = device.health;
+    final primaryTemp = device.primaryTemperature;
+    final report = StringBuffer();
+    report.writeln('========================================');
+    report.writeln('DriveGuard Storage Diagnostic Report');
+    report.writeln('Generated: ${DateTime.now().toIso8601String()}');
+    report.writeln('========================================\n');
+    report.writeln('DEVICE IDENTIFICATION:');
+    report.writeln('  Display Name:    ${device.displayName}');
+    report.writeln('  Device ID:       ${device.id}');
+    report.writeln('  Type:            ${_typeLabel()}');
+    report.writeln('  Interface:       ${device.interfaceType.name.toUpperCase()}');
+    report.writeln('  Serial Number:   ${device.serialNumber ?? "N/A"}');
+    report.writeln('  Firmware:        ${device.firmwareVersion ?? "N/A"}');
+    report.writeln('  Capacity:        ${_capacityText()}\n');
+    report.writeln('TEMPERATURE METRICS:');
+    report.writeln('  Current Temp:    ${primaryTemp != null ? "${primaryTemp.celsius.toStringAsFixed(1)} °C" : "Unavailable"}');
+    report.writeln('  Severity:        ${presentation.severity.name.toUpperCase()}');
+    report.writeln('  Sensor Source:   ${primaryTemp?.source.toString() ?? "N/A"}\n');
+    report.writeln('S.M.A.R.T. & HEALTH:');
+    report.writeln('  Health Status:   ${health.status.name.toUpperCase()}');
+    report.writeln('  SMART Passed:    ${health.smartPassed == null ? "N/A" : (health.smartPassed! ? "PASSED" : "FAILED")}');
+    report.writeln('  Percentage Used: ${health.percentageUsed != null ? "${health.percentageUsed}%" : "N/A"}');
+    report.writeln('  Life Remaining:  ${health.percentageUsed != null ? "${(100 - health.percentageUsed!).clamp(0, 100)}%" : "N/A"}');
+    report.writeln('  Available Spare: ${health.availableSparePercent != null ? "${health.availableSparePercent}%" : "N/A"}');
+    report.writeln('  Power Cycles:    ${health.powerCycles ?? "N/A"}');
+    report.writeln('  Power-On Hours:  ${health.powerOnHours != null ? "${health.powerOnHours} h" : "N/A"}');
+    report.writeln('  Media Errors:    ${health.mediaErrors ?? "0"}');
+    report.writeln('  Total Read:      ${health.totalBytesRead != null ? _formatBytes(health.totalBytesRead!) : "N/A"}');
+    report.writeln('  Total Written:   ${health.totalBytesWritten != null ? _formatBytes(health.totalBytesWritten!) : "N/A"}\n');
+    if (device.volumes.isNotEmpty) {
+      report.writeln('VOLUMES:');
+      for (final v in device.volumes) {
+        report.writeln('  - ${v.volumeName ?? v.mountPoint ?? v.id} (${v.filesystem ?? "Unknown FS"}, Total: ${v.totalBytes != null ? _formatBytes(v.totalBytes!) : "N/A"})');
+      }
+    }
+    report.writeln('\n========================================');
+
+    Clipboard.setData(ClipboardData(text: report.toString()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Diagnostic report copied to clipboard!'),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        backgroundColor: AppColors.accent,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final style = SeverityStyle.of(presentation.severity, context);
@@ -281,6 +333,22 @@ class _DeviceInfoPanel extends StatelessWidget {
                           ? AppColors.textPrimary
                           : AppColors.lightText,
                     ),
+                  ),
+                ),
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 18,
+                    icon: Icon(
+                      Icons.file_download_outlined,
+                      color: isDark
+                          ? AppColors.textSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                    onPressed: () => _exportReport(context),
+                    tooltip: 'Export Diagnostic Report',
                   ),
                 ),
               ],
@@ -1444,8 +1512,100 @@ class _HealthTab extends StatelessWidget {
                 icon: Icons.arrow_upward_rounded,
                 available: health.totalBytesWritten != null,
               ),
+              _HealthEntry(
+                label: 'Life Remaining',
+                value: health.percentageUsed != null
+                    ? '${(100 - health.percentageUsed!).clamp(0, 100)}%'
+                    : '--',
+                icon: Icons.favorite_rounded,
+                statusColor: health.percentageUsed != null
+                    ? (health.percentageUsed! > 90
+                        ? AppColors.critical
+                        : health.percentageUsed! > 75
+                            ? AppColors.warning
+                            : AppColors.normal)
+                    : null,
+                available: health.percentageUsed != null,
+              ),
             ],
             isDark: isDark,
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
+          _SectionLabel(title: 'TBW & Lifespan Estimation', isDark: isDark),
+          const SizedBox(height: AppSpacing.sm),
+
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.bg1 : AppColors.lightCard,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: isDark ? AppColors.border : AppColors.lightBorder,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Endurance Status',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.textPrimary : AppColors.lightText,
+                      ),
+                    ),
+                    Text(
+                      health.percentageUsed != null
+                          ? '${(100 - health.percentageUsed!).clamp(0, 100)}% Estimated Health'
+                          : 'Health Estimation Pending',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: health.percentageUsed != null
+                            ? (health.percentageUsed! > 90
+                                ? AppColors.critical
+                                : health.percentageUsed! > 75
+                                    ? AppColors.warning
+                                    : AppColors.normal)
+                            : (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: LinearProgressIndicator(
+                    value: health.percentageUsed != null
+                        ? ((100 - health.percentageUsed!) / 100.0).clamp(0.0, 1.0)
+                        : 1.0,
+                    minHeight: 8,
+                    backgroundColor: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
+                    valueColor: AlwaysStoppedAnimation(
+                      health.percentageUsed != null && health.percentageUsed! > 90
+                          ? AppColors.critical
+                          : health.percentageUsed != null && health.percentageUsed! > 75
+                              ? AppColors.warning
+                              : AppColors.normal,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  health.totalBytesWritten != null
+                      ? 'Total Written: ${_formatBytes(health.totalBytesWritten!)} · Power-on: ${health.powerOnHours != null ? "${health.powerOnHours} hours" : "N/A"}'
+                      : 'Accumulated TBW and endurance telemetry are queried via WMI / sysfs.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

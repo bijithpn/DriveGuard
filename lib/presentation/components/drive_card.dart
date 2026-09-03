@@ -78,6 +78,10 @@ class _DriveCardState extends State<DriveCard> {
   }
 
   String _healthLabel() {
+    if (widget.device.health.percentageUsed != null) {
+      final life = (100 - widget.device.health.percentageUsed!).clamp(0, 100);
+      return '$life% Life';
+    }
     switch (widget.device.health.status) {
       case DeviceHealthStatus.healthy:
         return 'Healthy';
@@ -438,9 +442,18 @@ class _GridCard extends StatelessWidget {
                           label: 'Health',
                           value: healthLabel,
                           valueColor: healthColor,
+                          icon: Icons.favorite_rounded,
                         ),
-                        _StatColumn(label: capacityLabel, value: capacityText),
-                        _StatColumn(label: 'Updated', value: updatedText),
+                        _StatColumn(
+                          label: capacityLabel,
+                          value: capacityText,
+                          icon: Icons.pie_chart_outline_rounded,
+                        ),
+                        _StatColumn(
+                          label: 'Updated',
+                          value: updatedText,
+                          icon: Icons.access_time_rounded,
+                        ),
                       ],
                     ),
                   ],
@@ -527,44 +540,75 @@ class _StatColumn extends StatelessWidget {
     required this.label,
     required this.value,
     this.valueColor,
+    this.icon,
   });
 
   final String label;
   final String value;
   final Color? valueColor;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? AppColors.textMuted
-                  : AppColors.lightTextSecondary,
-              letterSpacing: 0.3,
-            ),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.bg0.withValues(alpha: 0.5) : AppColors.lightSurfaceMuted.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          border: Border.all(
+            color: isDark ? AppColors.border.withValues(alpha: 0.5) : AppColors.lightBorder.withValues(alpha: 0.7),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color:
-                  valueColor ??
-                  (isDark ? AppColors.textPrimary : AppColors.lightText),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[
+                  Icon(
+                    icon,
+                    size: 11,
+                    color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                  ),
+                  const SizedBox(width: 3),
+                ],
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textMuted
+                          : AppColors.lightTextSecondary,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 3),
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color:
+                    valueColor ??
+                    (isDark ? AppColors.textPrimary : AppColors.lightText),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

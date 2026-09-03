@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../core/logging/app_logger.dart';
 import '../../domain/entities/device_health.dart';
 import '../../domain/entities/storage_activity.dart';
@@ -122,5 +124,37 @@ class FallbackStorageMonitor extends StorageMonitor {
   Stream<StorageDeviceEvent> watchDeviceEvents() => native.watchDeviceEvents();
 
   @override
-  Stream<StorageActivity> watchActivity() => native.watchActivity();
+  Stream<StorageActivity> watchActivity() {
+    late final StreamController<StorageActivity> controller;
+    StreamSubscription<StorageActivity>? nativeSub;
+    StreamSubscription<StorageActivity>? legacySub;
+
+    controller = StreamController<StorageActivity>.broadcast(
+      onListen: () {
+        nativeSub = native.watchActivity().listen(
+          (act) {
+            if (!controller.isClosed) controller.add(act);
+          },
+          onError: (Object e) {
+            AppLogger.instance.debug(_tag, 'Native activity stream error: $e');
+          },
+        );
+
+        legacySub = legacy.watchActivity().listen(
+          (act) {
+            if (!controller.isClosed) controller.add(act);
+          },
+          onError: (Object e) {
+            AppLogger.instance.debug(_tag, 'Legacy activity stream error: $e');
+          },
+        );
+      },
+      onCancel: () {
+        nativeSub?.cancel();
+        legacySub?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
 }

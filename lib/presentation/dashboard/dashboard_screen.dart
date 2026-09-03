@@ -940,12 +940,55 @@ class _DriveListItemState extends State<_DriveListItem> {
                   ),
                   const SizedBox(width: AppSpacing.md),
 
-                  Text(
-                    presentation.valueText,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: style.color,
+                  if (widget.device.capacity.isValid && widget.device.capacity.freeBytes != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: widget.isDark ? AppColors.bg0.withValues(alpha: 0.5) : AppColors.lightSurfaceMuted,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                        border: Border.all(
+                          color: widget.isDark ? AppColors.border.withValues(alpha: 0.6) : AppColors.lightBorder,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.pie_chart_outline_rounded,
+                            size: 11,
+                            color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(widget.device.capacity.freeBytes! / (1024 * 1024 * 1024)).toStringAsFixed(0)} GB free',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: widget.isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: style.color.withValues(alpha: widget.isDark ? 0.12 : 0.08),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(
+                        color: style.color.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      presentation.valueText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: style.color,
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
