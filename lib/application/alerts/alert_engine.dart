@@ -53,7 +53,8 @@ class DeviceAlertState {
     final severity = thresholds.classify(celsius);
     _lastSeverity = severity;
     final isAlertable =
-        severity == TemperatureSeverity.warning || severity == TemperatureSeverity.critical;
+        severity == TemperatureSeverity.warning ||
+        severity == TemperatureSeverity.critical;
 
     // Step 1: has temperature dropped back under the recovery band for
     // whichever alertable severity we're currently armed at? Two distinct
@@ -84,7 +85,9 @@ class DeviceAlertState {
           );
         }
         // (a) fully recovered out of any alertable band.
-        if (recoveryNotificationsEnabled && wasAlerting != null && _wasEverAlerted) {
+        if (recoveryNotificationsEnabled &&
+            wasAlerting != null &&
+            _wasEverAlerted) {
           _lastNotifiedAt = currentTime;
           return AlertEvaluation(
             severity: severity,
@@ -92,7 +95,11 @@ class DeviceAlertState {
             isRecoveryNotification: true,
           );
         }
-        return AlertEvaluation(severity: severity, shouldNotify: false, isRecoveryNotification: false);
+        return AlertEvaluation(
+          severity: severity,
+          shouldNotify: false,
+          isRecoveryNotification: false,
+        );
       }
     }
 
@@ -114,7 +121,8 @@ class DeviceAlertState {
     final justEscalated = _armedFor == null || currentRank > armedRank;
 
     final cooldownElapsed =
-        _lastNotifiedAt == null || currentTime.difference(_lastNotifiedAt!) >= cooldown;
+        _lastNotifiedAt == null ||
+        currentTime.difference(_lastNotifiedAt!) >= cooldown;
 
     final shouldNotify = justEscalated || cooldownElapsed;
 

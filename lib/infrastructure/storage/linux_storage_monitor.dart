@@ -64,15 +64,20 @@ class LinuxStorageMonitor implements StorageMonitor {
       // skip them - we monitor whole physical devices only.
       final removableFile = File('/sys/block/$name/removable');
       final isRemovable =
-          removableFile.existsSync() && removableFile.readAsStringSync().trim() == '1';
+          removableFile.existsSync() &&
+          removableFile.readAsStringSync().trim() == '1';
 
       final isNvme = name.startsWith('nvme');
-      final model = _readSysfsString('/sys/block/$name/device/model') ??
-          _readSysfsString('/sys/class/nvme/${_nvmeControllerName(name)}/model');
+      final model =
+          _readSysfsString('/sys/block/$name/device/model') ??
+          _readSysfsString(
+            '/sys/class/nvme/${_nvmeControllerName(name)}/model',
+          );
       final serial = _readSysfsString('/sys/block/$name/device/serial');
       final sizeSectors = _readSysfsString('/sys/block/$name/size');
-      final capacityBytes =
-          sizeSectors != null ? (int.tryParse(sizeSectors) ?? 0) * 512 : null;
+      final capacityBytes = sizeSectors != null
+          ? (int.tryParse(sizeSectors) ?? 0) * 512
+          : null;
       final rotational = _readSysfsString('/sys/block/$name/queue/rotational');
 
       StorageDeviceType type;
@@ -82,7 +87,9 @@ class LinuxStorageMonitor implements StorageMonitor {
         interfaceType = StorageInterfaceType.nvme;
       } else if (name.startsWith('sd') || name.startsWith('hd')) {
         interfaceType = StorageInterfaceType.sata;
-        type = rotational == '1' ? StorageDeviceType.hdd : StorageDeviceType.ssd;
+        type = rotational == '1'
+            ? StorageDeviceType.hdd
+            : StorageDeviceType.ssd;
       } else {
         type = StorageDeviceType.unknown;
         interfaceType = StorageInterfaceType.unknown;
@@ -91,16 +98,18 @@ class LinuxStorageMonitor implements StorageMonitor {
         interfaceType = StorageInterfaceType.usb;
       }
 
-      devices.add(StorageDevice(
-        id: 'linux-$name',
-        type: type,
-        interfaceType: interfaceType,
-        sensorAvailability: SensorAvailability.unavailable,
-        model: model,
-        serialNumber: serial,
-        capacityBytes: capacityBytes,
-        isRemovable: isRemovable,
-      ));
+      devices.add(
+        StorageDevice(
+          id: 'linux-$name',
+          type: type,
+          interfaceType: interfaceType,
+          sensorAvailability: SensorAvailability.unavailable,
+          model: model,
+          serialNumber: serial,
+          capacityBytes: capacityBytes,
+          isRemovable: isRemovable,
+        ),
+      );
     }
     return devices;
   }
@@ -160,11 +169,16 @@ class LinuxStorageMonitor implements StorageMonitor {
     final hasTool = await SafeProcessRunner.instance.exists('nvme');
     if (!hasTool) return null;
     try {
-      final result = await SafeProcessRunner.instance
-          .run('nvme', ['smart-log', '/dev/$sysName', '-o', 'json'], requireZeroExit: false);
+      final result = await SafeProcessRunner.instance.run('nvme', [
+        'smart-log',
+        '/dev/$sysName',
+        '-o',
+        'json',
+      ], requireZeroExit: false);
       final json = jsonDecode(result.stdout) as Map<String, dynamic>;
       final temp = json['temperature'];
-      if (temp is num) return temp.toDouble() - 273; // some builds report Kelvin
+      if (temp is num)
+        return temp.toDouble() - 273; // some builds report Kelvin
       return null;
     } catch (e) {
       AppLogger.instance.debug(_tag, 'nvme-cli read failed for $sysName: $e');
@@ -172,11 +186,17 @@ class LinuxStorageMonitor implements StorageMonitor {
     }
   }
 
-  Future<double?> _readSmartctlCelsius(String sysName, {required bool throwOnPermission}) async {
+  Future<double?> _readSmartctlCelsius(
+    String sysName, {
+    required bool throwOnPermission,
+  }) async {
     final hasTool = await SafeProcessRunner.instance.exists('smartctl');
     if (!hasTool) return null;
-    final result = await SafeProcessRunner.instance
-        .run('smartctl', ['-a', '-j', '/dev/$sysName'], requireZeroExit: false);
+    final result = await SafeProcessRunner.instance.run('smartctl', [
+      '-a',
+      '-j',
+      '/dev/$sysName',
+    ], requireZeroExit: false);
     Map<String, dynamic> json;
     try {
       json = jsonDecode(result.stdout) as Map<String, dynamic>;
@@ -186,7 +206,8 @@ class LinuxStorageMonitor implements StorageMonitor {
     final messages = (json['smartctl'] as Map<String, dynamic>?)?['messages'];
     if (messages is List && messages.isNotEmpty) {
       final text = messages.map((m) => m['string']).join(' ').toLowerCase();
-      if (throwOnPermission && (text.contains('permission') || text.contains('denied'))) {
+      if (throwOnPermission &&
+          (text.contains('permission') || text.contains('denied'))) {
         throw PermissionDeniedException(sysName, 'smartctl: $text');
       }
     }
@@ -245,32 +266,46 @@ class LinuxStorageMonitor implements StorageMonitor {
     // nvme-cli's `smart-log -o json` reports these as individual
     // "temperature_sensor_N" keys alongside the composite reading.
     final sysName = _sysName(deviceId);
-    if (sysName.startsWith('nvme') && await SafeProcessRunner.instance.exists('nvme')) {
+    if (sysName.startsWith('nvme') &&
+        await SafeProcessRunner.instance.exists('nvme')) {
       try {
-        final result = await SafeProcessRunner.instance
-            .run('nvme', ['smart-log', '/dev/$sysName', '-o', 'json'], requireZeroExit: false);
+        final result = await SafeProcessRunner.instance.run('nvme', [
+          'smart-log',
+          '/dev/$sysName',
+          '-o',
+          'json',
+        ], requireZeroExit: false);
         final json = jsonDecode(result.stdout) as Map<String, dynamic>;
         for (var i = 1; i <= 8; i++) {
           final raw = json['temperature_sensor_$i'];
           if (raw is! num) continue;
           // nvme-cli reports these in Kelvin, same as the composite field.
           var celsius = raw.toDouble();
-          if (celsius > 200) celsius -= 273; // Kelvin, matching _readNvmeCliCelsius's convention
+          if (celsius > 200)
+            celsius -= 273; // Kelvin, matching _readNvmeCliCelsius's convention
           if (celsius == 0) continue;
-          sensors.add(StorageSensor(
-            id: 'sensor$i',
-            name: 'Sensor $i',
-            reading: TemperatureReading(
-              celsius: celsius,
-              timestamp: DateTime.now(),
-              source: TemperatureSource(backendName: 'nvme-cli', sensorId: 'sensor$i'),
-              isValid: TemperatureUtils.isPlausibleValue(celsius),
+          sensors.add(
+            StorageSensor(
+              id: 'sensor$i',
+              name: 'Sensor $i',
+              reading: TemperatureReading(
+                celsius: celsius,
+                timestamp: DateTime.now(),
+                source: TemperatureSource(
+                  backendName: 'nvme-cli',
+                  sensorId: 'sensor$i',
+                ),
+                isValid: TemperatureUtils.isPlausibleValue(celsius),
+              ),
+              type: TemperatureSensorType.namespace,
             ),
-            type: TemperatureSensorType.namespace,
-          ));
+          );
         }
       } catch (e) {
-        AppLogger.instance.debug(_tag, 'multi-sensor nvme-cli read failed for $sysName: $e');
+        AppLogger.instance.debug(
+          _tag,
+          'multi-sensor nvme-cli read failed for $sysName: $e',
+        );
       }
     }
     return sensors;
@@ -283,8 +318,12 @@ class LinuxStorageMonitor implements StorageMonitor {
       final hasTool = await SafeProcessRunner.instance.exists('nvme');
       if (!hasTool) return DeviceHealth.unavailable;
       try {
-        final result = await SafeProcessRunner.instance
-            .run('nvme', ['smart-log', '/dev/$sysName', '-o', 'json'], requireZeroExit: false);
+        final result = await SafeProcessRunner.instance.run('nvme', [
+          'smart-log',
+          '/dev/$sysName',
+          '-o',
+          'json',
+        ], requireZeroExit: false);
         final json = jsonDecode(result.stdout) as Map<String, dynamic>;
         return DeviceHealth(
           status: (json['critical_warning'] as num?) == 0
@@ -307,15 +346,21 @@ class LinuxStorageMonitor implements StorageMonitor {
     final hasSmartctl = await SafeProcessRunner.instance.exists('smartctl');
     if (!hasSmartctl) return DeviceHealth.unavailable;
     try {
-      final result = await SafeProcessRunner.instance
-          .run('smartctl', ['-a', '-j', '/dev/$sysName'], requireZeroExit: false);
+      final result = await SafeProcessRunner.instance.run('smartctl', [
+        '-a',
+        '-j',
+        '/dev/$sysName',
+      ], requireZeroExit: false);
       final json = jsonDecode(result.stdout) as Map<String, dynamic>;
-      final passed = (json['smart_status'] as Map<String, dynamic>?)?['passed'] as bool?;
+      final passed =
+          (json['smart_status'] as Map<String, dynamic>?)?['passed'] as bool?;
       final powerOnTime = json['power_on_time'] as Map<String, dynamic>?;
       return DeviceHealth(
         status: passed == null
             ? DeviceHealthStatus.unknown
-            : (passed ? DeviceHealthStatus.healthy : DeviceHealthStatus.critical),
+            : (passed
+                  ? DeviceHealthStatus.healthy
+                  : DeviceHealthStatus.critical),
         powerOnHours: (powerOnTime?['hours'] as num?)?.toInt(),
         powerCycles: (json['power_cycle_count'] as num?)?.toInt(),
         smartPassed: passed,

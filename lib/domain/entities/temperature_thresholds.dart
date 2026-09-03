@@ -1,11 +1,6 @@
 import '../../core/constants/app_constants.dart';
 import '../enums/storage_enums.dart';
 
-/// Configurable severity bands for one device (or the global default).
-///
-/// Deliberately distinct from any manufacturer-reported limit: this is the
-/// *user's* (or app default's) alerting policy, never presented as a
-/// hardware safety fact.
 class TemperatureThresholds {
   const TemperatureThresholds({
     this.warningCelsius = AppConstants.defaultWarningCelsius,
@@ -26,11 +21,11 @@ class TemperatureThresholds {
     return TemperatureSeverity.normal;
   }
 
-  /// Temperature below which a critical alert is considered "recovered"
-  /// and may fire again on a subsequent breach (hysteresis, section 8).
-  double get criticalRecoveryCelsius => criticalCelsius - recoveryHysteresisCelsius;
+  double get criticalRecoveryCelsius =>
+      criticalCelsius - recoveryHysteresisCelsius;
 
-  double get warningRecoveryCelsius => warningCelsius - recoveryHysteresisCelsius;
+  double get warningRecoveryCelsius =>
+      warningCelsius - recoveryHysteresisCelsius;
 
   TemperatureThresholds copyWith({
     double? warningCelsius,
@@ -46,20 +41,22 @@ class TemperatureThresholds {
   }
 
   Map<String, dynamic> toJson() => {
-        'warningCelsius': warningCelsius,
-        'criticalCelsius': criticalCelsius,
-        'recoveryHysteresisCelsius': recoveryHysteresisCelsius,
-      };
+    'warningCelsius': warningCelsius,
+    'criticalCelsius': criticalCelsius,
+    'recoveryHysteresisCelsius': recoveryHysteresisCelsius,
+  };
 
   factory TemperatureThresholds.fromJson(Map<String, dynamic> json) {
     return TemperatureThresholds(
-      warningCelsius: (json['warningCelsius'] as num?)?.toDouble() ??
+      warningCelsius:
+          (json['warningCelsius'] as num?)?.toDouble() ??
           AppConstants.defaultWarningCelsius,
-      criticalCelsius: (json['criticalCelsius'] as num?)?.toDouble() ??
+      criticalCelsius:
+          (json['criticalCelsius'] as num?)?.toDouble() ??
           AppConstants.defaultCriticalCelsius,
       recoveryHysteresisCelsius:
           (json['recoveryHysteresisCelsius'] as num?)?.toDouble() ??
-              AppConstants.recoveryHysteresisCelsius,
+          AppConstants.recoveryHysteresisCelsius,
     );
   }
 }

@@ -9,17 +9,26 @@ class FakeNotificationService implements NotificationService {
   Future<void> initialize() async {}
 
   @override
-  Future<void> showWarning({required String deviceName, required String temperatureText}) async {
+  Future<void> showWarning({
+    required String deviceName,
+    required String temperatureText,
+  }) async {
     shown.add('warning:$deviceName:$temperatureText');
   }
 
   @override
-  Future<void> showCritical({required String deviceName, required String temperatureText}) async {
+  Future<void> showCritical({
+    required String deviceName,
+    required String temperatureText,
+  }) async {
     shown.add('critical:$deviceName:$temperatureText');
   }
 
   @override
-  Future<void> showRecovered({required String deviceName, required String temperatureText}) async {
+  Future<void> showRecovered({
+    required String deviceName,
+    required String temperatureText,
+  }) async {
     shown.add('recovered:$deviceName:$temperatureText');
   }
 }

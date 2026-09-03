@@ -3,20 +3,13 @@ import 'package:flutter/services.dart';
 import '../../core/errors/storage_exceptions.dart';
 import '../../core/logging/app_logger.dart';
 
-/// Thin wrapper around the platform's native storage-telemetry
-/// MethodChannel. One channel, one contract, implemented independently by
-/// each platform runner (macos/Runner/StorageMonitor, windows/native_storage,
-/// linux/native_storage) - see docs/architecture.md "Native data contract".
-///
-/// This class only knows how to invoke the channel and translate transport
-/// failures into [StorageMonitorException]s. It never decides *whether* a
-/// platform has a native backend at all - [NativeStorageMonitor] does that
-/// via [getCapabilities]/[MissingPluginException] handling.
 class StorageNativeChannel {
   StorageNativeChannel._();
   static final StorageNativeChannel instance = StorageNativeChannel._();
 
-  static const MethodChannel _channel = MethodChannel('driveguard/storage_native');
+  static const MethodChannel _channel = MethodChannel(
+    'driveguard/storage_native',
+  );
   static const _tag = 'StorageNativeChannel';
 
   Future<Map<String, dynamic>> getCapabilities() async {
@@ -27,7 +20,11 @@ class StorageNativeChannel {
   Future<List<Map<String, dynamic>>> getDevices() async {
     final raw = await _invoke('getDevices', null);
     if (raw is! List) return const [];
-    return raw.whereType<Object>().map(_asMap).whereType<Map<String, dynamic>>().toList();
+    return raw
+        .whereType<Object>()
+        .map(_asMap)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   Future<Map<String, dynamic>?> readTemperature(String deviceId) async {
@@ -40,31 +37,32 @@ class StorageNativeChannel {
     return _asMap(raw);
   }
 
-  /// Every distinct temperature sensor a device exposes (NVMe composite +
-  /// per-namespace/controller sensors - spec section 12). Returns an empty
-  /// list, never throws, when the backend only has a single composite
-  /// reading or none at all - [NativeStorageMonitor] falls back to
-  /// wrapping [readTemperature] as one sensor in that case.
   Future<List<Map<String, dynamic>>> getSensors(String deviceId) async {
     final raw = await _invoke('getSensors', {'deviceId': deviceId});
     if (raw is! List) return const [];
-    return raw.whereType<Object>().map(_asMap).whereType<Map<String, dynamic>>().toList();
+    return raw
+        .whereType<Object>()
+        .map(_asMap)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   Future<Object?> _invoke(String method, Map<String, dynamic>? args) async {
     try {
       return await _channel.invokeMethod<Object?>(method, args);
     } on MissingPluginException {
-      // Expected on any platform/build where the native channel handler
-      // hasn't been registered yet - callers treat this as "no native
-      // backend available" rather than an error.
       rethrow;
     } on PlatformException catch (e) {
-      AppLogger.instance.warning(_tag, '$method failed: ${e.code} ${e.message}');
+      AppLogger.instance.warning(
+        _tag,
+        '$method failed: ${e.code} ${e.message}',
+      );
       switch (e.code) {
         case 'PERMISSION_DENIED':
           throw PermissionDeniedException(
-              (args?['deviceId'] as String?) ?? '-', e.message);
+            (args?['deviceId'] as String?) ?? '-',
+            e.message,
+          );
         case 'UNSUPPORTED':
           return null;
         case 'DEVICE_NOT_FOUND':

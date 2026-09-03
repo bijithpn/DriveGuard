@@ -10,19 +10,6 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-/// macOS backend.
-///
-/// Device enumeration uses `system_profiler` (always present, no
-/// permissions required) - never IOKit-private SMART APIs, which Apple has
-/// progressively locked down and which do not exist at all for Apple
-/// Silicon's internal NVMe.
-///
-/// Temperature/health, where obtainable at all, comes from `smartctl`
-/// (smartmontools), checked for presence before use. On Apple Silicon
-/// Macs the internal NVMe is virtually never readable this way (Apple
-/// does not expose vendor SMART log pages for the internal controller) -
-/// this is a real, documented hardware/OS limitation, not a bug: such
-/// devices correctly report [SensorAvailability.unsupported].
 class MacOSStorageMonitor implements StorageMonitor {
   static const _tag = 'MacOSStorageMonitor';
   static const _smartctl = 'smartctl';
@@ -32,7 +19,9 @@ class MacOSStorageMonitor implements StorageMonitor {
   @override
   Future<bool> isAvailable() async {
     try {
-      await SafeProcessRunner.instance.run('system_profiler', ['-listDataTypes']);
+      await SafeProcessRunner.instance.run('system_profiler', [
+        '-listDataTypes',
+      ]);
       return true;
     } catch (_) {
       return false;
@@ -41,8 +30,10 @@ class MacOSStorageMonitor implements StorageMonitor {
 
   @override
   Future<BackendCapabilities> getCapabilities() async {
-    final hasSmartctl = await SafeProcessRunner.instance
-        .exists(_smartctl, extraPaths: const ['/opt/homebrew/bin', '/usr/local/bin']);
+    final hasSmartctl = await SafeProcessRunner.instance.exists(
+      _smartctl,
+      extraPaths: const ['/opt/homebrew/bin', '/usr/local/bin'],
+    );
     return BackendCapabilities(
       backendName: 'macOS (system_profiler + smartctl)',
       canEnumerateDevices: true,
@@ -62,22 +53,26 @@ class MacOSStorageMonitor implements StorageMonitor {
     final devices = <StorageDevice>[];
     _bsdNameById.clear();
     try {
-      final result = await SafeProcessRunner.instance.run(
-        'system_profiler',
-        ['SPNVMeDataType', 'SPSerialATADataType', '-json'],
-        timeout: const Duration(seconds: 10),
-      );
+      final result = await SafeProcessRunner.instance.run('system_profiler', [
+        'SPNVMeDataType',
+        'SPSerialATADataType',
+        '-json',
+      ], timeout: const Duration(seconds: 10));
       final json = jsonDecode(result.stdout) as Map<String, dynamic>;
-      devices.addAll(_parseCategory(
-        json['SPNVMeDataType'],
-        StorageDeviceType.nvme,
-        StorageInterfaceType.nvme,
-      ));
-      devices.addAll(_parseCategory(
-        json['SPSerialATADataType'],
-        StorageDeviceType.unknown,
-        StorageInterfaceType.sata,
-      ));
+      devices.addAll(
+        _parseCategory(
+          json['SPNVMeDataType'],
+          StorageDeviceType.nvme,
+          StorageInterfaceType.nvme,
+        ),
+      );
+      devices.addAll(
+        _parseCategory(
+          json['SPSerialATADataType'],
+          StorageDeviceType.unknown,
+          StorageInterfaceType.sata,
+        ),
+      );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Device enumeration failed', e);
     }
@@ -102,32 +97,45 @@ class MacOSStorageMonitor implements StorageMonitor {
         if (model == null) continue;
         final bsdName = raw['bsd_name'] as String?;
         final sizeStr = raw['size'] as String?;
-        final isSsd = (raw['spsata_ssd'] as String?)?.toLowerCase() == 'yes' ||
+        final isSsd =
+            (raw['spsata_ssd'] as String?)?.toLowerCase() == 'yes' ||
             interfaceType == StorageInterfaceType.nvme;
         final type = interfaceType == StorageInterfaceType.nvme
             ? StorageDeviceType.nvme
             : (isSsd ? StorageDeviceType.ssd : StorageDeviceType.hdd);
         final id = 'macos-${bsdName ?? model.hashCode}';
         if (bsdName != null) _bsdNameById[id] = bsdName;
-        result.add(StorageDevice(
-          id: id,
-          type: type,
-          interfaceType: interfaceType,
-          // Availability is only known once we've tried smartctl - see
-          // readTemperature; default to unavailable until proven otherwise.
-          sensorAvailability: SensorAvailability.unavailable,
-          model: model,
-          manufacturer: _guessManufacturer(model),
-          serialNumber: raw['device_serial'] as String?,
-          capacityBytes: _parseSize(sizeStr),
-        ));
+        result.add(
+          StorageDevice(
+            id: id,
+            type: type,
+            interfaceType: interfaceType,
+
+            sensorAvailability: SensorAvailability.unavailable,
+            model: model,
+            manufacturer: _guessManufacturer(model),
+            serialNumber: raw['device_serial'] as String?,
+            capacityBytes: _parseSize(sizeStr),
+          ),
+        );
       }
     }
     return result;
   }
 
   String? _guessManufacturer(String model) {
-    const known = ['Samsung', 'Western Digital', 'WD', 'Seagate', 'Crucial', 'SanDisk', 'Kingston', 'Apple', 'SK hynix', 'Toshiba'];
+    const known = [
+      'Samsung',
+      'Western Digital',
+      'WD',
+      'Seagate',
+      'Crucial',
+      'SanDisk',
+      'Kingston',
+      'Apple',
+      'SK hynix',
+      'Toshiba',
+    ];
     for (final brand in known) {
       if (model.toUpperCase().contains(brand.toUpperCase())) return brand;
     }
@@ -153,10 +161,15 @@ class MacOSStorageMonitor implements StorageMonitor {
   Future<Map<String, dynamic>?> _smartctlJson(String deviceId) async {
     final bsdName = _bsdNameById[deviceId];
     if (bsdName == null) return null;
-    final hasTool = await SafeProcessRunner.instance
-        .exists(_smartctl, extraPaths: const ['/opt/homebrew/bin', '/usr/local/bin']);
+    final hasTool = await SafeProcessRunner.instance.exists(
+      _smartctl,
+      extraPaths: const ['/opt/homebrew/bin', '/usr/local/bin'],
+    );
     if (!hasTool) {
-      throw const UnsupportedDeviceException('smartctl-missing', 'smartctl not installed');
+      throw const UnsupportedDeviceException(
+        'smartctl-missing',
+        'smartctl not installed',
+      );
     }
     final result = await SafeProcessRunner.instance.run(
       _smartctl,
@@ -185,16 +198,19 @@ class MacOSStorageMonitor implements StorageMonitor {
     final messages = smartStatus?['messages'];
     if (messages is List && messages.isNotEmpty) {
       final text = messages.map((m) => m['string']).join(' ').toLowerCase();
-      if (text.contains('permission') || text.contains('operation not permitted')) {
+      if (text.contains('permission') ||
+          text.contains('operation not permitted')) {
         throw PermissionDeniedException(deviceId, 'smartctl: $text');
       }
-      if (text.contains('unable to detect device type') || text.contains('not supported')) {
-        return null; // structurally unsupported for this device/bridge
+      if (text.contains('unable to detect device type') ||
+          text.contains('not supported')) {
+        return null;
       }
     }
 
     double? celsius;
-    final nvmeLog = json['nvme_smart_health_information_log'] as Map<String, dynamic>?;
+    final nvmeLog =
+        json['nvme_smart_health_information_log'] as Map<String, dynamic>?;
     if (nvmeLog != null && nvmeLog['temperature'] != null) {
       celsius = (nvmeLog['temperature'] as num).toDouble();
     } else {
@@ -215,7 +231,10 @@ class MacOSStorageMonitor implements StorageMonitor {
     return TemperatureReading(
       celsius: celsius,
       timestamp: DateTime.now(),
-      source: const TemperatureSource(backendName: 'smartctl', sensorId: 'composite'),
+      source: const TemperatureSource(
+        backendName: 'smartctl',
+        sensorId: 'composite',
+      ),
     );
   }
 
@@ -233,33 +252,35 @@ class MacOSStorageMonitor implements StorageMonitor {
       ),
     ];
 
-    // NVMe drives can expose several distinct sensors (spec section 12);
-    // smartctl reports these as `temperature_sensors` (a plain int-Celsius
-    // array) inside the NVMe health log when the controller implements
-    // more than the one composite reading already returned above.
     Map<String, dynamic>? json;
     try {
       json = await _smartctlJson(deviceId);
     } catch (_) {
       return sensors;
     }
-    final nvmeLog = json?['nvme_smart_health_information_log'] as Map<String, dynamic>?;
+    final nvmeLog =
+        json?['nvme_smart_health_information_log'] as Map<String, dynamic>?;
     final extra = nvmeLog?['temperature_sensors'];
     if (extra is List) {
       for (var i = 0; i < extra.length; i++) {
         final celsius = (extra[i] as num?)?.toDouble();
-        if (celsius == null || celsius == 0) continue; // 0 = sensor not implemented
-        sensors.add(StorageSensor(
-          id: 'sensor${i + 1}',
-          name: 'Sensor ${i + 1}',
-          reading: TemperatureReading(
-            celsius: celsius,
-            timestamp: DateTime.now(),
-            source: TemperatureSource(backendName: 'smartctl', sensorId: 'sensor${i + 1}'),
-            isValid: TemperatureUtils.isPlausibleValue(celsius),
+        if (celsius == null || celsius == 0) continue;
+        sensors.add(
+          StorageSensor(
+            id: 'sensor${i + 1}',
+            name: 'Sensor ${i + 1}',
+            reading: TemperatureReading(
+              celsius: celsius,
+              timestamp: DateTime.now(),
+              source: TemperatureSource(
+                backendName: 'smartctl',
+                sensorId: 'sensor${i + 1}',
+              ),
+              isValid: TemperatureUtils.isPlausibleValue(celsius),
+            ),
+            type: TemperatureSensorType.namespace,
           ),
-          type: TemperatureSensorType.namespace,
-        ));
+        );
       }
     }
     return sensors;
@@ -275,13 +296,16 @@ class MacOSStorageMonitor implements StorageMonitor {
     }
     if (json == null) return DeviceHealth.unavailable;
 
-    final nvmeLog = json['nvme_smart_health_information_log'] as Map<String, dynamic>?;
+    final nvmeLog =
+        json['nvme_smart_health_information_log'] as Map<String, dynamic>?;
     final smartStatus = json['smart_status'] as Map<String, dynamic>?;
     final passed = smartStatus?['passed'] as bool?;
 
     if (nvmeLog != null) {
       return DeviceHealth(
-        status: passed == false ? DeviceHealthStatus.critical : DeviceHealthStatus.healthy,
+        status: passed == false
+            ? DeviceHealthStatus.critical
+            : DeviceHealthStatus.healthy,
         percentageUsed: (nvmeLog['percentage_used'] as num?)?.toInt(),
         availableSparePercent: (nvmeLog['available_spare'] as num?)?.toInt(),
         criticalWarning: nvmeLog['critical_warning']?.toString(),

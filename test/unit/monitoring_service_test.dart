@@ -24,7 +24,8 @@ class _ScriptedMonitor implements StorageMonitor {
   Future<bool> isAvailable() async => true;
 
   @override
-  Future<BackendCapabilities> getCapabilities() async => const BackendCapabilities(
+  Future<BackendCapabilities> getCapabilities() async =>
+      const BackendCapabilities(
         backendName: 'scripted',
         canEnumerateDevices: true,
         canReadTemperature: true,
@@ -42,7 +43,10 @@ class _ScriptedMonitor implements StorageMonitor {
       return TemperatureReading(
         celsius: scripted,
         timestamp: DateTime.now(),
-        source: const TemperatureSource(backendName: 'scripted', sensorId: 'composite'),
+        source: const TemperatureSource(
+          backendName: 'scripted',
+          sensorId: 'composite',
+        ),
       );
     }
     return null;
@@ -52,83 +56,104 @@ class _ScriptedMonitor implements StorageMonitor {
   Future<List<StorageSensor>> getSensors(String deviceId) async => const [];
 
   @override
-  Future<DeviceHealth?> getHealth(String deviceId) async => DeviceHealth.unavailable;
+  Future<DeviceHealth?> getHealth(String deviceId) async =>
+      DeviceHealth.unavailable;
 }
 
 StorageDevice _device(String id) => StorageDevice(
-      id: id,
-      type: StorageDeviceType.nvme,
-      interfaceType: StorageInterfaceType.nvme,
-      sensorAvailability: SensorAvailability.unavailable,
-      model: id,
-    );
+  id: id,
+  type: StorageDeviceType.nvme,
+  interfaceType: StorageInterfaceType.nvme,
+  sensorAvailability: SensorAvailability.unavailable,
+  model: id,
+);
 
 void main() {
-  test('a failing device does not stop other devices from being polled', () async {
-    final backend = _ScriptedMonitor([_device('good'), _device('bad')]);
-    backend.nextReadingOrError['good'] = 42.0;
-    backend.nextReadingOrError['bad'] = const PermissionDeniedException('bad');
+  test(
+    'a failing device does not stop other devices from being polled',
+    () async {
+      final backend = _ScriptedMonitor([_device('good'), _device('bad')]);
+      backend.nextReadingOrError['good'] = 42.0;
+      backend.nextReadingOrError['bad'] = const PermissionDeniedException(
+        'bad',
+      );
 
-    final service = MonitoringService(
-      backend: backend,
-      notifications: FakeNotificationService(),
-      historyStore: TemperatureHistoryStore(),
-    );
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
 
-    await service.start(const AppSettings());
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+      await service.start(const AppSettings());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    final devices = {for (final d in service.currentDevices) d.id: d};
-    expect(devices['good']!.primaryTemperature?.celsius, 42.0);
-    expect(devices['good']!.monitoringStatus, MonitoringStatus.active);
-    expect(devices['bad']!.sensorAvailability, SensorAvailability.permissionDenied);
-    expect(devices['bad']!.monitoringStatus, MonitoringStatus.permissionDenied);
+      final devices = {for (final d in service.currentDevices) d.id: d};
+      expect(devices['good']!.primaryTemperature?.celsius, 42.0);
+      expect(devices['good']!.monitoringStatus, MonitoringStatus.active);
+      expect(
+        devices['bad']!.sensorAvailability,
+        SensorAvailability.permissionDenied,
+      );
+      expect(
+        devices['bad']!.monitoringStatus,
+        MonitoringStatus.permissionDenied,
+      );
 
-    await service.dispose();
-  });
+      await service.dispose();
+    },
+  );
 
-  test('a null reading is reported as unavailable, never fabricated as 0', () async {
-    final backend = _ScriptedMonitor([_device('no-sensor')]);
-    // no entry in nextReadingOrError -> readTemperature returns null
+  test(
+    'a null reading is reported as unavailable, never fabricated as 0',
+    () async {
+      final backend = _ScriptedMonitor([_device('no-sensor')]);
+      // no entry in nextReadingOrError -> readTemperature returns null
 
-    final service = MonitoringService(
-      backend: backend,
-      notifications: FakeNotificationService(),
-      historyStore: TemperatureHistoryStore(),
-    );
-    await service.start(const AppSettings());
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+      await service.start(const AppSettings());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    final device = service.currentDevices.single;
-    expect(device.primaryTemperature, isNull);
-    expect(device.sensorAvailability, SensorAvailability.unsupported);
-    expect(device.monitoringStatus, MonitoringStatus.sensorUnavailable);
+      final device = service.currentDevices.single;
+      expect(device.primaryTemperature, isNull);
+      expect(device.sensorAvailability, SensorAvailability.unsupported);
+      expect(device.monitoringStatus, MonitoringStatus.sensorUnavailable);
 
-    await service.dispose();
-  });
+      await service.dispose();
+    },
+  );
 
-  test('device disconnect is reflected, then removed after the next scan if still absent', () async {
-    final backend = _ScriptedMonitor([_device('removable')]);
-    backend.nextReadingOrError['removable'] = 30.0;
+  test(
+    'device disconnect is reflected, then removed after the next scan if still absent',
+    () async {
+      final backend = _ScriptedMonitor([_device('removable')]);
+      backend.nextReadingOrError['removable'] = 30.0;
 
-    final service = MonitoringService(
-      backend: backend,
-      notifications: FakeNotificationService(),
-      historyStore: TemperatureHistoryStore(),
-    );
-    await service.start(const AppSettings());
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(service.currentDevices.length, 1);
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+      await service.start(const AppSettings());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(service.currentDevices.length, 1);
 
-    backend.devices = [];
-    await service.rescan();
-    expect(service.currentDevices.single.monitoringStatus, MonitoringStatus.disconnected);
+      backend.devices = [];
+      await service.rescan();
+      expect(
+        service.currentDevices.single.monitoringStatus,
+        MonitoringStatus.disconnected,
+      );
 
-    await service.rescan();
-    expect(service.currentDevices, isEmpty);
+      await service.rescan();
+      expect(service.currentDevices, isEmpty);
 
-    await service.dispose();
-  });
+      await service.dispose();
+    },
+  );
 
   test('reconnecting a previously disconnected device restores it', () async {
     final device = _device('external');
@@ -145,12 +170,18 @@ void main() {
 
     backend.devices = [];
     await service.rescan();
-    expect(service.currentDevices.single.monitoringStatus, MonitoringStatus.disconnected);
+    expect(
+      service.currentDevices.single.monitoringStatus,
+      MonitoringStatus.disconnected,
+    );
 
     backend.devices = [device];
     await service.rescan();
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(service.currentDevices.single.monitoringStatus, isNot(MonitoringStatus.disconnected));
+    expect(
+      service.currentDevices.single.monitoringStatus,
+      isNot(MonitoringStatus.disconnected),
+    );
 
     await service.dispose();
   });

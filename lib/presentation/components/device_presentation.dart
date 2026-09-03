@@ -3,9 +3,6 @@ import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../core/utils/temperature_utils.dart';
 
-/// Pure view-model derivation from a [StorageDevice] + its configured
-/// thresholds. Keeps "how do we describe this device's state" in one
-/// place instead of duplicated string logic across widgets.
 class DevicePresentation {
   DevicePresentation._({
     required this.severity,
@@ -29,7 +26,8 @@ class DevicePresentation {
     TemperatureUnit unit,
   ) {
     final reading = device.primaryTemperature;
-    final isUnavailableStatus = device.sensorAvailability == SensorAvailability.unsupported ||
+    final isUnavailableStatus =
+        device.sensorAvailability == SensorAvailability.unsupported ||
         device.sensorAvailability == SensorAvailability.permissionDenied ||
         reading == null;
 
@@ -49,7 +47,8 @@ class DevicePresentation {
         severity: TemperatureSeverity.unavailable,
         valueText: 'Permission required',
         fraction: 0,
-        statusText: device.lastError ??
+        statusText:
+            device.lastError ??
             'This device does not expose temperature data to the application without additional permissions.',
         isStaleLike: false,
         tempCelsius: null,
@@ -61,7 +60,8 @@ class DevicePresentation {
         severity: TemperatureSeverity.unavailable,
         valueText: 'Unavailable',
         fraction: 0,
-        statusText: device.lastError ??
+        statusText:
+            device.lastError ??
             'This device does not expose SMART temperature data to the application.',
         isStaleLike: false,
         tempCelsius: null,
@@ -71,7 +71,9 @@ class DevicePresentation {
     final severity = thresholds.classify(reading.celsius);
     final isStale = device.monitoringStatus == MonitoringStatus.staleData;
     final valueText = TemperatureUtils.format(reading.celsius, unit);
-    final safeCritical = thresholds.criticalCelsius > 0 ? thresholds.criticalCelsius : 1.0;
+    final safeCritical = thresholds.criticalCelsius > 0
+        ? thresholds.criticalCelsius
+        : 1.0;
     final rawFraction = reading.celsius / (safeCritical * 1.15);
     final fraction = rawFraction.isFinite ? rawFraction.clamp(0.0, 1.0) : 1.0;
 
@@ -82,8 +84,8 @@ class DevicePresentation {
       statusText: isStale
           ? 'Sensor data is currently stale'
           : (device.monitoringStatus == MonitoringStatus.error
-              ? (device.lastError ?? 'Monitoring error')
-              : _severityStatusText(severity)),
+                ? (device.lastError ?? 'Monitoring error')
+                : _severityStatusText(severity)),
       isStaleLike: isStale,
       tempCelsius: reading.celsius,
     );

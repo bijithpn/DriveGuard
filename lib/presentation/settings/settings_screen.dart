@@ -24,7 +24,6 @@ class SettingsScreen extends ConsumerWidget {
       backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
       body: Column(
         children: [
-          // Header
           Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.bg0 : AppColors.lightBg,
@@ -59,7 +58,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           ),
-          // Content
+
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -504,8 +503,6 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 }
-
-// Sub-widgets
 
 class _BackButton extends StatelessWidget {
   const _BackButton({required this.isDark});
@@ -1202,8 +1199,6 @@ class _DiagnosticDialog extends StatelessWidget {
   }
 }
 
-// Validation helpers (preserved exactly from original)
-
 const double _minThresholdSeparationCelsius = 1.0;
 
 void _submitThreshold(
@@ -1279,9 +1274,6 @@ Future<void> _editDeviceThresholds(
   }
 }
 
-/// Dialog for editing per-device warning/critical thresholds.
-/// Controllers are owned by State (not the caller) to avoid a disposal
-/// race with the exit animation.
 class _ThresholdEditorDialog extends StatefulWidget {
   const _ThresholdEditorDialog({required this.current});
 

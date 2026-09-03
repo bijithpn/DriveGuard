@@ -52,31 +52,30 @@ class WidgetSettings {
   }
 
   Map<String, dynamic> toJson() => {
-        'enabled': enabled,
-        'x': x,
-        'y': y,
-        'width': width,
-        'height': height,
-        'opacity': opacity,
-        'alwaysOnTop': alwaysOnTop,
-        'compact': compact,
-        'borderless': borderless,
-      };
+    'enabled': enabled,
+    'x': x,
+    'y': y,
+    'width': width,
+    'height': height,
+    'opacity': opacity,
+    'alwaysOnTop': alwaysOnTop,
+    'compact': compact,
+    'borderless': borderless,
+  };
 
   factory WidgetSettings.fromJson(Map<String, dynamic> json) => WidgetSettings(
-        enabled: json['enabled'] as bool? ?? false,
-        x: (json['x'] as num?)?.toDouble() ?? 100,
-        y: (json['y'] as num?)?.toDouble() ?? 100,
-        width: (json['width'] as num?)?.toDouble() ?? 260,
-        height: (json['height'] as num?)?.toDouble() ?? 180,
-        opacity: (json['opacity'] as num?)?.toDouble() ?? 0.95,
-        alwaysOnTop: json['alwaysOnTop'] as bool? ?? true,
-        compact: json['compact'] as bool? ?? false,
-        borderless: json['borderless'] as bool? ?? false,
-      );
+    enabled: json['enabled'] as bool? ?? false,
+    x: (json['x'] as num?)?.toDouble() ?? 100,
+    y: (json['y'] as num?)?.toDouble() ?? 100,
+    width: (json['width'] as num?)?.toDouble() ?? 260,
+    height: (json['height'] as num?)?.toDouble() ?? 180,
+    opacity: (json['opacity'] as num?)?.toDouble() ?? 0.95,
+    alwaysOnTop: json['alwaysOnTop'] as bool? ?? true,
+    compact: json['compact'] as bool? ?? false,
+    borderless: json['borderless'] as bool? ?? false,
+  );
 }
 
-/// The full persisted configuration surface (section 19 & 33).
 class AppSettings {
   const AppSettings({
     this.pollingInterval = AppConstants.defaultPollingInterval,
@@ -123,12 +122,8 @@ class AppSettings {
   final bool diagnosticLoggingEnabled;
   final WidgetSettings widget;
 
-  /// Advanced -> "use simulated devices". Not a Windows/macOS/Linux
-  /// distinction - just a developer/demo escape hatch.
   final bool mockBackendForced;
 
-  /// Home page drive listing: false = card grid, true = compact one-row-
-  /// per-drive list. Persisted so the choice survives a restart.
   final bool dashboardCompactView;
 
   TemperatureThresholds thresholdsFor(String deviceId) =>
@@ -157,7 +152,8 @@ class AppSettings {
   }) {
     return AppSettings(
       pollingInterval: pollingInterval ?? this.pollingInterval,
-      deviceDiscoveryInterval: deviceDiscoveryInterval ?? this.deviceDiscoveryInterval,
+      deviceDiscoveryInterval:
+          deviceDiscoveryInterval ?? this.deviceDiscoveryInterval,
       temperatureUnit: temperatureUnit ?? this.temperatureUnit,
       monitoringEnabled: monitoringEnabled ?? this.monitoringEnabled,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
@@ -172,7 +168,8 @@ class AppSettings {
       startMinimized: startMinimized ?? this.startMinimized,
       minimizeToTray: minimizeToTray ?? this.minimizeToTray,
       closeToTray: closeToTray ?? this.closeToTray,
-      diagnosticLoggingEnabled: diagnosticLoggingEnabled ?? this.diagnosticLoggingEnabled,
+      diagnosticLoggingEnabled:
+          diagnosticLoggingEnabled ?? this.diagnosticLoggingEnabled,
       widget: widget ?? this.widget,
       mockBackendForced: mockBackendForced ?? this.mockBackendForced,
       dashboardCompactView: dashboardCompactView ?? this.dashboardCompactView,
@@ -180,65 +177,80 @@ class AppSettings {
   }
 
   Map<String, dynamic> toJson() => {
-        'pollingIntervalMs': pollingInterval.inMilliseconds,
-        'deviceDiscoveryIntervalMs': deviceDiscoveryInterval.inMilliseconds,
-        'temperatureUnit': temperatureUnit.name,
-        'monitoringEnabled': monitoringEnabled,
-        'notificationsEnabled': notificationsEnabled,
-        'notificationCooldownMs': notificationCooldown.inMilliseconds,
-        'recoveryNotificationsEnabled': recoveryNotificationsEnabled,
-        'globalThresholds': globalThresholds.toJson(),
-        'perDeviceThresholds':
-            perDeviceThresholds.map((k, v) => MapEntry(k, v.toJson())),
-        'themeMode': themeMode.name,
-        'uiDensity': uiDensity,
-        'startWithOS': startWithOS,
-        'startMinimized': startMinimized,
-        'minimizeToTray': minimizeToTray,
-        'closeToTray': closeToTray,
-        'diagnosticLoggingEnabled': diagnosticLoggingEnabled,
-        'widget': widget.toJson(),
-        'mockBackendForced': mockBackendForced,
-        'dashboardCompactView': dashboardCompactView,
-      };
+    'pollingIntervalMs': pollingInterval.inMilliseconds,
+    'deviceDiscoveryIntervalMs': deviceDiscoveryInterval.inMilliseconds,
+    'temperatureUnit': temperatureUnit.name,
+    'monitoringEnabled': monitoringEnabled,
+    'notificationsEnabled': notificationsEnabled,
+    'notificationCooldownMs': notificationCooldown.inMilliseconds,
+    'recoveryNotificationsEnabled': recoveryNotificationsEnabled,
+    'globalThresholds': globalThresholds.toJson(),
+    'perDeviceThresholds': perDeviceThresholds.map(
+      (k, v) => MapEntry(k, v.toJson()),
+    ),
+    'themeMode': themeMode.name,
+    'uiDensity': uiDensity,
+    'startWithOS': startWithOS,
+    'startMinimized': startMinimized,
+    'minimizeToTray': minimizeToTray,
+    'closeToTray': closeToTray,
+    'diagnosticLoggingEnabled': diagnosticLoggingEnabled,
+    'widget': widget.toJson(),
+    'mockBackendForced': mockBackendForced,
+    'dashboardCompactView': dashboardCompactView,
+  };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     final perDevice = <String, TemperatureThresholds>{};
     final rawPerDevice = json['perDeviceThresholds'] as Map<String, dynamic>?;
     if (rawPerDevice != null) {
       for (final entry in rawPerDevice.entries) {
-        perDevice[entry.key] =
-            TemperatureThresholds.fromJson(entry.value as Map<String, dynamic>);
+        perDevice[entry.key] = TemperatureThresholds.fromJson(
+          entry.value as Map<String, dynamic>,
+        );
       }
     }
     return AppSettings(
       pollingInterval: Duration(
-          milliseconds: json['pollingIntervalMs'] as int? ??
-              AppConstants.defaultPollingInterval.inMilliseconds),
+        milliseconds:
+            json['pollingIntervalMs'] as int? ??
+            AppConstants.defaultPollingInterval.inMilliseconds,
+      ),
       deviceDiscoveryInterval: Duration(
-          milliseconds: json['deviceDiscoveryIntervalMs'] as int? ??
-              AppConstants.deviceDiscoveryInterval.inMilliseconds),
+        milliseconds:
+            json['deviceDiscoveryIntervalMs'] as int? ??
+            AppConstants.deviceDiscoveryInterval.inMilliseconds,
+      ),
       temperatureUnit: TemperatureUnit.values.firstWhere(
-          (u) => u.name == json['temperatureUnit'],
-          orElse: () => TemperatureUnit.celsius),
+        (u) => u.name == json['temperatureUnit'],
+        orElse: () => TemperatureUnit.celsius,
+      ),
       monitoringEnabled: json['monitoringEnabled'] as bool? ?? true,
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
       notificationCooldown: Duration(
-          milliseconds: json['notificationCooldownMs'] as int? ??
-              AppConstants.defaultNotificationCooldown.inMilliseconds),
-      recoveryNotificationsEnabled: json['recoveryNotificationsEnabled'] as bool? ?? true,
+        milliseconds:
+            json['notificationCooldownMs'] as int? ??
+            AppConstants.defaultNotificationCooldown.inMilliseconds,
+      ),
+      recoveryNotificationsEnabled:
+          json['recoveryNotificationsEnabled'] as bool? ?? true,
       globalThresholds: json['globalThresholds'] != null
-          ? TemperatureThresholds.fromJson(json['globalThresholds'] as Map<String, dynamic>)
+          ? TemperatureThresholds.fromJson(
+              json['globalThresholds'] as Map<String, dynamic>,
+            )
           : TemperatureThresholds.defaults,
       perDeviceThresholds: perDevice,
-      themeMode: ThemeMode.values.firstWhere((m) => m.name == json['themeMode'],
-          orElse: () => ThemeMode.system),
+      themeMode: ThemeMode.values.firstWhere(
+        (m) => m.name == json['themeMode'],
+        orElse: () => ThemeMode.system,
+      ),
       uiDensity: (json['uiDensity'] as num?)?.toDouble() ?? 1.0,
       startWithOS: json['startWithOS'] as bool? ?? false,
       startMinimized: json['startMinimized'] as bool? ?? false,
       minimizeToTray: json['minimizeToTray'] as bool? ?? true,
       closeToTray: json['closeToTray'] as bool? ?? true,
-      diagnosticLoggingEnabled: json['diagnosticLoggingEnabled'] as bool? ?? false,
+      diagnosticLoggingEnabled:
+          json['diagnosticLoggingEnabled'] as bool? ?? false,
       widget: json['widget'] != null
           ? WidgetSettings.fromJson(json['widget'] as Map<String, dynamic>)
           : const WidgetSettings(),

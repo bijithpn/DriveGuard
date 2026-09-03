@@ -10,18 +10,24 @@ import 'monitoring/temperature_history_store.dart';
 import 'notifications/notification_service.dart';
 import 'settings/app_settings.dart';
 
-/// These three are overridden with concrete instances in main.dart after
-/// the async bootstrap (backend selection, settings load) completes -
-/// keeping every downstream provider synchronous and testable.
 final storageMonitorProvider = Provider<StorageMonitor>(
-    (ref) => throw UnimplementedError('storageMonitorProvider must be overridden'));
+  (ref) =>
+      throw UnimplementedError('storageMonitorProvider must be overridden'),
+);
 
 final notificationServiceProvider = Provider<NotificationService>(
-    (ref) => throw UnimplementedError('notificationServiceProvider must be overridden'));
+  (ref) => throw UnimplementedError(
+    'notificationServiceProvider must be overridden',
+  ),
+);
 
-final settingsRepositoryProvider = Provider<SettingsRepository>((ref) => SettingsRepository());
+final settingsRepositoryProvider = Provider<SettingsRepository>(
+  (ref) => SettingsRepository(),
+);
 
-final historyStoreProvider = Provider<TemperatureHistoryStore>((ref) => TemperatureHistoryStore());
+final historyStoreProvider = Provider<TemperatureHistoryStore>(
+  (ref) => TemperatureHistoryStore(),
+);
 
 final monitoringServiceProvider = Provider<MonitoringService>((ref) {
   final service = MonitoringService(
@@ -34,16 +40,6 @@ final monitoringServiceProvider = Provider<MonitoringService>((ref) {
 });
 
 class SettingsNotifier extends Notifier<AppSettings> {
-  /// [initial] carries the settings already loaded from disk in main.dart's
-  /// async bootstrap, before `runApp`. It must be supplied this way - via
-  /// `settingsProvider.overrideWith(() => SettingsNotifier(loaded))` at
-  /// `ProviderScope` construction - and never by reading
-  /// `settingsProvider.notifier` and mutating `state` from a descendant
-  /// widget's `initState`. Doing the latter mutates provider state while
-  /// `ProviderScope`'s own element is still mid-`rebuild()` for the first
-  /// frame, which trips Flutter's `!_dirty` reentrancy assertion (a real
-  /// crash this app hit before this fix). `build()` returning the already-
-  /// correct value up front avoids the mutation entirely.
   SettingsNotifier([this.initial]);
 
   final AppSettings? initial;
@@ -51,7 +47,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   @override
   AppSettings build() => initial ?? const AppSettings();
 
-  Future<void> updateWith(AppSettings Function(AppSettings current) updater) async {
+  Future<void> updateWith(
+    AppSettings Function(AppSettings current) updater,
+  ) async {
     final next = updater(state);
     state = next;
     await ref.read(settingsRepositoryProvider).save(next);
@@ -59,7 +57,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 }
 
-final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(SettingsNotifier.new);
+final settingsProvider = NotifierProvider<SettingsNotifier, AppSettings>(
+  SettingsNotifier.new,
+);
 
 class DevicesNotifier extends Notifier<List<StorageDevice>> {
   StreamSubscription<List<StorageDevice>>? _subscription;
@@ -73,4 +73,6 @@ class DevicesNotifier extends Notifier<List<StorageDevice>> {
   }
 }
 
-final devicesProvider = NotifierProvider<DevicesNotifier, List<StorageDevice>>(DevicesNotifier.new);
+final devicesProvider = NotifierProvider<DevicesNotifier, List<StorageDevice>>(
+  DevicesNotifier.new,
+);

@@ -50,8 +50,14 @@ void main() {
       final now = DateTime(2026, 1, 1, 12, 0, 0);
       final fresh = now.subtract(const Duration(seconds: 5));
       final stale = now.subtract(const Duration(minutes: 5));
-      expect(TemperatureUtils.isStale(fresh, const Duration(seconds: 20), now: now), isFalse);
-      expect(TemperatureUtils.isStale(stale, const Duration(seconds: 20), now: now), isTrue);
+      expect(
+        TemperatureUtils.isStale(fresh, const Duration(seconds: 20), now: now),
+        isFalse,
+      );
+      expect(
+        TemperatureUtils.isStale(stale, const Duration(seconds: 20), now: now),
+        isTrue,
+      );
     });
   });
 }

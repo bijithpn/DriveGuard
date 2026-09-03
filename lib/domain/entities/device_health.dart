@@ -1,8 +1,5 @@
 import '../enums/storage_enums.dart';
 
-/// SMART/NVMe health snapshot. Every field is nullable because most fields
-/// are backend- and device-dependent - a missing field must render as
-/// "Not available", never a fabricated 0 or "OK".
 class DeviceHealth {
   const DeviceHealth({
     required this.status,
@@ -28,5 +25,7 @@ class DeviceHealth {
   final String? lastErrorMessage;
   final bool? smartPassed;
 
-  static const unavailable = DeviceHealth(status: DeviceHealthStatus.unavailable);
+  static const unavailable = DeviceHealth(
+    status: DeviceHealthStatus.unavailable,
+  );
 }

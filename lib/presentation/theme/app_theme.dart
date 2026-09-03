@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../domain/enums/storage_enums.dart';
 
-// Design Tokens
-
 class AppSpacing {
   const AppSpacing._();
   static const double xxs = 2;
@@ -33,40 +31,32 @@ class AppDurations {
   static const Duration verySlow = Duration(milliseconds: 800);
 }
 
-// Neutral palette: graphite-dark surfaces, single calm blue accent, status
-// colors carry all semantic meaning.
-
 class AppColors {
   const AppColors._();
 
-  // Dark surfaces
-  static const Color bg0 = Color(0xFF1C1C1E); // macOS-style dark background
-  static const Color bg1 = Color(0xFF2C2C2E); // card
-  static const Color bg2 = Color(0xFF3A3A3C); // elevated / hover
-  static const Color bg3 = Color(0xFF48484A); // selected
+  static const Color bg0 = Color(0xFF1C1C1E);
+  static const Color bg1 = Color(0xFF2C2C2E);
+  static const Color bg2 = Color(0xFF3A3A3C);
+  static const Color bg3 = Color(0xFF48484A);
 
-  // Single restrained accent: calm steel blue
   static const Color accent = Color(0xFF3E7BFA);
   static const Color accentDim = Color(0xFF2B5ED6);
 
-  // Status colors: semantic only, not decorative
-  static const Color normal = Color(0xFF30D158); // green
+  static const Color normal = Color(0xFF30D158);
   static const Color normalDim = Color(0xFF248A3D);
-  static const Color warm = Color(0xFF7ED321); // yellow-green
-  static const Color warning = Color(0xFFFF9F0A); // amber
+  static const Color warm = Color(0xFF7ED321);
+  static const Color warning = Color(0xFFFF9F0A);
   static const Color warningDim = Color(0xFFB97000);
-  static const Color critical = Color(0xFFFF453A); // red
+  static const Color critical = Color(0xFFFF453A);
   static const Color criticalDim = Color(0xFFBF3228);
 
-  // Dark text
   static const Color textPrimary = Color(0xFFEEEEF0);
   static const Color textSecondary = Color(0xFF98989D);
   static const Color textMuted = Color(0xFF636366);
   static const Color divider = Color(0xFF38383A);
   static const Color border = Color(0xFF3A3A3C);
 
-  // Light surfaces
-  static const Color lightBg = Color(0xFFF2F2F7); // macOS sidebar-like
+  static const Color lightBg = Color(0xFFF2F2F7);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightSurfaceMuted = Color(0xFFEFEFF4);
   static const Color lightBorder = Color(0xFFD1D1D6);
@@ -74,8 +64,6 @@ class AppColors {
   static const Color lightTextSecondary = Color(0xFF6C6C70);
   static const Color lightShadow = Color(0x0C000000);
 }
-
-// Severity styling: no glow, no glassColor — just clean color+icon+label.
 
 class SeverityStyle {
   const SeverityStyle({
@@ -130,8 +118,6 @@ class SeverityStyle {
     }
   }
 }
-
-// Theme builder
 
 class AppTheme {
   const AppTheme._();
@@ -311,7 +297,7 @@ class AppTheme {
     );
   }
 
-  static String? _fontFamily() => null; // system font
+  static String? _fontFamily() => null;
 
   static TextTheme _buildTextTheme(Color primary, Color secondary) {
     return TextTheme(
@@ -389,8 +375,6 @@ class AppTheme {
     );
   }
 }
-
-// Shared decoration helpers
 
 class AppDecorations {
   const AppDecorations._();

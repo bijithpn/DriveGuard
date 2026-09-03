@@ -137,8 +137,6 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
   }
 }
 
-// Compact detail header
-
 class _DeviceHeader extends StatelessWidget {
   const _DeviceHeader({
     required this.device,
@@ -212,10 +210,9 @@ class _DeviceHeader extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Back
               _BackButton(isDark: isDark),
               const SizedBox(width: AppSpacing.md),
-              // Type icon
+
               Container(
                 width: 40,
                 height: 40,
@@ -227,7 +224,7 @@ class _DeviceHeader extends StatelessWidget {
                 child: Icon(_typeIcon(), color: style.color, size: 20),
               ),
               const SizedBox(width: AppSpacing.md),
-              // Name + meta
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,7 +278,7 @@ class _DeviceHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              // Temperature reading
+
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
@@ -354,8 +351,6 @@ class _BackButton extends StatelessWidget {
   }
 }
 
-// Native tab bar
-
 class _NativeTabBar extends StatelessWidget {
   const _NativeTabBar({required this.controller, required this.isDark});
   final TabController controller;
@@ -401,8 +396,6 @@ class _NativeTabBar extends StatelessWidget {
   }
 }
 
-// Temperature tab
-
 class _TemperatureTab extends ConsumerWidget {
   const _TemperatureTab({
     required this.device,
@@ -437,7 +430,6 @@ class _TemperatureTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gauge + stats
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -518,7 +510,6 @@ class _TemperatureTab extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.md),
 
-          // Source row
           if (device.primaryTemperature != null)
             _SourceRow(
               source: device.primaryTemperature!.source.toString(),
@@ -531,7 +522,6 @@ class _TemperatureTab extends ConsumerWidget {
           _SectionLabel(title: 'Temperature History', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
 
-          // Window selector
           Wrap(
             spacing: AppSpacing.xs,
             children: _historyWindows.keys.map((label) {
@@ -573,7 +563,6 @@ class _TemperatureTab extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.md),
 
-          // Chart
           Container(
             height: 200,
             decoration: BoxDecoration(
@@ -804,8 +793,6 @@ class _SectionLabel extends StatelessWidget {
     );
   }
 }
-
-// Professional monitoring chart
 
 class _HistoryChart extends StatelessWidget {
   const _HistoryChart({
@@ -1153,8 +1140,6 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
   }
 }
 
-// Health tab
-
 class _HealthTab extends StatelessWidget {
   const _HealthTab({required this.device, required this.isDark});
   final StorageDevice device;
@@ -1186,7 +1171,6 @@ class _HealthTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status card
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
@@ -1430,8 +1414,6 @@ class _HealthTile extends StatelessWidget {
   }
 }
 
-// Diagnostics tab
-
 class _DiagnosticsTab extends StatelessWidget {
   const _DiagnosticsTab({
     required this.device,
@@ -1571,7 +1553,6 @@ class _DiagnosticsTab extends StatelessWidget {
               child: identifierRows[i],
             ),
 
-          // Permission warning
           if (device.sensorAvailability ==
               SensorAvailability.permissionDenied) ...[
             const SizedBox(height: AppSpacing.lg),

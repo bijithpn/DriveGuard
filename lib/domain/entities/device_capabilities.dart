@@ -1,18 +1,6 @@
 import '../enums/storage_enums.dart';
 import 'storage_device.dart';
 
-/// Per-device telemetry capability breakdown (spec section 10) - distinct
-/// from [BackendCapabilities] in storage_monitor.dart, which describes what
-/// the OS *backend as a whole* can do. This describes what has actually
-/// been observed for *this one device*: a NVMe drive behind an
-/// unsupported RAID HBA and a well-supported one both report
-/// `canEnumerateDevices: true` at the backend level, but only one of them
-/// will show `temperature: true` here.
-///
-/// Every field is derived from data the device already carries - nothing
-/// here is a fresh native call, and nothing is guessed from device type
-/// alone. A field is `true` only because a real reading populated it,
-/// matching spec section 42 ("do not show fake values").
 class DeviceCapabilities {
   const DeviceCapabilities({
     required this.temperature,
@@ -42,24 +30,24 @@ class DeviceCapabilities {
       multipleSensors: device.sensors.length > 1,
       smart: hasHealth,
       health: hasHealth,
-      nvmeHealth: device.interfaceType == StorageInterfaceType.nvme &&
-          (health.availableSparePercent != null || health.criticalWarning != null),
+      nvmeHealth:
+          device.interfaceType == StorageInterfaceType.nvme &&
+          (health.availableSparePercent != null ||
+              health.criticalWarning != null),
       powerCycles: health.powerCycles != null,
       powerOnHours: health.powerOnHours != null,
       percentageUsed: health.percentageUsed != null,
     );
   }
 
-  /// Ordered (label, available) pairs for display - spec section 10's
-  /// "Temperature ✓ / Health — " list format.
   List<(String, bool)> get entries => [
-        ('Temperature', temperature),
-        ('Multiple sensors', multipleSensors),
-        ('SMART', smart),
-        ('Health', health),
-        ('NVMe data', nvmeHealth),
-        ('Power cycles', powerCycles),
-        ('Power-on hours', powerOnHours),
-        ('Percentage used', percentageUsed),
-      ];
+    ('Temperature', temperature),
+    ('Multiple sensors', multipleSensors),
+    ('SMART', smart),
+    ('Health', health),
+    ('NVMe data', nvmeHealth),
+    ('Power cycles', powerCycles),
+    ('Power-on hours', powerOnHours),
+    ('Percentage used', percentageUsed),
+  ];
 }

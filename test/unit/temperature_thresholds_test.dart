@@ -3,7 +3,10 @@ import 'package:driveguard/domain/enums/storage_enums.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const thresholds = TemperatureThresholds(warningCelsius: 60, criticalCelsius: 70);
+  const thresholds = TemperatureThresholds(
+    warningCelsius: 60,
+    criticalCelsius: 70,
+  );
 
   group('TemperatureThresholds.classify', () {
     test('below warning band is normal', () {
@@ -27,15 +30,18 @@ void main() {
     });
   });
 
-  test('recovery points sit below their threshold by the hysteresis margin', () {
-    const custom = TemperatureThresholds(
-      warningCelsius: 60,
-      criticalCelsius: 70,
-      recoveryHysteresisCelsius: 5,
-    );
-    expect(custom.criticalRecoveryCelsius, 65);
-    expect(custom.warningRecoveryCelsius, 55);
-  });
+  test(
+    'recovery points sit below their threshold by the hysteresis margin',
+    () {
+      const custom = TemperatureThresholds(
+        warningCelsius: 60,
+        criticalCelsius: 70,
+        recoveryHysteresisCelsius: 5,
+      );
+      expect(custom.criticalRecoveryCelsius, 65);
+      expect(custom.warningRecoveryCelsius, 55);
+    },
+  );
 
   test('round-trips through JSON', () {
     final json = thresholds.toJson();

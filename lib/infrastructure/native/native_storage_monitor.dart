@@ -9,19 +9,6 @@ import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 import 'storage_native_channel.dart';
 
-/// [StorageMonitor] backed by the platform's real native backend
-/// (DeviceIoControl on Windows, IOKit on macOS, sysfs/ioctl on Linux - see
-/// docs/architecture.md) via [StorageNativeChannel], rather than shelling
-/// out to a CLI tool.
-///
-/// A native channel handler may legitimately not exist yet on a given
-/// platform/build (during incremental rollout) or may only support part of
-/// the contract (e.g. macOS IOKit enumerates devices natively but cannot
-/// read SMART/NVMe temperature without a private entitlement Apple does not
-/// grant third-party apps). [isAvailable] reflects whether the channel
-/// responds at all; per-call `null`/[MissingPluginException] results let
-/// [FallbackStorageMonitor] fall through to the legacy CLI backend
-/// independently for enumeration vs. temperature vs. health.
 class NativeStorageMonitor implements StorageMonitor {
   static const _tag = 'NativeStorageMonitor';
   final _channel = StorageNativeChannel.instance;
@@ -51,8 +38,12 @@ class NativeStorageMonitor implements StorageMonitor {
         canEnumerateDevices: raw['canEnumerateDevices'] == true,
         canReadTemperature: raw['canReadTemperature'] == true,
         canReadHealth: raw['canReadHealth'] == true,
-        missingTools: (raw['missingTools'] as List?)?.map((e) => e.toString()).toList() ?? const [],
-        notes: (raw['notes'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+        missingTools:
+            (raw['missingTools'] as List?)?.map((e) => e.toString()).toList() ??
+            const [],
+        notes:
+            (raw['notes'] as List?)?.map((e) => e.toString()).toList() ??
+            const [],
       );
     } on MissingPluginException {
       return const BackendCapabilities(
@@ -94,19 +85,19 @@ class NativeStorageMonitor implements StorageMonitor {
   }
 
   StorageDeviceType _parseDeviceType(String? v) => switch (v) {
-        'nvme' => StorageDeviceType.nvme,
-        'ssd' => StorageDeviceType.ssd,
-        'hdd' => StorageDeviceType.hdd,
-        _ => StorageDeviceType.unknown,
-      };
+    'nvme' => StorageDeviceType.nvme,
+    'ssd' => StorageDeviceType.ssd,
+    'hdd' => StorageDeviceType.hdd,
+    _ => StorageDeviceType.unknown,
+  };
 
   StorageInterfaceType _parseInterfaceType(String? v) => switch (v) {
-        'nvme' => StorageInterfaceType.nvme,
-        'sata' => StorageInterfaceType.sata,
-        'usb' => StorageInterfaceType.usb,
-        'scsi' => StorageInterfaceType.scsi,
-        _ => StorageInterfaceType.unknown,
-      };
+    'nvme' => StorageInterfaceType.nvme,
+    'sata' => StorageInterfaceType.sata,
+    'usb' => StorageInterfaceType.usb,
+    'scsi' => StorageInterfaceType.scsi,
+    _ => StorageInterfaceType.unknown,
+  };
 
   @override
   Future<TemperatureReading?> readTemperature(String deviceId) async {
@@ -121,8 +112,9 @@ class NativeStorageMonitor implements StorageMonitor {
     if (celsius == null) return null;
 
     final timestampMs = (raw['timestampMs'] as num?)?.toInt();
-    final timestamp =
-        timestampMs != null ? DateTime.fromMillisecondsSinceEpoch(timestampMs) : DateTime.now();
+    final timestamp = timestampMs != null
+        ? DateTime.fromMillisecondsSinceEpoch(timestampMs)
+        : DateTime.now();
 
     if (!TemperatureUtils.isPlausibleValue(celsius)) {
       return TemperatureReading(
@@ -133,7 +125,8 @@ class NativeStorageMonitor implements StorageMonitor {
           sensorId: raw['sensorId']?.toString() ?? 'composite',
         ),
         isValid: false,
-        invalidReason: 'Implausible temperature from native backend: $celsius°C',
+        invalidReason:
+            'Implausible temperature from native backend: $celsius°C',
       );
     }
 
@@ -149,20 +142,22 @@ class NativeStorageMonitor implements StorageMonitor {
 
   @override
   Future<List<StorageSensor>> getSensors(String deviceId) async {
-    // Multiple distinct sensors (NVMe composite + per-namespace/controller -
-    // spec section 12) where the native backend actually reports them.
     try {
       final raw = await _channel.getSensors(deviceId);
       if (raw.isNotEmpty) {
         final now = DateTime.now();
-        final sensors = raw.map((m) => _sensorFromMap(m, now)).whereType<StorageSensor>().toList();
+        final sensors = raw
+            .map((m) => _sensorFromMap(m, now))
+            .whereType<StorageSensor>()
+            .toList();
         if (sensors.isNotEmpty) return sensors;
       }
     } on MissingPluginException {
-      // No multi-sensor support on this platform/build - fall through to
-      // wrapping the single composite reading below.
     } catch (e) {
-      AppLogger.instance.debug(_tag, 'Native multi-sensor read failed for $deviceId: $e');
+      AppLogger.instance.debug(
+        _tag,
+        'Native multi-sensor read failed for $deviceId: $e',
+      );
     }
 
     final reading = await readTemperature(deviceId);
@@ -170,7 +165,9 @@ class NativeStorageMonitor implements StorageMonitor {
     return [
       StorageSensor(
         id: reading.source.sensorId,
-        name: reading.source.sensorId == 'composite' ? 'Composite' : reading.source.sensorId,
+        name: reading.source.sensorId == 'composite'
+            ? 'Composite'
+            : reading.source.sensorId,
         reading: reading,
         type: TemperatureSensorType.composite,
         isPrimary: true,
@@ -194,7 +191,9 @@ class NativeStorageMonitor implements StorageMonitor {
       id: id,
       name: name,
       reading: reading,
-      type: id == 'composite' ? TemperatureSensorType.composite : TemperatureSensorType.namespace,
+      type: id == 'composite'
+          ? TemperatureSensorType.composite
+          : TemperatureSensorType.namespace,
       isPrimary: isPrimary,
     );
   }
@@ -222,10 +221,10 @@ class NativeStorageMonitor implements StorageMonitor {
   }
 
   DeviceHealthStatus _parseHealthStatus(String? v) => switch (v) {
-        'healthy' => DeviceHealthStatus.healthy,
-        'warning' => DeviceHealthStatus.warning,
-        'critical' => DeviceHealthStatus.critical,
-        'unavailable' => DeviceHealthStatus.unavailable,
-        _ => DeviceHealthStatus.unknown,
-      };
+    'healthy' => DeviceHealthStatus.healthy,
+    'warning' => DeviceHealthStatus.warning,
+    'critical' => DeviceHealthStatus.critical,
+    'unavailable' => DeviceHealthStatus.unavailable,
+    _ => DeviceHealthStatus.unknown,
+  };
 }

@@ -5,9 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../application/settings/app_settings.dart';
 import '../../core/logging/app_logger.dart';
 
-/// Persists [AppSettings] via shared_preferences (the platform-correct
-/// small-KV store on each of Windows/macOS/Linux - not an ad-hoc JSON
-/// file on disk, per section 33).
 class SettingsRepository {
   static const _key = 'driveguard.settings.v1';
 
@@ -18,7 +15,11 @@ class SettingsRepository {
       if (raw == null) return const AppSettings();
       return AppSettings.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (e) {
-      AppLogger.instance.error('SettingsRepository', 'Failed to load settings, using defaults', e);
+      AppLogger.instance.error(
+        'SettingsRepository',
+        'Failed to load settings, using defaults',
+        e,
+      );
       return const AppSettings();
     }
   }
@@ -28,7 +29,11 @@ class SettingsRepository {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_key, jsonEncode(settings.toJson()));
     } catch (e) {
-      AppLogger.instance.error('SettingsRepository', 'Failed to save settings', e);
+      AppLogger.instance.error(
+        'SettingsRepository',
+        'Failed to save settings',
+        e,
+      );
     }
   }
 }

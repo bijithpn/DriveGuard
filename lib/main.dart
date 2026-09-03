@@ -18,54 +18,39 @@ import 'presentation/app_root.dart';
 import 'presentation/widget/mini_widget_app.dart';
 
 void main() {
-  // Framework-caught widget-build errors (thrown during build/layout/paint)
-  // still render Flutter's normal red error screen via presentError - we
-  // only add structured logging alongside it so a crash also lands in
-  // AppLogger (and therefore in Settings -> Advanced -> Export Diagnostic
-  // Report), instead of only ever existing as terminal scrollback.
   FlutterError.onError = (FlutterErrorDetails details) {
-    AppLogger.instance.error('FlutterError', details.exceptionAsString(), details.exception);
+    AppLogger.instance.error(
+      'FlutterError',
+      details.exceptionAsString(),
+      details.exception,
+    );
     FlutterError.presentError(details);
   };
 
-  // Errors thrown outside the widget build pipeline (a bad async call in a
-  // service, a stream listener throwing, etc.) do NOT go through
-  // FlutterError.onError and would otherwise crash the isolate silently on
-  // desktop with nothing but a stack trace in the terminal. Returning true
-  // marks it handled so the app keeps running instead of dying.
   PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
     AppLogger.instance.error('PlatformDispatcher', 'Uncaught error', error);
     return true;
   };
 
-  // Everything - including `WidgetsFlutterBinding.ensureInitialized()` -
-  // has to run inside this same zone. Calling `ensureInitialized()` before
-  // `runZonedGuarded` (as an earlier version of this file did, to decide
-  // between the two branches below) binds the framework to the root zone
-  // while `runApp` for the dashboard path then runs inside this child zone
-  // instead - a real "Zone mismatch" Flutter warns about, not just a
-  // style nit.
   runZonedGuarded(_run, (error, stack) {
-    AppLogger.instance.error('main', 'Uncaught zone error during bootstrap', error);
+    AppLogger.instance.error(
+      'main',
+      'Uncaught zone error during bootstrap',
+      error,
+    );
   });
 }
 
 Future<void> _run() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // `desktop_multi_window` gives every window - including this process's
-  // very first one - a `WindowController`. The mini-widget window is
-  // created with JSON `arguments` (see DesktopWindowController.
-  // enterWidgetMode); the main window's own controller has none. That's
-  // the only signal available this early to tell which one this process
-  // instance is - it must branch before any of the normal bootstrap below
-  // runs, since the widget window is a separate engine/isolate with no
-  // access to the main window's ProviderScope, storage backend, or
-  // monitoring service, and must never re-run any of that.
   final windowController = await WindowController.fromCurrentEngine();
   if (windowController.arguments.isNotEmpty) {
-    final initialArgs = jsonDecode(windowController.arguments) as Map<String, dynamic>;
-    runApp(MiniWidgetApp(controller: windowController, initialArgs: initialArgs));
+    final initialArgs =
+        jsonDecode(windowController.arguments) as Map<String, dynamic>;
+    runApp(
+      MiniWidgetApp(controller: windowController, initialArgs: initialArgs),
+    );
     return;
   }
 
@@ -80,23 +65,25 @@ Future<void> _bootstrap() async {
     AppLogger.instance.verboseDiagnostics = settings.diagnosticLoggingEnabled;
     AppLogger.instance.info('main', 'DriveGuard starting');
 
-    final backend = await StorageMonitorFactory.create(forceMock: settings.mockBackendForced);
+    final backend = await StorageMonitorFactory.create(
+      forceMock: settings.mockBackendForced,
+    );
     final notificationService = LocalNotifierService();
 
     final windowController = DesktopWindowController();
     await windowController.initialize(startMinimized: settings.startMinimized);
 
     try {
-      launchAtStartup.setup(appName: 'DriveGuard', appPath: Platform.resolvedExecutable);
+      launchAtStartup.setup(
+        appName: 'DriveGuard',
+        appPath: Platform.resolvedExecutable,
+      );
       if (settings.startWithOS) {
         await launchAtStartup.enable();
       } else {
         await launchAtStartup.disable();
       }
     } catch (e) {
-      // Not every platform's launch_at_startup implementation supports
-      // every method (e.g. a missing platform channel implementation) -
-      // this is a non-fatal capability gap, not a startup failure.
       AppLogger.instance.warning('main', 'launch-at-startup setup skipped: $e');
     }
 
@@ -105,21 +92,13 @@ Future<void> _bootstrap() async {
         overrides: [
           storageMonitorProvider.overrideWithValue(backend),
           notificationServiceProvider.overrideWithValue(notificationService),
-          // The settings loaded from disk are supplied here, at provider
-          // construction, rather than by mutating settingsProvider.notifier
-          // from a descendant's initState (that pattern caused a real
-          // '!_dirty' reentrant-rebuild crash - see SettingsNotifier's doc
-          // comment).
+
           settingsProvider.overrideWith(() => SettingsNotifier(settings)),
         ],
         child: _Bootstrapper(windowController: windowController),
       ),
     );
   } catch (error, stack) {
-    // If startup itself fails (before there is any UI to show a normal
-    // error in), show something rather than leaving a blank/frozen
-    // window - this uses Flutter's own error-screen widget so it looks
-    // and behaves like any other Flutter error, not a bespoke screen.
     AppLogger.instance.error('main', 'Bootstrap failed', error);
     runApp(_BootstrapFailureApp(error: error, stack: stack));
   }
@@ -143,9 +122,6 @@ class _BootstrapFailureApp extends StatelessWidget {
   }
 }
 
-/// Starts the monitoring service exactly once (after settings have
-/// already been supplied via provider override) before handing off to
-/// [AppRoot].
 class _Bootstrapper extends ConsumerStatefulWidget {
   const _Bootstrapper({required this.windowController});
   final DesktopWindowController windowController;
@@ -199,7 +175,11 @@ class _BootstrapperState extends ConsumerState<_Bootstrapper> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.storage_rounded, color: Colors.white, size: 32),
+                  child: const Icon(
+                    Icons.storage_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 const Text(
@@ -221,7 +201,9 @@ class _BootstrapperState extends ConsumerState<_Bootstrapper> {
                   width: 180,
                   child: LinearProgressIndicator(
                     backgroundColor: const Color(0xFF201E4D),
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7E5FF0)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF7E5FF0),
+                    ),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),

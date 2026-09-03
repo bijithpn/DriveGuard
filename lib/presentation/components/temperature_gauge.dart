@@ -5,10 +5,6 @@ import 'package:flutter/material.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../theme/app_theme.dart';
 
-/// Quiet circular temperature gauge.
-/// - Thinner arc on a neutral track.
-/// - No glow, no bright tip dot, no scale pulsing.
-/// - Value changes tween smoothly (controller preserved).
 class TemperatureGauge extends StatefulWidget {
   const TemperatureGauge({
     super.key,
@@ -20,10 +16,8 @@ class TemperatureGauge extends StatefulWidget {
     this.labelText,
   });
 
-  /// Pre-formatted value string, e.g. "48 C" or "Unavailable".
   final String valueText;
 
-  /// 0..1 fill fraction.
   final double fraction;
   final TemperatureSeverity severity;
   final double size;
@@ -146,9 +140,8 @@ class _GaugePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.width / 2 - 8;
-    final strokeWidth = size.width * 0.06; // thinner than before
+    final strokeWidth = size.width * 0.06;
 
-    // Track
     final trackPaint = Paint()
       ..color = trackColor
       ..style = PaintingStyle.stroke
@@ -165,7 +158,6 @@ class _GaugePainter extends CustomPainter {
     final clamped = fraction.clamp(0.0, 1.0);
     if (clamped <= 0) return;
 
-    // Value arc — flat single color, no gradient, no glow
     final valuePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -178,7 +170,6 @@ class _GaugePainter extends CustomPainter {
       false,
       valuePaint,
     );
-    // No tip dot; the arc end is sufficiently clear.
   }
 
   @override

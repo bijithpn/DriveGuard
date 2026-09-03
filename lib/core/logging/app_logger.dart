@@ -20,12 +20,6 @@ class LogEntry {
   }
 }
 
-/// Structured, in-memory-ring-buffered application logger.
-///
-/// Section 30 requires: log key lifecycle events, never log sensitive
-/// identifiers (serial numbers) by default, and expose a diagnostic export.
-/// This is intentionally simple - no third-party logging dependency is
-/// justified for a single-process desktop app.
 class AppLogger {
   AppLogger._();
   static final AppLogger instance = AppLogger._();
@@ -33,9 +27,6 @@ class AppLogger {
   static const int _maxEntries = 2000;
   final Queue<LogEntry> _entries = Queue<LogEntry>();
 
-  /// When false (default), callers must not pass serial numbers/identifiers
-  /// into log messages. This flag only widens what *diagnostic export*
-  /// includes, matching Settings -> Advanced -> Diagnostic logging.
   bool verboseDiagnostics = false;
 
   void debug(String tag, String message) => _log(LogLevel.debug, tag, message);
@@ -51,7 +42,7 @@ class AppLogger {
     while (_entries.length > _maxEntries) {
       _entries.removeFirst();
     }
-    // ignore: avoid_print
+
     print(entry);
   }
 

@@ -7,8 +7,6 @@ import '../theme/app_theme.dart';
 import 'device_presentation.dart';
 import 'temperature_gauge.dart';
 
-/// Flat drive card. No gradients, no glow, no pulsing.
-/// Hover shows a subtle border/background change only.
 class DriveCard extends StatefulWidget {
   const DriveCard({
     super.key,
@@ -149,7 +147,6 @@ class _DriveCardState extends State<DriveCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
                   Row(
                     children: [
                       _TypeBadge(icon: _typeIcon(), color: style.color),
@@ -182,7 +179,7 @@ class _DriveCardState extends State<DriveCard> {
                           ],
                         ),
                       ),
-                      // Static status indicator (no pulse)
+
                       _StatusIndicator(
                         severity: presentation.severity,
                         color: style.color,
@@ -192,7 +189,6 @@ class _DriveCardState extends State<DriveCard> {
 
                   const SizedBox(height: AppSpacing.md),
 
-                  // Temperature gauge
                   Center(
                     child: TemperatureGauge(
                       valueText: presentation.valueText,
@@ -205,7 +201,6 @@ class _DriveCardState extends State<DriveCard> {
 
                   const SizedBox(height: AppSpacing.md),
 
-                  // Stale data
                   if (presentation.isStaleLike)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -230,7 +225,6 @@ class _DriveCardState extends State<DriveCard> {
                       ),
                     ),
 
-                  // Divider
                   Divider(
                     height: 1,
                     thickness: 1,
@@ -239,7 +233,6 @@ class _DriveCardState extends State<DriveCard> {
 
                   const SizedBox(height: AppSpacing.sm),
 
-                  // Stats row
                   Row(
                     children: [
                       _StatColumn(
@@ -282,9 +275,6 @@ class _TypeBadge extends StatelessWidget {
   }
 }
 
-/// Static colored dot + icon indicating severity.
-/// No pulsing animation; warning/critical are clear through color and the
-/// icon label on the gauge itself.
 class _StatusIndicator extends StatelessWidget {
   const _StatusIndicator({required this.severity, required this.color});
   final TemperatureSeverity severity;
@@ -292,7 +282,6 @@ class _StatusIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // For critical/warning show an icon in addition to the dot for clarity.
     if (severity == TemperatureSeverity.critical ||
         severity == TemperatureSeverity.warning) {
       return Icon(

@@ -10,29 +10,6 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-/// Windows backend.
-///
-/// IMPORTANT / honest limitation (see docs/platform-support.md): this
-/// implementation is written against documented Windows storage
-/// management APIs but has **not been compiled or run** in this
-/// environment (no Windows machine available during development). It
-/// should be built and smoke-tested on real Windows hardware before being
-/// trusted in production.
-///
-/// Enumeration and temperature both go through `MSFT_PhysicalDisk` /
-/// `Get-StorageReliabilityCounter` in the Storage Management WMI
-/// namespace (`root\Microsoft\Windows\Storage`), invoked via PowerShell.
-/// This is the standard, storport-mediated path Windows itself uses for
-/// Explorer/Optimize-Drives-style health reporting, and it works for
-/// NVMe, SATA and most USB-attached disks without extra elevation for
-/// read access on most systems. It is intentionally *not* a raw shell
-/// string: PowerShell is invoked once with a fixed script and structured
-/// JSON output, never string-interpolated with device-controlled data.
-///
-/// A lower-level DeviceIoControl (IOCTL_STORAGE_QUERY_PROPERTY /
-/// IOCTL_SCSI_MINIPORT) native FFI backend would avoid the PowerShell
-/// process-spawn cost per poll and is the documented upgrade path (see
-/// docs/architecture.md) but is out of scope for this pass.
 class WindowsStorageMonitor implements StorageMonitor {
   static const _tag = 'WindowsStorageMonitor';
 
@@ -53,15 +30,10 @@ Get-CimInstance -Namespace root\Microsoft\Windows\Storage -ClassName MSFT_Physic
   } | ConvertTo-Json -Compress
 ''';
 
-  /// `MSFT_PhysicalDisk.DeviceId` is documented as a small numeric string
-  /// ("0", "1", ...) on every Windows release. Rejecting anything else
-  /// before it is interpolated into the PowerShell script text means a
-  /// malformed or unexpected DeviceId can never break out of the intended
-  /// `-eq '...'` string literal (section 43) - it fails closed with
-  /// [CommandExecutionException] instead.
   static final RegExp _validDeviceId = RegExp(r'^[0-9A-Za-z_.\-]{1,64}$');
 
-  static String _reliabilityScript(String deviceId) => '''
+  static String _reliabilityScript(String deviceId) =>
+      '''
 \$disk = Get-CimInstance -Namespace root\\Microsoft\\Windows\\Storage -ClassName MSFT_PhysicalDisk | Where-Object { \$_.DeviceId -eq '${deviceId.replaceAll("'", "''")}' }
 if (\$null -eq \$disk) { exit 2 }
 \$counter = \$disk | Get-StorageReliabilityCounter
@@ -74,12 +46,16 @@ if (\$null -eq \$disk) { exit 2 }
 } | ConvertTo-Json -Compress
 ''';
 
-  Future<Object?> _runPowerShellJson(String script, {String? deviceIdForError}) async {
-    final result = await SafeProcessRunner.instance.run(
-      'powershell',
-      ['-NoProfile', '-NonInteractive', '-Command', script],
-      requireZeroExit: false,
-    );
+  Future<Object?> _runPowerShellJson(
+    String script, {
+    String? deviceIdForError,
+  }) async {
+    final result = await SafeProcessRunner.instance.run('powershell', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      script,
+    ], requireZeroExit: false);
     final text = result.stdout.trim();
     if (text.isEmpty) return null;
     try {
@@ -93,7 +69,8 @@ if (\$null -eq \$disk) { exit 2 }
   }
 
   @override
-  Future<bool> isAvailable() async => SafeProcessRunner.instance.exists('powershell');
+  Future<bool> isAvailable() async =>
+      SafeProcessRunner.instance.exists('powershell');
 
   @override
   Future<BackendCapabilities> getCapabilities() async {
@@ -149,17 +126,19 @@ if (\$null -eq \$disk) { exit 2 }
           type = StorageDeviceType.unknown;
         }
 
-        devices.add(StorageDevice(
-          id: 'windows-$deviceId',
-          type: type,
-          interfaceType: interfaceType,
-          sensorAvailability: SensorAvailability.unavailable,
-          model: item['FriendlyName']?.toString(),
-          manufacturer: item['Manufacturer']?.toString(),
-          serialNumber: item['SerialNumber']?.toString(),
-          capacityBytes: int.tryParse(item['Size']?.toString() ?? ''),
-          isRemovable: interfaceType == StorageInterfaceType.usb,
-        ));
+        devices.add(
+          StorageDevice(
+            id: 'windows-$deviceId',
+            type: type,
+            interfaceType: interfaceType,
+            sensorAvailability: SensorAvailability.unavailable,
+            model: item['FriendlyName']?.toString(),
+            manufacturer: item['Manufacturer']?.toString(),
+            serialNumber: item['SerialNumber']?.toString(),
+            capacityBytes: int.tryParse(item['Size']?.toString() ?? ''),
+            isRemovable: interfaceType == StorageInterfaceType.usb,
+          ),
+        );
       }
     } catch (e) {
       AppLogger.instance.error(_tag, 'Device enumeration failed', e);
@@ -180,7 +159,10 @@ if (\$null -eq \$disk) { exit 2 }
     }
     Object? raw;
     try {
-      raw = await _runPowerShellJson(_reliabilityScript(rawId), deviceIdForError: deviceId);
+      raw = await _runPowerShellJson(
+        _reliabilityScript(rawId),
+        deviceIdForError: deviceId,
+      );
     } on CommandExecutionException {
       rethrow;
     } catch (e) {
@@ -188,14 +170,17 @@ if (\$null -eq \$disk) { exit 2 }
       if (message.contains('access') && message.contains('denied')) {
         throw PermissionDeniedException(deviceId, e.toString());
       }
-      AppLogger.instance.warning(_tag, 'Reliability counter read failed for $deviceId: $e');
+      AppLogger.instance.warning(
+        _tag,
+        'Reliability counter read failed for $deviceId: $e',
+      );
       return null;
     }
     if (raw is! Map<String, dynamic>) return null;
     final temp = raw['Temperature'];
-    if (temp == null) return null; // counter exists but no temperature exposed
+    if (temp == null) return null;
     final celsius = (temp as num).toDouble();
-    if (celsius <= 0) return null; // 0/absent is Storage Management's "not reported", not a real 0°C
+    if (celsius <= 0) return null;
 
     if (!TemperatureUtils.isPlausibleValue(celsius)) {
       throw InvalidReadingException(
@@ -208,7 +193,9 @@ if (\$null -eq \$disk) { exit 2 }
       celsius: celsius,
       timestamp: DateTime.now(),
       source: const TemperatureSource(
-          backendName: 'StorageReliabilityCounter', sensorId: 'composite'),
+        backendName: 'StorageReliabilityCounter',
+        sensorId: 'composite',
+      ),
     );
   }
 
@@ -232,7 +219,10 @@ if (\$null -eq \$disk) { exit 2 }
     final rawId = _rawId(deviceId);
     if (!_validDeviceId.hasMatch(rawId)) return DeviceHealth.unavailable;
     try {
-      final raw = await _runPowerShellJson(_reliabilityScript(rawId), deviceIdForError: deviceId);
+      final raw = await _runPowerShellJson(
+        _reliabilityScript(rawId),
+        deviceIdForError: deviceId,
+      );
       if (raw is! Map<String, dynamic>) return DeviceHealth.unavailable;
       final wear = raw['Wear'];
       final readErrors = (raw['ReadErrorsUncorrected'] as num?)?.toInt();

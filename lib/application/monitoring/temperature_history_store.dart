@@ -16,12 +16,6 @@ class HistoryStats {
   final double? average;
 }
 
-/// Bounded in-memory temperature history per device (section 17).
-///
-/// Raw samples are kept at full resolution for [AppConstants.rawHistoryRetention];
-/// older points are downsampled into 1-minute buckets so memory stays
-/// bounded regardless of how long the app runs, instead of growing
-/// unboundedly or being dropped outright once the raw window rolls off.
 class TemperatureHistoryStore {
   final Map<String, Queue<HistoryPoint>> _raw = {};
   final Map<String, Queue<HistoryPoint>> _aggregated = {};
@@ -39,12 +33,18 @@ class TemperatureHistoryStore {
     final rawCutoff = now.subtract(AppConstants.rawHistoryRetention);
     while (raw.isNotEmpty && raw.first.timestamp.isBefore(rawCutoff)) {
       final point = raw.removeFirst();
-      final agg = _aggregated.putIfAbsent(deviceId, () => Queue<HistoryPoint>());
-      final bucketStart = DateTime(point.timestamp.year, point.timestamp.month,
-          point.timestamp.day, point.timestamp.hour, point.timestamp.minute);
+      final agg = _aggregated.putIfAbsent(
+        deviceId,
+        () => Queue<HistoryPoint>(),
+      );
+      final bucketStart = DateTime(
+        point.timestamp.year,
+        point.timestamp.month,
+        point.timestamp.day,
+        point.timestamp.hour,
+        point.timestamp.minute,
+      );
       if (agg.isNotEmpty && agg.last.timestamp == bucketStart) {
-        // averaged in-place would need mutable state; simplest correct
-        // approach is to keep one representative sample per minute bucket.
         continue;
       }
       agg.addLast(HistoryPoint(bucketStart, point.celsius));

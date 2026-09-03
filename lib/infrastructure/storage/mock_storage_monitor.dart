@@ -8,14 +8,6 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-/// Development/demo backend used automatically when no real backend is
-/// available (or explicitly via Settings -> Advanced) so the UI, alert
-/// engine and charts can be exercised without physical hardware.
-///
-/// Simulates a realistic mixed fleet: an NVMe with a healthy thermal
-/// curve, a SATA SSD, a spinning HDD that runs warmer under simulated
-/// load, and a USB drive with genuinely unavailable telemetry - plus
-/// scriptable disconnect/reconnect and spike scenarios for manual QA.
 class MockStorageMonitor implements StorageMonitor {
   MockStorageMonitor({Random? random}) : _random = random ?? Random(7);
 
@@ -42,8 +34,6 @@ class MockStorageMonitor implements StorageMonitor {
   bool _usbConnected = true;
   final DateTime _start = DateTime.now();
 
-  /// Test/demo hook: force a specific device to a specific temperature on
-  /// the next read (used by the Advanced -> "Simulate" debug controls).
   void forceTemperature(String deviceId, double celsius) {
     for (final s in [_nvme, _sataSsd, _hdd]) {
       if (s.id == deviceId) s.override = celsius;
@@ -56,7 +46,8 @@ class MockStorageMonitor implements StorageMonitor {
   Future<bool> isAvailable() async => true;
 
   @override
-  Future<BackendCapabilities> getCapabilities() async => const BackendCapabilities(
+  Future<BackendCapabilities> getCapabilities() async =>
+      const BackendCapabilities(
         backendName: 'Mock',
         canEnumerateDevices: true,
         canReadTemperature: true,
@@ -99,17 +90,19 @@ class MockStorageMonitor implements StorageMonitor {
       ),
     ];
     if (_usbConnected) {
-      devices.add(const StorageDevice(
-        id: 'mock-usb-hdd-1',
-        type: StorageDeviceType.hdd,
-        interfaceType: StorageInterfaceType.usb,
-        sensorAvailability: SensorAvailability.unsupported,
-        model: 'Generic USB 3.0 Enclosure',
-        manufacturer: null,
-        serialNumber: 'MOCKSN0004',
-        capacityBytes: 4000000000000,
-        isRemovable: true,
-      ));
+      devices.add(
+        const StorageDevice(
+          id: 'mock-usb-hdd-1',
+          type: StorageDeviceType.hdd,
+          interfaceType: StorageInterfaceType.usb,
+          sensorAvailability: SensorAvailability.unsupported,
+          model: 'Generic USB 3.0 Enclosure',
+          manufacturer: null,
+          serialNumber: 'MOCKSN0004',
+          capacityBytes: 4000000000000,
+          isRemovable: true,
+        ),
+      );
     }
     return devices;
   }
@@ -118,8 +111,6 @@ class MockStorageMonitor implements StorageMonitor {
   Future<TemperatureReading?> readTemperature(String deviceId) async {
     await Future<void>.delayed(const Duration(milliseconds: 15));
     if (deviceId == 'mock-usb-hdd-1') {
-      // Structurally unsupported - this backend never returns a fabricated
-      // number for it.
       return null;
     }
     final state = [_nvme, _sataSsd, _hdd].firstWhere(
@@ -130,7 +121,10 @@ class MockStorageMonitor implements StorageMonitor {
     return TemperatureReading(
       celsius: celsius,
       timestamp: DateTime.now(),
-      source: const TemperatureSource(backendName: 'Mock', sensorId: 'composite'),
+      source: const TemperatureSource(
+        backendName: 'Mock',
+        sensorId: 'composite',
+      ),
     );
   }
 

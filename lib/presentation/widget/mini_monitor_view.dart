@@ -7,13 +7,6 @@ import '../../application/widget/mini_widget_snapshot.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../theme/app_theme.dart';
 
-// Design read: compact always-on-top desktop utility widget for a technical
-// user who glances at it frequently. Native dark panel, dense information
-// layout, clear temperature hierarchy. Status carried by color only - no
-// decorative glow or animation clutter. VARIANCE 4 / MOTION 3 / DENSITY 8.
-
-/// Always-on-top mini temperature monitor widget.
-/// Pure data-in, no Riverpod. [snapshot] arrives over the method channel.
 class MiniMonitorView extends StatelessWidget {
   const MiniMonitorView({
     super.key,
@@ -80,8 +73,6 @@ class MiniMonitorView extends StatelessWidget {
   }
 }
 
-// Widget shell: the outer container with the native dark surface treatment.
-
 class _WidgetShell extends StatelessWidget {
   const _WidgetShell({required this.child});
   final Widget child;
@@ -90,14 +81,9 @@ class _WidgetShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        // Slightly translucent dark surface. On macOS this reads as native
-        // because the system compositor fills the blur layer underneath.
-        color: const Color(0xEA1C1C1E), // bg0 at 92% opacity
+        color: const Color(0xEA1C1C1E),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: const Color(0xFF3A3A3C), // AppColors.border
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFF3A3A3C), width: 1),
         boxShadow: const [
           BoxShadow(
             color: Color(0x50000000),
@@ -105,7 +91,7 @@ class _WidgetShell extends StatelessWidget {
             spreadRadius: 0,
             offset: Offset(0, 6),
           ),
-          // Inner highlight to simulate a slight raised edge
+
           BoxShadow(
             color: Color(0x0CFFFFFF),
             blurRadius: 0,
@@ -121,8 +107,6 @@ class _WidgetShell extends StatelessWidget {
     );
   }
 }
-
-// Header row: app label, live status dot, device count, expand button.
 
 class _Header extends StatelessWidget {
   const _Header({
@@ -152,7 +136,6 @@ class _Header extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Status dot
           AnimatedContainer(
             duration: const Duration(milliseconds: 400),
             width: compact ? 5 : 6,
@@ -163,11 +146,11 @@ class _Header extends StatelessWidget {
             ),
           ),
           SizedBox(width: compact ? 5 : 6),
-          // Label
+
           Text(
             'Drives',
             style: TextStyle(
-              color: const Color(0xFF98989D), // textSecondary
+              color: const Color(0xFF98989D),
               fontSize: compact ? 10 : 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.1,
@@ -192,7 +175,7 @@ class _Header extends StatelessWidget {
             ),
           ],
           const Spacer(),
-          // Expand button
+
           _ExpandButton(onPressed: onExpand, compact: compact),
         ],
       ),
@@ -227,8 +210,8 @@ class _ExpandButtonState extends State<_ExpandButton> {
             height: widget.compact ? 18 : 20,
             decoration: BoxDecoration(
               color: _hovered
-                  ? const Color(0xFF48484A) // bg3
-                  : const Color(0xFF3A3A3C), // bg2
+                  ? const Color(0xFF48484A)
+                  : const Color(0xFF3A3A3C),
               borderRadius: BorderRadius.circular(4),
               border: Border.all(color: const Color(0xFF48484A), width: 1),
             ),
@@ -246,22 +229,14 @@ class _ExpandButtonState extends State<_ExpandButton> {
   }
 }
 
-// Divider used between header/list/footer
-
 class _WidgetDivider extends StatelessWidget {
   const _WidgetDivider();
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      height: 1,
-      thickness: 1,
-      color: Color(0xFF38383A), // AppColors.divider
-    );
+    return const Divider(height: 1, thickness: 1, color: Color(0xFF38383A));
   }
 }
-
-// Empty body when no devices are available yet
 
 class _EmptyBody extends StatelessWidget {
   const _EmptyBody({required this.compact});
@@ -296,8 +271,6 @@ class _EmptyBody extends StatelessWidget {
   }
 }
 
-// Device list
-
 class _DeviceList extends StatelessWidget {
   const _DeviceList({required this.devices, required this.compact});
 
@@ -318,7 +291,7 @@ class _DeviceList extends StatelessWidget {
               child: const Divider(
                 height: 1,
                 thickness: 1,
-                color: Color(0xFF2C2C2E), // slightly darker than main divider
+                color: Color(0xFF2C2C2E),
               ),
             ),
         ],
@@ -326,8 +299,6 @@ class _DeviceList extends StatelessWidget {
     );
   }
 }
-
-// Single drive row
 
 class _DeviceRow extends StatelessWidget {
   const _DeviceRow({required this.device, required this.compact});
@@ -346,28 +317,27 @@ class _DeviceRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Micro arc ring
           _TempRing(
             fraction: device.fraction,
             color: style.color,
             size: compact ? 22 : 26,
           ),
           SizedBox(width: compact ? 7 : 8),
-          // Name
+
           Expanded(
             child: Text(
               device.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: const Color(0xFFEEEEF0), // textPrimary
+                color: const Color(0xFFEEEEF0),
                 fontSize: compact ? 11 : 12,
                 fontWeight: FontWeight.w400,
               ),
             ),
           ),
           SizedBox(width: compact ? 6 : 8),
-          // Temperature value - the primary reading, clear and prominent
+
           Text(
             device.valueText,
             style: TextStyle(
@@ -382,8 +352,6 @@ class _DeviceRow extends StatelessWidget {
     );
   }
 }
-
-// Footer: one-line status summary
 
 class _Footer extends StatelessWidget {
   const _Footer({
@@ -453,8 +421,6 @@ class _Footer extends StatelessWidget {
   }
 }
 
-// Animated temperature ring gauge - quiet version
-
 class _TempRing extends StatelessWidget {
   const _TempRing({
     required this.fraction,
@@ -489,7 +455,6 @@ class _RingPainter extends CustomPainter {
   final double fraction;
   final Color color;
 
-  // Start from the top (-pi/2), sweep clockwise
   static const _start = -pi / 2;
 
   @override
@@ -498,7 +463,6 @@ class _RingPainter extends CustomPainter {
     final radius = size.width / 2 - 2;
     final strokeWidth = size.width * 0.18;
 
-    // Track
     canvas.drawCircle(
       center,
       radius,
@@ -510,7 +474,6 @@ class _RingPainter extends CustomPainter {
 
     if (fraction <= 0) return;
 
-    // Value arc
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       _start,

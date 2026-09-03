@@ -12,18 +12,14 @@ import '../notifications/notification_service.dart';
 import '../settings/app_settings.dart';
 import 'temperature_history_store.dart';
 
-/// Central monitoring scheduler (section 10 / 31): one poll timer and one
-/// discovery timer for the whole app, never one timer per device. A
-/// single device failing to read never stops polling the others (section
-/// 27/28) - every per-device operation is individually try/caught.
 class MonitoringService {
   MonitoringService({
     required StorageMonitor backend,
     required NotificationService notifications,
     required TemperatureHistoryStore historyStore,
-  })  : _backend = backend,
-        _notifications = notifications,
-        _historyStore = historyStore;
+  }) : _backend = backend,
+       _notifications = notifications,
+       _historyStore = historyStore;
 
   static const _tag = 'MonitoringService';
 
@@ -37,7 +33,8 @@ class MonitoringService {
 
   final _devicesController = StreamController<List<StorageDevice>>.broadcast();
   Stream<List<StorageDevice>> get devicesStream => _devicesController.stream;
-  List<StorageDevice> get currentDevices => _devices.values.toList(growable: false);
+  List<StorageDevice> get currentDevices =>
+      _devices.values.toList(growable: false);
 
   Timer? _pollTimer;
   Timer? _discoveryTimer;
@@ -57,7 +54,8 @@ class MonitoringService {
   }
 
   void updateSettings(AppSettings settings) {
-    final intervalsChanged = settings.pollingInterval != _settings.pollingInterval ||
+    final intervalsChanged =
+        settings.pollingInterval != _settings.pollingInterval ||
         settings.deviceDiscoveryInterval != _settings.deviceDiscoveryInterval;
     _settings = settings;
     if (_started && intervalsChanged) _rescheduleTimers();
@@ -67,8 +65,10 @@ class MonitoringService {
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
     _pollTimer = Timer.periodic(_settings.pollingInterval, (_) => _pollAll());
-    _discoveryTimer =
-        Timer.periodic(_settings.deviceDiscoveryInterval, (_) => _discoverDevices());
+    _discoveryTimer = Timer.periodic(
+      _settings.deviceDiscoveryInterval,
+      (_) => _discoverDevices(),
+    );
   }
 
   void pause() {
@@ -83,9 +83,6 @@ class MonitoringService {
 
   Future<void> rescan() => _discoverDevices();
 
-  /// Called after system sleep/wake (section 28): the native backend
-  /// state can be entirely stale after resume, so re-discover and force a
-  /// fresh poll rather than trusting whatever timers happen to fire next.
   Future<void> reinitializeAfterResume() async {
     AppLogger.instance.info(_tag, 'Reinitializing after system resume');
     await _discoverDevices();
@@ -98,7 +95,7 @@ class MonitoringService {
       discovered = await _backend.getDevices();
     } catch (e) {
       AppLogger.instance.error(_tag, 'Device discovery failed', e);
-      return; // keep showing last-known devices rather than clearing the UI
+      return;
     }
 
     final discoveredIds = discovered.map((d) => d.id).toSet();
@@ -108,10 +105,12 @@ class MonitoringService {
       if (existing == null) {
         _devices[device.id] = device;
         _disconnectedOnce.remove(device.id);
-        AppLogger.instance.info(_tag, 'Discovered new device: ${device.type.name} ${device.interfaceType.name}');
+        AppLogger.instance.info(
+          _tag,
+          'Discovered new device: ${device.type.name} ${device.interfaceType.name}',
+        );
         unawaited(_pollOne(device.id));
       } else if (existing.monitoringStatus == MonitoringStatus.disconnected) {
-        // Reconnected: keep history/alert state, refresh static metadata.
         _devices[device.id] = device.copyWith(
           primaryTemperature: existing.primaryTemperature,
           monitoringStatus: MonitoringStatus.initializing,
@@ -131,7 +130,9 @@ class MonitoringService {
         _disconnectedOnce.remove(id);
         AppLogger.instance.info(_tag, 'Device removed after disconnect: $id');
       } else {
-        _devices[id] = _devices[id]!.copyWith(monitoringStatus: MonitoringStatus.disconnected);
+        _devices[id] = _devices[id]!.copyWith(
+          monitoringStatus: MonitoringStatus.disconnected,
+        );
         _disconnectedOnce.add(id);
         AppLogger.instance.warning(_tag, 'Device disconnected: $id');
       }
@@ -143,7 +144,10 @@ class MonitoringService {
   Future<void> _pollAll() async {
     if (_paused || !_settings.monitoringEnabled) return;
     final ids = _devices.keys
-        .where((id) => _devices[id]!.monitoringStatus != MonitoringStatus.disconnected)
+        .where(
+          (id) =>
+              _devices[id]!.monitoringStatus != MonitoringStatus.disconnected,
+        )
         .toList();
     await Future.wait(ids.map(_pollOne));
     _emit();
@@ -168,15 +172,21 @@ class MonitoringService {
         final previous = device.primaryTemperature;
         var plausible = TemperatureUtils.isPlausibleValue(reading.celsius);
         if (plausible && previous != null && previous.isValid) {
-          plausible = TemperatureUtils.isPlausibleTransition(previous.celsius, reading.celsius);
+          plausible = TemperatureUtils.isPlausibleTransition(
+            previous.celsius,
+            reading.celsius,
+          );
         }
 
         if (!plausible) {
           AppLogger.instance.warning(
-              _tag, 'Rejected implausible reading for $id: ${reading.celsius}C');
+            _tag,
+            'Rejected implausible reading for $id: ${reading.celsius}C',
+          );
           _devices[id] = device.copyWith(
             monitoringStatus: MonitoringStatus.error,
-            lastError: 'Sensor returned an implausible value; reading discarded',
+            lastError:
+                'Sensor returned an implausible value; reading discarded',
           );
         } else {
           _historyStore.record(id, reading);
@@ -216,14 +226,21 @@ class MonitoringService {
   void _checkStale(String id) {
     final device = _devices[id];
     if (device?.lastUpdated == null) return;
-    final staleAfter = _settings.pollingInterval * AppConstants.staleThresholdMultiplier;
+    final staleAfter =
+        _settings.pollingInterval * AppConstants.staleThresholdMultiplier;
     if (device!.monitoringStatus == MonitoringStatus.active &&
         TemperatureUtils.isStale(device.lastUpdated!, staleAfter)) {
-      _devices[id] = device.copyWith(monitoringStatus: MonitoringStatus.staleData);
+      _devices[id] = device.copyWith(
+        monitoringStatus: MonitoringStatus.staleData,
+      );
     }
   }
 
-  Future<void> _evaluateAlert(String id, double celsius, StorageDevice device) async {
+  Future<void> _evaluateAlert(
+    String id,
+    double celsius,
+    StorageDevice device,
+  ) async {
     final alertState = _alertStates.putIfAbsent(id, DeviceAlertState.new);
     final thresholds = _settings.thresholdsFor(id);
     final result = alertState.evaluate(
@@ -234,13 +251,25 @@ class MonitoringService {
     );
     if (!result.shouldNotify || !_settings.notificationsEnabled) return;
 
-    final tempText = TemperatureUtils.format(celsius, _settings.temperatureUnit);
+    final tempText = TemperatureUtils.format(
+      celsius,
+      _settings.temperatureUnit,
+    );
     if (result.isRecoveryNotification) {
-      await _notifications.showRecovered(deviceName: device.displayName, temperatureText: tempText);
+      await _notifications.showRecovered(
+        deviceName: device.displayName,
+        temperatureText: tempText,
+      );
     } else if (result.severity == TemperatureSeverity.critical) {
-      await _notifications.showCritical(deviceName: device.displayName, temperatureText: tempText);
+      await _notifications.showCritical(
+        deviceName: device.displayName,
+        temperatureText: tempText,
+      );
     } else if (result.severity == TemperatureSeverity.warning) {
-      await _notifications.showWarning(deviceName: device.displayName, temperatureText: tempText);
+      await _notifications.showWarning(
+        deviceName: device.displayName,
+        temperatureText: tempText,
+      );
     }
   }
 

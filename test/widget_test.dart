@@ -12,12 +12,16 @@ import 'package:driveguard/presentation/dashboard/dashboard_screen.dart';
 import 'mocks/fake_notification_service.dart';
 
 void main() {
-  testWidgets('Dashboard shows the app bar and title', (WidgetTester tester) async {
+  testWidgets('Dashboard shows the app bar and title', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           storageMonitorProvider.overrideWithValue(MockStorageMonitor()),
-          notificationServiceProvider.overrideWithValue(FakeNotificationService()),
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
         ],
         child: const MaterialApp(home: DashboardScreen()),
       ),

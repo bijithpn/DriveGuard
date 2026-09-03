@@ -67,8 +67,6 @@ Route<void> _slideRoute(Widget page) {
   );
 }
 
-// Dashboard Header
-
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
     required this.deviceCount,
@@ -151,10 +149,9 @@ class _DashboardHeader extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // App icon
               _AppLogo(),
               const SizedBox(width: AppSpacing.md),
-              // Title + status
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,7 +193,7 @@ class _DashboardHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              // Action strip
+
               _ViewToggle(compact: compactView, onChanged: onToggleCompactView),
               const SizedBox(width: AppSpacing.xs),
               _HeaderIconButton(
@@ -392,8 +389,6 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-// Body
-
 class _Body extends StatelessWidget {
   const _Body({required this.devices, required this.settings});
   final List<StorageDevice> devices;
@@ -514,8 +509,6 @@ class _Body extends StatelessWidget {
   }
 }
 
-// Compact list row
-
 class _CompactDriveRow extends StatefulWidget {
   const _CompactDriveRow({
     required this.device,
@@ -606,7 +599,6 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
               ),
               child: Row(
                 children: [
-                  // Type icon
                   Container(
                     width: 34,
                     height: 34,
@@ -627,7 +619,7 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
-                  // Name + type
+
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -659,7 +651,7 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
-                  // Temperature gauge (small)
+
                   TemperatureGauge(
                     valueText: presentation.valueText,
                     fraction: presentation.fraction,
@@ -684,8 +676,6 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
     );
   }
 }
-
-// Empty state
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState();

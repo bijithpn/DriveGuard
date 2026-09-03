@@ -2,9 +2,6 @@ import '../enums/storage_enums.dart';
 import 'device_health.dart';
 import 'temperature_reading.dart';
 
-/// Unified, platform-independent representation of one physical storage
-/// device. Never carries raw platform-specific output - backends are
-/// responsible for translating diskutil/sysfs/WMI output into this shape.
 class StorageDevice {
   const StorageDevice({
     required this.id,
@@ -24,10 +21,6 @@ class StorageDevice {
     this.lastError,
   });
 
-  /// Stable identifier (backend-derived, e.g. a WMI PNPDeviceID, an IOKit
-  /// registry entry path, or a /dev/disk* + serial hash) - NEVER the
-  /// display name, so it survives renames and is safe to persist
-  /// per-device threshold overrides against.
   final String id;
 
   final StorageDeviceType type;
@@ -40,9 +33,6 @@ class StorageDevice {
   final int? capacityBytes;
   final bool isRemovable;
 
-  /// The primary/composite sensor's latest reading, or null if temperature
-  /// is unavailable. The UI must render "Temperature unavailable" for
-  /// null - never 0 or a stale placeholder.
   final TemperatureReading? primaryTemperature;
   final List<StorageSensor> sensors;
 
@@ -83,8 +73,9 @@ class StorageDevice {
       serialNumber: serialNumber ?? this.serialNumber,
       capacityBytes: capacityBytes ?? this.capacityBytes,
       isRemovable: isRemovable ?? this.isRemovable,
-      primaryTemperature:
-          clearTemperature ? null : (primaryTemperature ?? this.primaryTemperature),
+      primaryTemperature: clearTemperature
+          ? null
+          : (primaryTemperature ?? this.primaryTemperature),
       sensors: sensors ?? this.sensors,
       health: health ?? this.health,
       monitoringStatus: monitoringStatus ?? this.monitoringStatus,
