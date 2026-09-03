@@ -51,6 +51,10 @@ set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
 # System-level dependencies.
+if(EXISTS "$ENV{HOME}/.local/lib/pkgconfig")
+  set(ENV{PKG_CONFIG_PATH} "$ENV{HOME}/.local/lib/pkgconfig:$ENV{HOME}/.local/share/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+  link_directories("$ENV{HOME}/.local/lib")
+endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 # libudev: storage hot-plug notifications (native_storage/storage_native_channel.cc).

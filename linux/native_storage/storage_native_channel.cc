@@ -11,6 +11,11 @@
 
 namespace {
 
+using driveguard::NativeDeviceInfo;
+using driveguard::NativeHealthInfo;
+using driveguard::NativeStorageStatus;
+using driveguard::StorageBackend;
+
 // Hot-plug push notifications (Phase 7, STORAGE_MONITORING.md) via a udev
 // monitor on the "block"/"disk" subsystem - the same kernel uevent source
 // `udevadm monitor` reads, integrated into the GLib main loop the Flutter
@@ -178,10 +183,6 @@ FlMethodErrorResponse* OnDeviceEventsCancel(FlEventChannel* channel, FlValue* ar
   return nullptr;
 }
 
-using driveguard::NativeDeviceInfo;
-using driveguard::NativeHealthInfo;
-using driveguard::NativeStorageStatus;
-using driveguard::StorageBackend;
 
 FlValue* OptString(const std::optional<std::string>& s) {
   return s.has_value() && !s->empty() ? fl_value_new_string(s->c_str()) : fl_value_new_null();
