@@ -303,9 +303,9 @@ class LinuxStorageMonitor extends StorageMonitor {
               : DeviceHealthStatus.warning,
           percentageUsed: (json['percentage_used'] as num?)?.toInt(),
           availableSparePercent: (json['avail_spare'] as num?)?.toInt(),
-          // nvme-cli's field name for this has varied across versions
-          // ("spare_thresh" historically, "avail_spare_threshold" in newer
-          // releases) - try both rather than committing to one.
+          
+          
+          
           availableSpareThreshold:
               (json['spare_thresh'] as num?)?.toInt() ??
               (json['avail_spare_threshold'] as num?)?.toInt(),

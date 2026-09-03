@@ -48,10 +48,10 @@ class MonitoringService {
   final Map<String, StorageActivity> _latestActivity = {};
   final _activityController = StreamController<StorageActivity>.broadcast();
 
-  /// Real-time per-device I/O activity (STORAGE_MONITORING.md Phase 8) - one
-  /// event per sample, pushed by the native layer, not polled. An empty
-  /// stream on any backend/platform without native activity support; the UI
-  /// must treat "no events yet" as unavailable, never as zero throughput.
+  
+  
+  
+  
   Stream<StorageActivity> get activityStream => _activityController.stream;
   StorageActivity? latestActivityFor(String deviceId) =>
       _latestActivity[deviceId];
@@ -77,9 +77,9 @@ class MonitoringService {
     AppLogger.instance.info(_tag, 'Monitoring started');
   }
 
-  /// Subscribes to native real-time I/O activity (Phase 8) once, for the
-  /// life of the service - each event just updates [_latestActivity] and
-  /// re-broadcasts, no polling/timer involved on the Dart side.
+  
+  
+  
   void _listenForActivity() {
     _activitySub = _backend.watchActivity().listen(
       (activity) {
@@ -94,11 +94,11 @@ class MonitoringService {
     );
   }
 
-  /// Native hot-plug push notifications (see STORAGE_MONITORING.md Phase 7)
-  /// are a *hint* to rediscover immediately, not a replacement for polled
-  /// discovery - not every platform/driver combination reliably fires
-  /// them, and [watchDeviceEvents] is an empty stream wherever a backend
-  /// doesn't support it, so this simply does nothing extra there.
+  
+  
+  
+  
+  
   void _listenForHotplugEvents() {
     _deviceEventsSub = _backend.watchDeviceEvents().listen(
       (event) {
@@ -207,11 +207,11 @@ class MonitoringService {
     unawaited(_refreshCapacity());
   }
 
-  /// Refreshes capacity/usage and volume enumeration for every tracked
-  /// device. Deliberately run on the (slower) discovery cadence rather than
-  /// the temperature-polling cadence - see STORAGE_MONITORING.md section 6
-  /// ("medium" metrics, 5-10s) - since a full volume/statfs walk is more
-  /// expensive than a single temperature read.
+  
+  
+  
+  
+  
   Future<void> _refreshCapacity() async {
     final ids = _devices.keys
         .where(
@@ -237,9 +237,9 @@ class MonitoringService {
             volumes: volumes,
           );
           _devices[id] = updated;
-          // Diagnostics (spec section 19): which metrics were actually
-          // retrieved vs. unavailable for this device, on this poll. Never
-          // logs the serial number or any other identifying field.
+          
+          
+          
           AppLogger.instance.debug(
             _tag,
             'Capacity for $id: ${capacity.availability.name}'
@@ -258,9 +258,9 @@ class MonitoringService {
     _emit();
   }
 
-  /// Low-disk-space alerting, the capacity counterpart to [_evaluateAlert].
-  /// Only runs when [StorageCapacity.usagePercent] is actually available -
-  /// a device that can't report usage never triggers or clears an alert.
+  
+  
+  
   Future<void> _evaluateCapacityAlert(
     String id,
     StorageCapacity capacity,
@@ -438,12 +438,12 @@ class MonitoringService {
     }
   }
 
-  /// Rapid-rise ("hike") detection - independent of the absolute
-  /// warning/critical thresholds in [_evaluateAlert]. Uses the same
-  /// [TemperatureHistoryStore] the history chart already reads, so no
-  /// separate sample buffer is needed. Armed/disarmed with hysteresis (drop
-  /// below half the configured delta to re-arm) so a sustained high delta
-  /// doesn't notify every poll, mirroring [DeviceAlertState]'s pattern.
+  
+  
+  
+  
+  
+  
   Future<void> _evaluateRapidRise(
     String id,
     double celsius,
@@ -452,9 +452,9 @@ class MonitoringService {
     if (!_settings.rapidRiseAlertsEnabled) return;
 
     final points = _historyStore.pointsFor(id, _settings.rapidRiseWindow);
-    // Need at least one earlier sample spanning close to the full window -
-    // otherwise a device that just connected would appear to have "risen"
-    // from its very first reading.
+    
+    
+    
     if (points.length < 2) return;
     final windowStart = DateTime.now().subtract(_settings.rapidRiseWindow);
     if (points.first.timestamp.isAfter(
@@ -508,10 +508,10 @@ class MonitoringService {
     }
   }
 
-  /// A short, human-readable line of other currently-available metrics for
-  /// a device, appended to notification bodies - built only from fields
-  /// that are actually available; a metric this device can't report is
-  /// omitted entirely, never shown as "N/A" or a placeholder.
+  
+  
+  
+  
   String? _detailsFor(StorageDevice device) {
     final parts = <String>[];
     switch (device.health.status) {

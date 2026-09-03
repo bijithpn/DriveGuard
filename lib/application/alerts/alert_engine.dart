@@ -140,11 +140,11 @@ class CapacityAlertEvaluation {
   final bool isRecoveryNotification;
 }
 
-/// Same escalation/cooldown/hysteresis shape as [DeviceAlertState], for
-/// disk-usage percentage instead of temperature. Kept as a separate,
-/// smaller class rather than generalizing [DeviceAlertState] - the two
-/// units (°C vs %) and severity enums differ enough that a shared abstract
-/// base would add more indirection than it would save.
+
+
+
+
+
 class StorageAlertState {
   StorageAlertState();
 

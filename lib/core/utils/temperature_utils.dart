@@ -24,11 +24,11 @@ class TemperatureUtils {
   static String unitSuffix(TemperatureUnit unit) =>
       unit == TemperatureUnit.celsius ? '°C' : '°F';
 
-  /// Converts a *difference* between two Celsius readings (e.g. "rose by
-  /// 10°C") to the target unit. Deliberately separate from [convert]:
-  /// Fahrenheit's +32 offset only applies to an absolute reading, never to
-  /// a delta - converting a delta with [convert] would silently add 32°F
-  /// to a temperature *change*, which is wrong.
+  
+  
+  
+  
+  
   static double convertDelta(double deltaCelsius, TemperatureUnit unit) {
     switch (unit) {
       case TemperatureUnit.celsius:

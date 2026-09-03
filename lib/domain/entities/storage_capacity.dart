@@ -1,10 +1,10 @@
 import '../enums/storage_enums.dart';
 
-/// Capacity/usage for a physical disk, as reported by the native layer.
-///
-/// `availability` follows the same [SensorAvailability] states used for
-/// temperature/health — a disk whose capacity couldn't be read is
-/// `unavailable`/`error`, never a fabricated zero.
+
+
+
+
+
 class StorageCapacity {
   const StorageCapacity({
     required this.availability,
@@ -20,10 +20,10 @@ class StorageCapacity {
   final int? usedBytes;
   final int? freeBytes;
 
-  /// Bytes allocated to partitions/volumes (may be less than [totalBytes]).
+  
   final int? allocatedBytes;
 
-  /// Bytes on the physical disk not allocated to any partition.
+  
   final int? unallocatedBytes;
 
   static const unavailable = StorageCapacity(

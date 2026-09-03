@@ -1,9 +1,9 @@
 enum CapacitySeverity { normal, warning, critical, unavailable }
 
-/// Usage-percentage thresholds for low-disk-space alerts, the capacity
-/// counterpart to [TemperatureThresholds]. Free space, unlike temperature,
-/// has no vendor-specified danger point - these are just sensible UI
-/// defaults, always user-configurable, never presented as a hardware spec.
+
+
+
+
 class StorageThresholds {
   const StorageThresholds({
     this.warningPercent = 85,

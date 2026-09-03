@@ -1516,10 +1516,10 @@ class _HealthTile extends StatelessWidget {
   }
 }
 
-/// Capacity/usage, mounted volumes, and real-time read/write activity
-/// (STORAGE_MONITORING.md Phases 3/8). Reuses [_HealthGrid]/[_HealthEntry]
-/// for the stat tiles rather than introducing a parallel widget - these are
-/// generic "labeled stat" tiles, not health-specific.
+
+
+
+
 class _StorageTab extends ConsumerWidget {
   const _StorageTab({required this.device, required this.isDark});
 

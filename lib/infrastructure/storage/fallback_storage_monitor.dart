@@ -118,15 +118,15 @@ class FallbackStorageMonitor extends StorageMonitor {
     return legacy.getVolumes(deviceId);
   }
 
-  /// The legacy CLI-shelling backends never push hot-plug events (nothing
-  /// to fall back to); this only ever reflects native's stream, which is
-  /// itself an empty stream on a platform/build without native hot-plug
-  /// support.
+  
+  
+  
+  
   @override
   Stream<StorageDeviceEvent> watchDeviceEvents() => native.watchDeviceEvents();
 
-  /// Same rationale as [watchDeviceEvents] - only native can push activity
-  /// samples; legacy CLI backends have nothing to fall back to.
+  
+  
   @override
   Stream<StorageActivity> watchActivity() => native.watchActivity();
 }

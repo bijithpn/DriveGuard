@@ -32,8 +32,8 @@ class AppConstants {
   static const Duration rawHistoryRetention = Duration(hours: 1);
   static const Duration maxHistoryRetention = Duration(hours: 24);
 
-  // Rapid-rise ("hike") detection - a UI default, not a hardware spec; see
-  // AppSettings.rapidRiseDeltaCelsius doc comment.
+  
+  
   static const double defaultRapidRiseDeltaCelsius = 10.0;
   static const Duration defaultRapidRiseWindow = Duration(minutes: 3);
 }

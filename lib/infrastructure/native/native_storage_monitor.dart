@@ -306,11 +306,11 @@ class NativeStorageMonitor extends StorageMonitor {
         .map(_deviceEventFromMap)
         .where((e) => e != null)
         .cast<StorageDeviceEvent>()
-        // A platform with no native hot-plug support (EventChannel never
-        // registered) fails the stream with MissingPluginException on
-        // first listen; callers (MonitoringService) fall back to polled
-        // discovery, so swallow it here rather than propagating an error
-        // event.
+        
+        
+        
+        
+        
         .handleError((Object e) {
           if (e is! MissingPluginException) {
             AppLogger.instance.debug(_tag, 'Device event stream error: $e');

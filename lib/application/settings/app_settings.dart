@@ -120,11 +120,11 @@ class AppSettings {
   final StorageThresholds storageThresholds;
   final bool storageAlertsEnabled;
 
-  /// Rapid-rise ("temperature hike") detection: notifies when a device's
-  /// temperature climbs by [rapidRiseDeltaCelsius] or more within
-  /// [rapidRiseWindow], independent of the absolute warning/critical
-  /// thresholds above - catches a sudden spike (failing fan, runaway
-  /// workload) even while still nominally under the warning threshold.
+  
+  
+  
+  
+  
   final bool rapidRiseAlertsEnabled;
   final double rapidRiseDeltaCelsius;
   final Duration rapidRiseWindow;

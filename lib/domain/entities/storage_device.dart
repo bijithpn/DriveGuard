@@ -37,9 +37,9 @@ class StorageDevice {
   final String? serialNumber;
   final String? firmwareVersion;
 
-  /// Raw capacity reported at enumeration time. Prefer [capacity] for
-  /// used/free/usage% — this field is kept for backward compatibility with
-  /// existing callers that only need the total.
+  
+  
+  
   final int? capacityBytes;
   final bool isRemovable;
 
@@ -48,14 +48,14 @@ class StorageDevice {
 
   final DeviceHealth health;
 
-  /// Capacity/usage for the physical disk. Defaults to
-  /// [StorageCapacity.unavailable] until the native layer supplies it
-  /// (Phase 3-5) — never fabricated.
+  
+  
+  
   final StorageCapacity capacity;
 
-  /// Mounted filesystem volumes on this physical disk. Empty until the
-  /// native layer supplies volume enumeration (Phase 3-5); an empty list is
-  /// not necessarily "no volumes" — check [capacity]'s availability too.
+  
+  
+  
   final List<StorageVolume> volumes;
 
   final MonitoringStatus monitoringStatus;

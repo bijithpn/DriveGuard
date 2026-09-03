@@ -21,10 +21,10 @@ class DeviceHealth {
   final int? percentageUsed;
   final int? availableSparePercent;
 
-  /// The spare-capacity percentage below which the device itself considers
-  /// the "Available Spare" critical warning bit warranted (NVMe SMART/Health
-  /// log byte 4). `null` when not reported - never assume a universal
-  /// threshold across vendors.
+  
+  
+  
+  
   final int? availableSpareThreshold;
   final String? criticalWarning;
   final int? mediaErrors;
@@ -32,11 +32,11 @@ class DeviceHealth {
   final int? powerOnHours;
   final int? unsafeShutdowns;
 
-  /// Lifetime data units read/written, in NVMe's native unit: 1000 * 512
-  /// bytes = 512,000 bytes per unit (NVMe base spec 5.14.1.3). Kept as the
-  /// raw counter rather than a pre-multiplied byte count so a caller can see
-  /// exactly what the device reported; use [totalBytesRead]/
-  /// [totalBytesWritten] for the derived byte value.
+  
+  
+  
+  
+  
   final int? dataUnitsRead;
   final int? dataUnitsWritten;
 

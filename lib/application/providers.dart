@@ -78,10 +78,10 @@ final devicesProvider = NotifierProvider<DevicesNotifier, List<StorageDevice>>(
   DevicesNotifier.new,
 );
 
-/// Real-time per-device I/O activity (Phase 8), keyed by device id. Only
-/// devices with at least one native activity sample appear here - the UI
-/// must treat a missing entry as "activity unavailable", never as zero
-/// throughput.
+
+
+
+
 class ActivityNotifier extends Notifier<Map<String, StorageActivity>> {
   StreamSubscription<StorageActivity>? _subscription;
 

@@ -67,10 +67,10 @@ class _DriveCardState extends State<DriveCard> {
     return '${size.toStringAsFixed(1)} ${units[unitIndex]}';
   }
 
-  /// Prefers actual free space (STORAGE_MONITORING.md Phase 3) over the
-  /// static total capacity - more useful at a glance than a number that
-  /// never changes. Falls back to total capacity when usage data isn't
-  /// available on this platform/device yet, never fabricates a percentage.
+  
+  
+  
+  
   String _capacityText() {
     final capacity = widget.device.capacity;
     if (capacity.isValid && capacity.freeBytes != null) {

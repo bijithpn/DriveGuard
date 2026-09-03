@@ -18,12 +18,12 @@ class StorageNativeChannel {
   );
   static const _tag = 'StorageNativeChannel';
 
-  /// Real-time per-device I/O activity, one map per sample
-  /// (`{"deviceId", "readBytesPerSecond", "writeBytesPerSecond",
-  /// "readOpsPerSecond", "writeOpsPerSecond", "utilizationPercent"}`, any
-  /// numeric field may be absent when the platform doesn't expose it). Same
-  /// "no stream handler registered -> MissingPluginException on first
-  /// listen" caveat as [deviceEvents].
+  
+  
+  
+  
+  
+  
   Stream<Map<String, dynamic>> activityEvents() {
     return _activityChannel.receiveBroadcastStream().map((raw) {
       final map = _asMap(raw);
@@ -31,12 +31,12 @@ class StorageNativeChannel {
     });
   }
 
-  /// Native hot-plug push notifications, one map per event
-  /// (`{"kind": "added"|"removed", "deviceId": "..."}`). Native backends
-  /// that don't implement this EventChannel simply never register a
-  /// stream handler for it, so `receiveBroadcastStream` completes with a
-  /// [MissingPluginException] on first listen on those platforms - callers
-  /// must handle that rather than assuming the stream always works.
+  
+  
+  
+  
+  
+  
   Stream<Map<String, dynamic>> deviceEvents() {
     return _deviceEventsChannel.receiveBroadcastStream().map((raw) {
       final map = _asMap(raw);
