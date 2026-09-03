@@ -375,11 +375,14 @@ void DispatchMethodCall(
       m[EncodableValue("status")] = EncodableValue(h.status);
       m[EncodableValue("percentageUsed")] = OptInt(h.percentage_used ? std::optional<int64_t>(*h.percentage_used) : std::nullopt);
       m[EncodableValue("availableSparePercent")] = OptInt(h.available_spare_percent ? std::optional<int64_t>(*h.available_spare_percent) : std::nullopt);
+      m[EncodableValue("availableSpareThreshold")] = OptInt(h.available_spare_threshold ? std::optional<int64_t>(*h.available_spare_threshold) : std::nullopt);
       m[EncodableValue("criticalWarning")] = OptString(h.critical_warning);
       m[EncodableValue("mediaErrors")] = OptInt(h.media_errors);
       m[EncodableValue("powerCycles")] = OptInt(h.power_cycles);
       m[EncodableValue("powerOnHours")] = OptInt(h.power_on_hours);
       m[EncodableValue("unsafeShutdowns")] = OptInt(h.unsafe_shutdowns);
+      m[EncodableValue("dataUnitsRead")] = OptInt(h.data_units_read);
+      m[EncodableValue("dataUnitsWritten")] = OptInt(h.data_units_written);
       if (h.smart_passed.has_value()) {
         m[EncodableValue("smartPassed")] = EncodableValue(*h.smart_passed);
       }

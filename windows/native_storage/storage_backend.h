@@ -68,11 +68,17 @@ struct NativeHealthInfo {
   std::string status;  // "healthy" | "warning" | "critical" | "unknown"
   std::optional<int> percentage_used;
   std::optional<int> available_spare_percent;
+  std::optional<int> available_spare_threshold;
   std::optional<std::string> critical_warning;
   std::optional<int64_t> media_errors;
   std::optional<int64_t> power_cycles;
   std::optional<int64_t> power_on_hours;
   std::optional<int64_t> unsafe_shutdowns;
+  // Raw NVMe "Data Units Read/Written" counters (1 unit = 512,000 bytes,
+  // NVMe base spec 5.14.1.3) - not pre-multiplied, so the Dart layer can
+  // show both the raw and derived value.
+  std::optional<int64_t> data_units_read;
+  std::optional<int64_t> data_units_written;
   std::optional<bool> smart_passed;
 };
 

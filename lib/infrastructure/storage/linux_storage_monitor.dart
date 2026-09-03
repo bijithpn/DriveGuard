@@ -303,11 +303,19 @@ class LinuxStorageMonitor extends StorageMonitor {
               : DeviceHealthStatus.warning,
           percentageUsed: (json['percentage_used'] as num?)?.toInt(),
           availableSparePercent: (json['avail_spare'] as num?)?.toInt(),
+          // nvme-cli's field name for this has varied across versions
+          // ("spare_thresh" historically, "avail_spare_threshold" in newer
+          // releases) - try both rather than committing to one.
+          availableSpareThreshold:
+              (json['spare_thresh'] as num?)?.toInt() ??
+              (json['avail_spare_threshold'] as num?)?.toInt(),
           criticalWarning: json['critical_warning']?.toString(),
           mediaErrors: (json['media_errors'] as num?)?.toInt(),
           powerCycles: (json['power_cycles'] as num?)?.toInt(),
           powerOnHours: (json['power_on_hours'] as num?)?.toInt(),
           unsafeShutdowns: (json['unsafe_shutdowns'] as num?)?.toInt(),
+          dataUnitsRead: (json['data_units_read'] as num?)?.toInt(),
+          dataUnitsWritten: (json['data_units_written'] as num?)?.toInt(),
         );
       } catch (e) {
         AppLogger.instance.debug(_tag, 'nvme health read failed: $e');

@@ -156,11 +156,14 @@ class MockStorageMonitor extends StorageMonitor {
       status: DeviceHealthStatus.healthy,
       percentageUsed: 4,
       availableSparePercent: 100,
+      availableSpareThreshold: 10,
       criticalWarning: '0x00',
       mediaErrors: 0,
       powerCycles: 128,
       powerOnHours: 940,
       unsafeShutdowns: 2,
+      dataUnitsRead: 45000000,
+      dataUnitsWritten: 30000000,
       smartPassed: true,
     );
   }

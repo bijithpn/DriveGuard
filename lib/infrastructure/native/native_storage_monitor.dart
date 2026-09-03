@@ -220,10 +220,14 @@ class NativeStorageMonitor extends StorageMonitor {
       percentageUsed: (raw['percentageUsed'] as num?)?.toInt(),
       availableSparePercent: (raw['availableSparePercent'] as num?)?.toInt(),
       criticalWarning: raw['criticalWarning']?.toString(),
+      availableSpareThreshold: (raw['availableSpareThreshold'] as num?)
+          ?.toInt(),
       mediaErrors: (raw['mediaErrors'] as num?)?.toInt(),
       powerCycles: (raw['powerCycles'] as num?)?.toInt(),
       powerOnHours: (raw['powerOnHours'] as num?)?.toInt(),
       unsafeShutdowns: (raw['unsafeShutdowns'] as num?)?.toInt(),
+      dataUnitsRead: (raw['dataUnitsRead'] as num?)?.toInt(),
+      dataUnitsWritten: (raw['dataUnitsWritten'] as num?)?.toInt(),
       smartPassed: raw['smartPassed'] as bool?,
     );
   }

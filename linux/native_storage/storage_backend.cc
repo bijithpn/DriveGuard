@@ -297,7 +297,10 @@ NativeResult<NativeHealthInfo> StorageBackend::ReadHealth(const std::string& dev
     const uint8_t* l = log->data();
     uint8_t criticalWarning = l[0];
     uint8_t availableSpare = l[3];
+    uint8_t availableSpareThreshold = l[4];
     uint8_t percentageUsed = l[5];
+    uint64_t dataUnitsRead = ReadU64LE(l + 32);
+    uint64_t dataUnitsWritten = ReadU64LE(l + 48);
     uint64_t powerCycles = ReadU64LE(l + 112);
     uint64_t powerOnHours = ReadU64LE(l + 128);
     uint64_t unsafeShutdowns = ReadU64LE(l + 144);
@@ -307,6 +310,9 @@ NativeResult<NativeHealthInfo> StorageBackend::ReadHealth(const std::string& dev
     health.status = criticalWarning != 0 ? "warning" : "healthy";
     health.percentage_used = percentageUsed;
     health.available_spare_percent = availableSpare;
+    health.available_spare_threshold = availableSpareThreshold;
+    health.data_units_read = static_cast<int64_t>(dataUnitsRead);
+    health.data_units_written = static_cast<int64_t>(dataUnitsWritten);
     if (criticalWarning != 0) {
       std::ostringstream oss;
       oss << "0x" << std::hex << static_cast<int>(criticalWarning);

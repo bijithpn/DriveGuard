@@ -31,4 +31,28 @@ class FakeNotificationService implements NotificationService {
   }) async {
     shown.add('recovered:$deviceName:$temperatureText');
   }
+
+  @override
+  Future<void> showStorageWarning({
+    required String deviceName,
+    required String usageText,
+  }) async {
+    shown.add('storage-warning:$deviceName:$usageText');
+  }
+
+  @override
+  Future<void> showStorageCritical({
+    required String deviceName,
+    required String usageText,
+  }) async {
+    shown.add('storage-critical:$deviceName:$usageText');
+  }
+
+  @override
+  Future<void> showStorageRecovered({
+    required String deviceName,
+    required String usageText,
+  }) async {
+    shown.add('storage-recovered:$deviceName:$usageText');
+  }
 }

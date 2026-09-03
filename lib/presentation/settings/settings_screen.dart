@@ -6,6 +6,7 @@ import '../../application/settings/app_settings.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/logging/app_logger.dart';
 import '../../domain/entities/device_capabilities.dart';
+import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../app_root.dart' show widgetModeActiveProvider;
@@ -665,11 +666,59 @@ class _AlertsSection extends ConsumerWidget {
         label: 'Recovery notifications',
         subtitle: 'Notify when a drive returns to normal temperature',
         isDark: isDark,
-        isLast: true,
         trailing: Switch(
           value: settings.recoveryNotificationsEnabled,
           onChanged: (v) => notifier.updateWith(
             (s) => s.copyWith(recoveryNotificationsEnabled: v),
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Low disk space alerts',
+        subtitle: 'Notify when a volume runs low on free space',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.storageAlertsEnabled,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(storageAlertsEnabled: v)),
+        ),
+      ),
+      _SettingRow(
+        label: 'Disk warning threshold',
+        isDark: isDark,
+        trailing: _ThresholdField(
+          key: ValueKey(
+            'storage-warning-${settings.storageThresholds.warningPercent}',
+          ),
+          value: settings.storageThresholds.warningPercent,
+          color: AppColors.warning,
+          suffixText: '%',
+          onSubmit: (v) => _submitStorageThreshold(
+            context,
+            notifier,
+            current: settings.storageThresholds,
+            rawValue: v,
+            isWarningField: true,
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Disk critical threshold',
+        isDark: isDark,
+        isLast: true,
+        trailing: _ThresholdField(
+          key: ValueKey(
+            'storage-critical-${settings.storageThresholds.criticalPercent}',
+          ),
+          value: settings.storageThresholds.criticalPercent,
+          color: AppColors.critical,
+          suffixText: '%',
+          onSubmit: (v) => _submitStorageThreshold(
+            context,
+            notifier,
+            current: settings.storageThresholds,
+            rawValue: v,
+            isWarningField: false,
           ),
         ),
       ),
@@ -958,11 +1007,13 @@ class _ThresholdField extends StatelessWidget {
     required this.value,
     required this.color,
     required this.onSubmit,
+    this.suffixText = 'C',
   });
 
   final double value;
   final Color color;
   final ValueChanged<String> onSubmit;
+  final String suffixText;
 
   @override
   Widget build(BuildContext context) {
@@ -978,7 +1029,7 @@ class _ThresholdField extends StatelessWidget {
           color: color,
         ),
         decoration: InputDecoration(
-          suffixText: 'C',
+          suffixText: suffixText,
           suffixStyle: TextStyle(color: color, fontWeight: FontWeight.w500),
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
@@ -1260,6 +1311,41 @@ void _submitThreshold(
   }
 
   notifier.updateWith((s) => apply(s, updated));
+}
+
+const double _minStorageThresholdSeparationPercent = 1.0;
+
+void _submitStorageThreshold(
+  BuildContext context,
+  SettingsNotifier notifier, {
+  required StorageThresholds current,
+  required String rawValue,
+  required bool isWarningField,
+}) {
+  final value = double.tryParse(rawValue.trim());
+  if (value == null) {
+    _showThresholdError(context, 'Enter a numeric percentage.');
+    return;
+  }
+  if (value <= 0 || value > 100 || !value.isFinite) {
+    _showThresholdError(context, 'Threshold must be between 1 and 100.');
+    return;
+  }
+
+  final updated = isWarningField
+      ? current.copyWith(warningPercent: value)
+      : current.copyWith(criticalPercent: value);
+
+  if (updated.criticalPercent - updated.warningPercent <
+      _minStorageThresholdSeparationPercent) {
+    _showThresholdError(
+      context,
+      'Critical threshold must be higher than warning threshold.',
+    );
+    return;
+  }
+
+  notifier.updateWith((s) => s.copyWith(storageThresholds: updated));
 }
 
 void _showThresholdError(BuildContext context, String message) {

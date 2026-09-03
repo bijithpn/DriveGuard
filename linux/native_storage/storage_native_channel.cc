@@ -339,11 +339,17 @@ void HandleMethodCall(FlMethodChannel* channel, FlMethodCall* method_call, gpoin
                                 h.available_spare_percent.has_value()
                                     ? fl_value_new_int(*h.available_spare_percent)
                                     : fl_value_new_null());
+      fl_value_set_string_take(m, "availableSpareThreshold",
+                                h.available_spare_threshold.has_value()
+                                    ? fl_value_new_int(*h.available_spare_threshold)
+                                    : fl_value_new_null());
       fl_value_set_string_take(m, "criticalWarning", OptString(h.critical_warning));
       fl_value_set_string_take(m, "mediaErrors", OptInt(h.media_errors));
       fl_value_set_string_take(m, "powerCycles", OptInt(h.power_cycles));
       fl_value_set_string_take(m, "powerOnHours", OptInt(h.power_on_hours));
       fl_value_set_string_take(m, "unsafeShutdowns", OptInt(h.unsafe_shutdowns));
+      fl_value_set_string_take(m, "dataUnitsRead", OptInt(h.data_units_read));
+      fl_value_set_string_take(m, "dataUnitsWritten", OptInt(h.data_units_written));
       if (h.smart_passed.has_value()) {
         fl_value_set_string_take(m, "smartPassed", fl_value_new_bool(*h.smart_passed));
       }

@@ -8,6 +8,7 @@ import '../../domain/entities/storage_activity.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
 import '../../domain/entities/storage_device_event.dart';
+import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/storage_volume.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
@@ -33,6 +34,7 @@ class MonitoringService {
 
   final Map<String, StorageDevice> _devices = {};
   final Map<String, DeviceAlertState> _alertStates = {};
+  final Map<String, StorageAlertState> _capacityAlertStates = {};
   final Set<String> _disconnectedOnce = {};
 
   final _devicesController = StreamController<List<StorageDevice>>.broadcast();
@@ -182,6 +184,7 @@ class MonitoringService {
       if (_disconnectedOnce.contains(id)) {
         _devices.remove(id);
         _alertStates.remove(id);
+        _capacityAlertStates.remove(id);
         _historyStore.clearDevice(id);
         _latestActivity.remove(id);
         _disconnectedOnce.remove(id);
@@ -224,7 +227,11 @@ class MonitoringService {
           if (current == null) return;
           final capacity = results[0] as StorageCapacity;
           final volumes = results[1] as List<StorageVolume>;
-          _devices[id] = current.copyWith(capacity: capacity, volumes: volumes);
+          final updated = current.copyWith(
+            capacity: capacity,
+            volumes: volumes,
+          );
+          _devices[id] = updated;
           // Diagnostics (spec section 19): which metrics were actually
           // retrieved vs. unavailable for this device, on this poll. Never
           // logs the serial number or any other identifying field.
@@ -234,6 +241,7 @@ class MonitoringService {
             '${capacity.isValid ? ' (${capacity.usagePercent?.toStringAsFixed(0) ?? '?'}% used)' : ''}, '
             'volumes: ${volumes.length}',
           );
+          await _evaluateCapacityAlert(id, capacity, updated);
         } catch (e) {
           AppLogger.instance.debug(
             _tag,
@@ -243,6 +251,48 @@ class MonitoringService {
       }),
     );
     _emit();
+  }
+
+  /// Low-disk-space alerting, the capacity counterpart to [_evaluateAlert].
+  /// Only runs when [StorageCapacity.usagePercent] is actually available -
+  /// a device that can't report usage never triggers or clears an alert.
+  Future<void> _evaluateCapacityAlert(
+    String id,
+    StorageCapacity capacity,
+    StorageDevice device,
+  ) async {
+    if (!_settings.storageAlertsEnabled) return;
+    final alertState = _capacityAlertStates.putIfAbsent(
+      id,
+      StorageAlertState.new,
+    );
+    final result = alertState.evaluate(
+      usagePercent: capacity.usagePercent,
+      thresholds: _settings.storageThresholds,
+      cooldown: _settings.notificationCooldown,
+      recoveryNotificationsEnabled: _settings.recoveryNotificationsEnabled,
+    );
+    if (!result.shouldNotify || !_settings.notificationsEnabled) return;
+
+    final usageText = capacity.usagePercent != null
+        ? '${capacity.usagePercent!.toStringAsFixed(0)}% used'
+        : 'Usage unavailable';
+    if (result.isRecoveryNotification) {
+      await _notifications.showStorageRecovered(
+        deviceName: device.displayName,
+        usageText: usageText,
+      );
+    } else if (result.severity == CapacitySeverity.critical) {
+      await _notifications.showStorageCritical(
+        deviceName: device.displayName,
+        usageText: usageText,
+      );
+    } else if (result.severity == CapacitySeverity.warning) {
+      await _notifications.showStorageWarning(
+        deviceName: device.displayName,
+        usageText: usageText,
+      );
+    }
   }
 
   Future<void> _pollAll() async {
@@ -379,6 +429,9 @@ class MonitoringService {
 
   TemperatureSeverity severityFor(String deviceId) =>
       _alertStates[deviceId]?.lastSeverity ?? TemperatureSeverity.normal;
+
+  CapacitySeverity capacitySeverityFor(String deviceId) =>
+      _capacityAlertStates[deviceId]?.lastSeverity ?? CapacitySeverity.normal;
 
   void _emit() {
     if (!_devicesController.isClosed) {

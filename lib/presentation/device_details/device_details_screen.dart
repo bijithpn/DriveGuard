@@ -1349,6 +1349,14 @@ class _HealthTab extends StatelessWidget {
                 available: health.availableSparePercent != null,
               ),
               _HealthEntry(
+                label: 'Spare Threshold',
+                value: health.availableSpareThreshold != null
+                    ? '${health.availableSpareThreshold}%'
+                    : '--',
+                icon: Icons.rule_rounded,
+                available: health.availableSpareThreshold != null,
+              ),
+              _HealthEntry(
                 label: 'Critical Warnings',
                 value: _na(health.criticalWarning),
                 icon: Icons.warning_amber_outlined,
@@ -1379,6 +1387,22 @@ class _HealthTab extends StatelessWidget {
                 value: _na(health.unsafeShutdowns),
                 icon: Icons.power_off_rounded,
                 available: health.unsafeShutdowns != null,
+              ),
+              _HealthEntry(
+                label: 'Total Read',
+                value: health.totalBytesRead != null
+                    ? _formatBytes(health.totalBytesRead!)
+                    : '--',
+                icon: Icons.arrow_downward_rounded,
+                available: health.totalBytesRead != null,
+              ),
+              _HealthEntry(
+                label: 'Total Written',
+                value: health.totalBytesWritten != null
+                    ? _formatBytes(health.totalBytesWritten!)
+                    : '--',
+                icon: Icons.arrow_upward_rounded,
+                available: health.totalBytesWritten != null,
               ),
             ],
             isDark: isDark,

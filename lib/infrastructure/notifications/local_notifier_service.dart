@@ -60,4 +60,37 @@ class LocalNotifierService implements NotificationService {
       '$deviceName\nTemperature: $temperatureText\n\nThe drive has returned to a normal temperature range.',
     );
   }
+
+  @override
+  Future<void> showStorageWarning({
+    required String deviceName,
+    required String usageText,
+  }) {
+    return _show(
+      'Low Disk Space Warning',
+      '$deviceName\n$usageText\n\nThis drive is approaching your configured free-space limit.',
+    );
+  }
+
+  @override
+  Future<void> showStorageCritical({
+    required String deviceName,
+    required String usageText,
+  }) {
+    return _show(
+      'Critical: Disk Almost Full',
+      '$deviceName\n$usageText\n\nThis drive has exceeded your configured critical free-space limit.',
+    );
+  }
+
+  @override
+  Future<void> showStorageRecovered({
+    required String deviceName,
+    required String usageText,
+  }) {
+    return _show(
+      'Disk Space Normal',
+      '$deviceName\n$usageText\n\nFree space on this drive has returned to a normal level.',
+    );
+  }
 }

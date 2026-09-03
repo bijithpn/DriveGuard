@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 
@@ -87,6 +88,8 @@ class AppSettings {
     this.recoveryNotificationsEnabled = true,
     this.globalThresholds = TemperatureThresholds.defaults,
     this.perDeviceThresholds = const {},
+    this.storageThresholds = StorageThresholds.defaults,
+    this.storageAlertsEnabled = true,
     this.themeMode = ThemeMode.system,
     this.uiDensity = 1.0,
     this.startWithOS = false,
@@ -110,6 +113,9 @@ class AppSettings {
 
   final TemperatureThresholds globalThresholds;
   final Map<String, TemperatureThresholds> perDeviceThresholds;
+
+  final StorageThresholds storageThresholds;
+  final bool storageAlertsEnabled;
 
   final ThemeMode themeMode;
   final double uiDensity;
@@ -139,6 +145,8 @@ class AppSettings {
     bool? recoveryNotificationsEnabled,
     TemperatureThresholds? globalThresholds,
     Map<String, TemperatureThresholds>? perDeviceThresholds,
+    StorageThresholds? storageThresholds,
+    bool? storageAlertsEnabled,
     ThemeMode? themeMode,
     double? uiDensity,
     bool? startWithOS,
@@ -162,6 +170,8 @@ class AppSettings {
           recoveryNotificationsEnabled ?? this.recoveryNotificationsEnabled,
       globalThresholds: globalThresholds ?? this.globalThresholds,
       perDeviceThresholds: perDeviceThresholds ?? this.perDeviceThresholds,
+      storageThresholds: storageThresholds ?? this.storageThresholds,
+      storageAlertsEnabled: storageAlertsEnabled ?? this.storageAlertsEnabled,
       themeMode: themeMode ?? this.themeMode,
       uiDensity: uiDensity ?? this.uiDensity,
       startWithOS: startWithOS ?? this.startWithOS,
@@ -188,6 +198,8 @@ class AppSettings {
     'perDeviceThresholds': perDeviceThresholds.map(
       (k, v) => MapEntry(k, v.toJson()),
     ),
+    'storageThresholds': storageThresholds.toJson(),
+    'storageAlertsEnabled': storageAlertsEnabled,
     'themeMode': themeMode.name,
     'uiDensity': uiDensity,
     'startWithOS': startWithOS,
@@ -240,6 +252,12 @@ class AppSettings {
             )
           : TemperatureThresholds.defaults,
       perDeviceThresholds: perDevice,
+      storageThresholds: json['storageThresholds'] != null
+          ? StorageThresholds.fromJson(
+              json['storageThresholds'] as Map<String, dynamic>,
+            )
+          : StorageThresholds.defaults,
+      storageAlertsEnabled: json['storageAlertsEnabled'] as bool? ?? true,
       themeMode: ThemeMode.values.firstWhere(
         (m) => m.name == json['themeMode'],
         orElse: () => ThemeMode.system,

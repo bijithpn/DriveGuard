@@ -15,4 +15,19 @@ abstract class NotificationService {
     required String deviceName,
     required String temperatureText,
   });
+
+  Future<void> showStorageWarning({
+    required String deviceName,
+    required String usageText,
+  });
+
+  Future<void> showStorageCritical({
+    required String deviceName,
+    required String usageText,
+  });
+
+  Future<void> showStorageRecovered({
+    required String deviceName,
+    required String usageText,
+  });
 }
