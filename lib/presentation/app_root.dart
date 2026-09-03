@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../application/providers.dart';
@@ -106,7 +108,10 @@ class _AppRootState extends ConsumerState<AppRoot>
       },
       onRescan: () => ref.read(monitoringServiceProvider).rescan(),
       onQuit: () async {
-        await windowManager.destroy();
+        try {
+          await trayManager.destroy();
+        } catch (_) {}
+        exit(0);
       },
     );
     try {
@@ -223,7 +228,10 @@ class _AppRootState extends ConsumerState<AppRoot>
     if (settings.closeToTray) {
       await windowManager.hide();
     } else {
-      await windowManager.destroy();
+      try {
+        await trayManager.destroy();
+      } catch (_) {}
+      exit(0);
     }
   }
 

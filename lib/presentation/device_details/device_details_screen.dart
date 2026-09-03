@@ -497,7 +497,11 @@ class _TemperatureTab extends ConsumerWidget {
     final window = _historyWindows[windowLabel]!;
     final historyStore = ref.watch(historyStoreProvider);
     final samples = historyStore.pointsFor(device.id, window);
-    final stats = historyStore.statsFor(device.id, window);
+    final stats = historyStore.statsFor(
+      device.id,
+      window,
+      currentCelsius: device.primaryTemperature?.celsius,
+    );
     final presentation = DevicePresentation.of(
       device,
       ref.watch(settingsProvider).thresholdsFor(device.id),
@@ -509,6 +513,42 @@ class _TemperatureTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (stats.isElevated) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.trending_up_rounded,
+                    color: AppColors.warning,
+                    size: 20,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Temperature is higher than usual (+${TemperatureUtils.convertDelta(stats.elevationDelta, unit).toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)} vs ${windowLabel.toLowerCase()} average)',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [

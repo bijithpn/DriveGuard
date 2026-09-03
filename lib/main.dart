@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
+import 'application/monitoring/temperature_history_store.dart';
 import 'application/providers.dart';
 import 'core/logging/app_logger.dart';
 import 'infrastructure/notifications/local_notifier_service.dart';
@@ -73,6 +74,9 @@ Future<void> _bootstrap() async {
     final windowController = DesktopWindowController();
     await windowController.initialize(startMinimized: settings.startMinimized);
 
+    final historyStore = TemperatureHistoryStore();
+    await historyStore.initialize();
+
     try {
       launchAtStartup.setup(
         appName: 'DriveGuard',
@@ -92,7 +96,7 @@ Future<void> _bootstrap() async {
         overrides: [
           storageMonitorProvider.overrideWithValue(backend),
           notificationServiceProvider.overrideWithValue(notificationService),
-
+          historyStoreProvider.overrideWithValue(historyStore),
           settingsProvider.overrideWith(() => SettingsNotifier(settings)),
         ],
         child: _Bootstrapper(windowController: windowController),

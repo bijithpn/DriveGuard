@@ -687,9 +687,14 @@ NativeCapacityInfo StorageBackend::GetCapacity(const std::string& device_id) {
     CloseHandle(h);
   }
 
-  int64_t usedSum = 0, freeSum = 0;
+  int64_t usedSum = 0, freeSum = 0, totalSum = 0;
   bool haveAny = false;
+  bool haveTotal = false;
   for (const auto& v : EnumerateVolumes(device_id)) {
+    if (v.total_bytes.has_value()) {
+      totalSum += *v.total_bytes;
+      haveTotal = true;
+    }
     if (v.used_bytes.has_value()) {
       usedSum += *v.used_bytes;
       haveAny = true;
@@ -698,6 +703,9 @@ NativeCapacityInfo StorageBackend::GetCapacity(const std::string& device_id) {
       freeSum += *v.free_bytes;
       haveAny = true;
     }
+  }
+  if (!capacity.total_bytes.has_value() && haveTotal) {
+    capacity.total_bytes = totalSum;
   }
   if (haveAny) {
     capacity.used_bytes = usedSum;

@@ -42,7 +42,7 @@ class AppTrayService {
   TemperatureSeverity _lastSeverity = TemperatureSeverity.normal;
   bool _paused = false;
   List<TrayDeviceSummary> _devices = const [];
-  final Map<TemperatureSeverity, String> _iconPathCache = {};
+  final Map<String, String> _iconPathCache = {};
 
   String? _selectedDeviceId;
   bool _selectionIsExplicit = false;
@@ -102,12 +102,13 @@ class AppTrayService {
 
   Future<void> _applyIcon(TemperatureSeverity severity) async {
     try {
-      final path = await _iconPathFor(severity);
+      final displayed = _displayedDevice;
+      final label = displayed?.valueText;
+      final path = await _iconPathFor(severity, label);
       await trayManager.setIcon(path);
       await trayManager.setToolTip('DriveGuard - ${_tooltipSummary(severity)}');
 
       if (Platform.isMacOS) {
-        final displayed = _displayedDevice;
         await trayManager.setTitle(
           displayed == null ? '' : displayed.valueText,
         );
@@ -137,16 +138,19 @@ class AppTrayService {
     TemperatureSeverity.unavailable => 0,
   };
 
-  Future<String> _iconPathFor(TemperatureSeverity severity) async {
-    final cached = _iconPathCache[severity];
+  Future<String> _iconPathFor(TemperatureSeverity severity, String? label) async {
+    // Include label in cache key so icon re-renders when temperature changes.
+    final cacheKey = '${severity.name}_${label ?? ''}';
+    final cached = _iconPathCache[cacheKey];
     if (cached != null && File(cached).existsSync()) return cached;
 
-    final bytes = await _renderDotPng(_severityColor(severity));
+    final bytes = await _renderTrayIcon(_severityColor(severity), label);
+    final safe = (label ?? '').replaceAll(RegExp(r'[^\w]'), '_');
     final file = File(
-      '${Directory.systemTemp.path}${Platform.pathSeparator}driveguard_tray_${severity.name}.png',
+      '${Directory.systemTemp.path}${Platform.pathSeparator}driveguard_tray_${severity.name}_$safe.png',
     );
     await file.writeAsBytes(bytes, flush: true);
-    _iconPathCache[severity] = file.path;
+    _iconPathCache[cacheKey] = file.path;
     return file.path;
   }
 
@@ -164,28 +168,65 @@ class AppTrayService {
     }
   }
 
-  Future<Uint8List> _renderDotPng(ui.Color color) async {
+  /// Renders a 64×64 tray icon.
+  ///
+  /// When [label] is provided (e.g. "38°C", "N/A") it is drawn as white text
+  /// centred on a coloured rounded-rectangle — giving a visible temperature
+  /// reading directly in the Windows system tray.
+  /// When [label] is null the original dot + lines design is used as a
+  /// fallback (e.g. before any device is discovered).
+  Future<Uint8List> _renderTrayIcon(ui.Color color, String? label) async {
     const double size = 64;
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
 
-    final badgeRect = ui.RRect.fromRectAndRadius(
-      const ui.Rect.fromLTWH(4, 4, size - 8, size - 8),
-      const ui.Radius.circular(18),
-    );
-    final badgePaint = ui.Paint()
+    // Background rounded rectangle.
+    final bgPaint = ui.Paint()
       ..color = color
       ..isAntiAlias = true;
-    canvas.drawRRect(badgeRect, badgePaint);
+    canvas.drawRRect(
+      ui.RRect.fromRectAndRadius(
+        const ui.Rect.fromLTWH(2, 2, size - 4, size - 4),
+        const ui.Radius.circular(14),
+      ),
+      bgPaint,
+    );
 
-    final glyphPaint = ui.Paint()
-      ..blendMode = ui.BlendMode.clear
-      ..style = ui.PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = ui.StrokeCap.round
-      ..isAntiAlias = true;
-    for (final y in [23.0, 32.0, 41.0]) {
-      canvas.drawLine(ui.Offset(17, y), ui.Offset(size - 17, y), glyphPaint);
+    if (label != null && label.isNotEmpty) {
+      // Draw the label text centred in the icon.
+      // ui.Paragraph lets us render text onto a canvas in dart:ui.
+      final style = ui.TextStyle(
+        color: const ui.Color(0xFFFFFFFF),
+        fontSize: label.length <= 4 ? 22.0 : 17.0,
+        fontWeight: ui.FontWeight.w700,
+      );
+      final paraStyle = ui.ParagraphStyle(
+        textAlign: ui.TextAlign.center,
+        maxLines: 1,
+      );
+      final builder = ui.ParagraphBuilder(paraStyle)
+        ..pushStyle(style)
+        ..addText(label);
+      final para = builder.build();
+      para.layout(const ui.ParagraphConstraints(width: size));
+      // Centre vertically.
+      final yOffset = (size - para.height) / 2;
+      canvas.drawParagraph(para, ui.Offset(0, yOffset));
+    } else {
+      // Fallback: three horizontal lines (hamburger / scanning indicator).
+      final linePaint = ui.Paint()
+        ..blendMode = ui.BlendMode.clear
+        ..style = ui.PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..strokeCap = ui.StrokeCap.round
+        ..isAntiAlias = true;
+      for (final y in [23.0, 32.0, 41.0]) {
+        canvas.drawLine(
+          ui.Offset(17, y),
+          ui.Offset(size - 17, y),
+          linePaint,
+        );
+      }
     }
 
     final picture = recorder.endRecording();
