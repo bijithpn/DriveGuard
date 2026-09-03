@@ -7,6 +7,14 @@ class MiniWidgetDeviceSnapshot {
     required this.valueText,
     required this.fraction,
     required this.severity,
+    this.type = StorageDeviceType.unknown,
+    this.healthStatus = 'OK',
+    this.lifePercent,
+    this.freeCapacityText,
+    this.readSpeedText,
+    this.writeSpeedText,
+    this.tbwText,
+    this.powerOnHoursText,
   });
 
   final String id;
@@ -14,6 +22,14 @@ class MiniWidgetDeviceSnapshot {
   final String valueText;
   final double fraction;
   final TemperatureSeverity severity;
+  final StorageDeviceType type;
+  final String healthStatus;
+  final int? lifePercent;
+  final String? freeCapacityText;
+  final String? readSpeedText;
+  final String? writeSpeedText;
+  final String? tbwText;
+  final String? powerOnHoursText;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -21,6 +37,14 @@ class MiniWidgetDeviceSnapshot {
     'valueText': valueText,
     'fraction': fraction,
     'severity': severity.name,
+    'type': type.name,
+    'healthStatus': healthStatus,
+    'lifePercent': lifePercent,
+    'freeCapacityText': freeCapacityText,
+    'readSpeedText': readSpeedText,
+    'writeSpeedText': writeSpeedText,
+    'tbwText': tbwText,
+    'powerOnHoursText': powerOnHoursText,
   };
 
   factory MiniWidgetDeviceSnapshot.fromJson(Map<String, dynamic> json) =>
@@ -33,6 +57,17 @@ class MiniWidgetDeviceSnapshot {
           (s) => s.name == json['severity'],
           orElse: () => TemperatureSeverity.unavailable,
         ),
+        type: StorageDeviceType.values.firstWhere(
+          (t) => t.name == json['type'],
+          orElse: () => StorageDeviceType.unknown,
+        ),
+        healthStatus: json['healthStatus'] as String? ?? 'OK',
+        lifePercent: json['lifePercent'] as int?,
+        freeCapacityText: json['freeCapacityText'] as String?,
+        readSpeedText: json['readSpeedText'] as String?,
+        writeSpeedText: json['writeSpeedText'] as String?,
+        tbwText: json['tbwText'] as String?,
+        powerOnHoursText: json['powerOnHoursText'] as String?,
       );
 }
 

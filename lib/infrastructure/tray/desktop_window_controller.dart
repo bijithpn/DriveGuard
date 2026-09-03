@@ -10,19 +10,22 @@ import '../../core/logging/app_logger.dart';
 
 const kWidgetChannel = WindowMethodChannel('driveguard.widget');
 
-const kWidgetMinimumSize = Size(220, 170);
+const kWidgetMinimumSize = Size(260, 220);
 
-class DesktopWindowController {
+class DesktopWindowController with WindowListener {
   static const _tag = 'DesktopWindowController';
   static const Size _defaultDashboardSize = Size(1100, 760);
   static const Size _dashboardMinimumSize = Size(720, 480);
 
   WindowController? _miniWindow;
+  Future<void> Function()? onCloseHandler;
+  Future<void> Function()? onMinimizeHandler;
 
   bool get isMiniWindowOpen => _miniWindow != null;
 
   Future<void> initialize({required bool startMinimized}) async {
     await windowManager.ensureInitialized();
+    windowManager.addListener(this);
     final options = WindowOptions(
       size: _defaultDashboardSize,
       minimumSize: _dashboardMinimumSize,
@@ -40,6 +43,22 @@ class DesktopWindowController {
     });
 
     await windowManager.setPreventClose(true);
+  }
+
+  @override
+  void onWindowClose() async {
+    if (onCloseHandler != null) {
+      await onCloseHandler!();
+    } else {
+      await windowManager.hide();
+    }
+  }
+
+  @override
+  void onWindowMinimize() async {
+    if (onMinimizeHandler != null) {
+      await onMinimizeHandler!();
+    }
   }
 
   Future<void> enterWidgetMode(WidgetSettings widgetSettings) async {

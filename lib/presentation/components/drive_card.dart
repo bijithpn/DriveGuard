@@ -67,14 +67,48 @@ class _DriveCardState extends State<DriveCard> {
     return '${size.toStringAsFixed(1)} ${units[unitIndex]}';
   }
 
-  String _capacityText() {
-    final capacity = widget.device.capacity;
-    if (capacity.isValid && capacity.freeBytes != null) {
-      return '${_formatBytes(capacity.freeBytes!)} free';
+  String _usageStatLabel() {
+    if (widget.device.health.totalBytesWritten != null) {
+      return 'Written';
+    }
+    if (widget.device.health.powerOnHours != null) {
+      return 'Power-On';
+    }
+    return 'Capacity';
+  }
+
+  String _usageStatText() {
+    final tbw = widget.device.health.totalBytesWritten;
+    if (tbw != null) {
+      final tb = tbw / (1024 * 1024 * 1024 * 1024);
+      if (tb >= 1.0) {
+        return '${tb.toStringAsFixed(1)} TB';
+      }
+      final gb = tbw / (1024 * 1024 * 1024);
+      return '${gb.toStringAsFixed(0)} GB';
+    }
+    final hours = widget.device.health.powerOnHours;
+    if (hours != null) {
+      if (hours >= 24) {
+        return '${(hours / 24).toStringAsFixed(0)}d (${hours}h)';
+      }
+      return '${hours}h';
     }
     final bytes = widget.device.capacityBytes;
-    if (bytes == null) return '--';
-    return _formatBytes(bytes);
+    if (bytes != null && bytes > 0) {
+      return _formatBytes(bytes);
+    }
+    return 'Active';
+  }
+
+  IconData _usageStatIcon() {
+    if (widget.device.health.totalBytesWritten != null) {
+      return Icons.save_as_rounded;
+    }
+    if (widget.device.health.powerOnHours != null) {
+      return Icons.schedule_rounded;
+    }
+    return Icons.storage_rounded;
   }
 
   String _healthLabel() {
@@ -159,12 +193,9 @@ class _DriveCardState extends State<DriveCard> {
                 typeIcon: _typeIcon(),
                 healthLabel: _healthLabel(),
                 healthColor: _healthColor(context),
-                capacityLabel:
-                    widget.device.capacity.isValid &&
-                        widget.device.capacity.freeBytes != null
-                    ? 'Free'
-                    : 'Capacity',
-                capacityText: _capacityText(),
+                statLabel: _usageStatLabel(),
+                statText: _usageStatText(),
+                statIcon: _usageStatIcon(),
                 updatedText: _updatedText(),
                 onTap: widget.onTap,
               ),
@@ -311,8 +342,9 @@ class _GridCard extends StatelessWidget {
     required this.typeIcon,
     required this.healthLabel,
     required this.healthColor,
-    required this.capacityLabel,
-    required this.capacityText,
+    required this.statLabel,
+    required this.statText,
+    required this.statIcon,
     required this.updatedText,
     required this.onTap,
   });
@@ -326,8 +358,9 @@ class _GridCard extends StatelessWidget {
   final IconData typeIcon;
   final String healthLabel;
   final Color healthColor;
-  final String capacityLabel;
-  final String capacityText;
+  final String statLabel;
+  final String statText;
+  final IconData statIcon;
   final String updatedText;
   final VoidCallback onTap;
 
@@ -438,23 +471,43 @@ class _GridCard extends StatelessWidget {
 
                     Row(
                       children: [
-                        _StatColumn(
+                        _StatCard(
                           label: 'Health',
                           value: healthLabel,
                           valueColor: healthColor,
                           icon: Icons.favorite_rounded,
                         ),
-                        _StatColumn(
-                          label: capacityLabel,
-                          value: capacityText,
-                          icon: Icons.pie_chart_outline_rounded,
-                        ),
-                        _StatColumn(
-                          label: 'Updated',
-                          value: updatedText,
-                          icon: Icons.access_time_rounded,
+                        const SizedBox(width: AppSpacing.sm),
+                        _StatCard(
+                          label: statLabel,
+                          value: statText,
+                          icon: statIcon,
                         ),
                       ],
+                    ),
+
+                    const SizedBox(height: AppSpacing.xs),
+
+                    Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 11,
+                            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Updated $updatedText',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -535,8 +588,8 @@ class _TempProgressBar extends StatelessWidget {
   }
 }
 
-class _StatColumn extends StatelessWidget {
-  const _StatColumn({
+class _StatCard extends StatelessWidget {
+  const _StatCard({
     required this.label,
     required this.value,
     this.valueColor,
@@ -553,58 +606,63 @@ class _StatColumn extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.bg0.withValues(alpha: 0.5) : AppColors.lightSurfaceMuted.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
+          color: isDark
+              ? AppColors.bg0.withValues(alpha: 0.7)
+              : AppColors.lightSurfaceMuted.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: isDark ? AppColors.border.withValues(alpha: 0.5) : AppColors.lightBorder.withValues(alpha: 0.7),
+            color: isDark
+                ? AppColors.border.withValues(alpha: 0.7)
+                : AppColors.lightBorder,
           ),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (icon != null) ...[
                   Icon(
                     icon,
-                    size: 11,
-                    color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                    size: 12,
+                    color: isDark
+                        ? AppColors.textMuted
+                        : AppColors.lightTextSecondary,
                   ),
-                  const SizedBox(width: 3),
+                  const SizedBox(width: 4),
                 ],
-                Flexible(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? AppColors.textMuted
-                          : AppColors.lightTextSecondary,
-                      letterSpacing: 0.2,
-                    ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textMuted
+                        : AppColors.lightTextSecondary,
+                    letterSpacing: 0.2,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 3),
-            Text(
-              value,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color:
-                    valueColor ??
-                    (isDark ? AppColors.textPrimary : AppColors.lightText),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color:
+                      valueColor ??
+                      (isDark ? AppColors.textPrimary : AppColors.lightText),
+                ),
               ),
             ),
           ],

@@ -5,6 +5,7 @@ import '../../application/providers.dart';
 import '../../domain/entities/storage_device.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
+import '../app_root.dart' show widgetModeActiveProvider;
 import '../components/device_presentation.dart';
 import '../components/drive_card.dart';
 
@@ -567,6 +568,71 @@ class _DriveListToolbar extends StatelessWidget {
 
           const Spacer(),
 
+          Consumer(
+            builder: (context, ref, _) {
+              final isWidgetActive = ref.watch(widgetModeActiveProvider);
+              return Container(
+                margin: const EdgeInsets.only(right: 8),
+                height: 26,
+                child: Tooltip(
+                  message: isWidgetActive
+                      ? 'Hide Mini Widget'
+                      : 'Open Mini Widget (HUD)',
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      backgroundColor: isWidgetActive
+                          ? AppColors.accent.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                      side: BorderSide(
+                        color: isWidgetActive
+                            ? AppColors.accent.withValues(alpha: 0.6)
+                            : (isDark
+                                  ? AppColors.border
+                                  : AppColors.lightBorder),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.picture_in_picture_alt_rounded,
+                      size: 13,
+                      color: isWidgetActive
+                          ? AppColors.accent
+                          : (isDark
+                                ? AppColors.textSecondary
+                                : AppColors.lightTextSecondary),
+                    ),
+                    label: Text(
+                      'Widget',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isWidgetActive
+                            ? AppColors.accent
+                            : (isDark
+                                  ? AppColors.textSecondary
+                                  : AppColors.lightTextSecondary),
+                      ),
+                    ),
+                    onPressed: () {
+                      ref
+                          .read(settingsProvider.notifier)
+                          .updateWith(
+                            (s) => s.copyWith(
+                              widget: s.widget.copyWith(
+                                enabled: !isWidgetActive,
+                              ),
+                            ),
+                          );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+
           _ViewToggleSegment(
             compactView: compactView,
             isDark: isDark,
@@ -700,11 +766,11 @@ class _DriveScrollBody extends StatelessWidget {
         final width = constraints.maxWidth;
         final double cardWidth;
         if (width >= 1400) {
-          cardWidth = 300;
+          cardWidth = 360;
         } else if (width >= 1000) {
-          cardWidth = 280;
+          cardWidth = 340;
         } else if (width >= 650) {
-          cardWidth = 260;
+          cardWidth = 320;
         } else {
           cardWidth = width - AppSpacing.lg * 2;
         }
@@ -716,9 +782,9 @@ class _DriveScrollBody extends StatelessWidget {
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: cardWidth,
-                  mainAxisExtent: 288,
-                  crossAxisSpacing: AppSpacing.sm,
-                  mainAxisSpacing: AppSpacing.sm,
+                  mainAxisExtent: 310,
+                  crossAxisSpacing: AppSpacing.md,
+                  mainAxisSpacing: AppSpacing.md,
                 ),
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final device = devices[index];
@@ -940,15 +1006,23 @@ class _DriveListItemState extends State<_DriveListItem> {
                   ),
                   const SizedBox(width: AppSpacing.md),
 
-                  if (widget.device.capacity.isValid && widget.device.capacity.freeBytes != null)
+                  if (widget.device.capacity.isValid &&
+                      widget.device.capacity.freeBytes != null)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
-                        color: widget.isDark ? AppColors.bg0.withValues(alpha: 0.5) : AppColors.lightSurfaceMuted,
+                        color: widget.isDark
+                            ? AppColors.bg0.withValues(alpha: 0.5)
+                            : AppColors.lightSurfaceMuted,
                         borderRadius: BorderRadius.circular(AppRadius.sm),
                         border: Border.all(
-                          color: widget.isDark ? AppColors.border.withValues(alpha: 0.6) : AppColors.lightBorder,
+                          color: widget.isDark
+                              ? AppColors.border.withValues(alpha: 0.6)
+                              : AppColors.lightBorder,
                         ),
                       ),
                       child: Row(
@@ -957,7 +1031,9 @@ class _DriveListItemState extends State<_DriveListItem> {
                           Icon(
                             Icons.pie_chart_outline_rounded,
                             size: 11,
-                            color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                            color: widget.isDark
+                                ? AppColors.textMuted
+                                : AppColors.lightTextSecondary,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -965,7 +1041,9 @@ class _DriveListItemState extends State<_DriveListItem> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: widget.isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+                              color: widget.isDark
+                                  ? AppColors.textSecondary
+                                  : AppColors.lightTextSecondary,
                             ),
                           ),
                         ],
@@ -973,9 +1051,14 @@ class _DriveListItemState extends State<_DriveListItem> {
                     ),
 
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: style.color.withValues(alpha: widget.isDark ? 0.12 : 0.08),
+                      color: style.color.withValues(
+                        alpha: widget.isDark ? 0.12 : 0.08,
+                      ),
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                       border: Border.all(
                         color: style.color.withValues(alpha: 0.25),

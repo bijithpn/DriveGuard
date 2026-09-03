@@ -744,7 +744,7 @@ class _TemperatureTab extends ConsumerWidget {
           const SizedBox(height: AppSpacing.md),
 
           Container(
-            height: 200,
+            height: 240,
             decoration: BoxDecoration(
               color: isDark ? AppColors.bg1 : AppColors.lightCard,
               borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -1015,16 +1015,29 @@ class _HistoryChart extends StatelessWidget {
 
     const lineColor = AppColors.accent;
 
+    final maxSeconds = spots.isNotEmpty ? spots.last.x : 0.0;
+
     return LineChart(
       LineChartData(
         minY: minTemp,
         maxY: maxTemp,
         gridData: FlGridData(
           show: true,
-          drawVerticalLine: false,
+          drawVerticalLine: true,
+          horizontalInterval: ((maxTemp - minTemp) / 4).clamp(2.0, 20.0),
           getDrawingHorizontalLine: (_) => FlLine(
-            color: isDark ? AppColors.divider : AppColors.lightBorder,
+            color: isDark
+                ? AppColors.divider.withValues(alpha: 0.5)
+                : AppColors.lightBorder.withValues(alpha: 0.6),
             strokeWidth: 1,
+            dashArray: [4, 4],
+          ),
+          getDrawingVerticalLine: (_) => FlLine(
+            color: isDark
+                ? AppColors.divider.withValues(alpha: 0.3)
+                : AppColors.lightBorder.withValues(alpha: 0.4),
+            strokeWidth: 1,
+            dashArray: [4, 6],
           ),
         ),
         titlesData: FlTitlesData(
@@ -1034,17 +1047,49 @@ class _HistoryChart extends StatelessWidget {
           rightTitles: const AxisTitles(
             sideTitles: SideTitles(showTitles: false),
           ),
-          bottomTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 22,
+              interval: maxSeconds > 60 ? maxSeconds / 3 : 30,
+              getTitlesWidget: (val, meta) {
+                if (val == meta.min || val == meta.max) return const SizedBox.shrink();
+                final agoSeconds = (maxSeconds - val).round();
+                final String timeLabel;
+                if (agoSeconds <= 5) {
+                  timeLabel = 'Now';
+                } else if (agoSeconds < 60) {
+                  timeLabel = '-${agoSeconds}s';
+                } else if (agoSeconds < 3600) {
+                  timeLabel = '-${(agoSeconds / 60).round()}m';
+                } else {
+                  timeLabel = '-${(agoSeconds / 3600).toStringAsFixed(1)}h';
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    timeLabel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: isDark
+                          ? AppColors.textMuted
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 36,
+              reservedSize: 40,
               getTitlesWidget: (value, meta) => Text(
                 '${value.toInt()}${TemperatureUtils.unitSuffix(unit)}',
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
                   color: isDark
                       ? AppColors.textMuted
                       : AppColors.lightTextSecondary,
@@ -1058,34 +1103,36 @@ class _HistoryChart extends StatelessWidget {
           horizontalLines: [
             HorizontalLine(
               y: warn,
-              color: AppColors.warning.withValues(alpha: 0.6),
-              strokeWidth: 1,
-              dashArray: [6, 4],
+              color: AppColors.warning.withValues(alpha: 0.7),
+              strokeWidth: 1.2,
+              dashArray: [5, 4],
               label: HorizontalLineLabel(
                 show: true,
                 alignment: Alignment.topRight,
+                padding: const EdgeInsets.only(right: 6, bottom: 2),
                 style: const TextStyle(
                   fontSize: 10,
                   color: AppColors.warning,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w700,
                 ),
-                labelResolver: (_) => 'Warn',
+                labelResolver: (_) => 'Warn (${warn.toInt()}${TemperatureUtils.unitSuffix(unit)})',
               ),
             ),
             HorizontalLine(
               y: crit,
-              color: AppColors.critical.withValues(alpha: 0.6),
-              strokeWidth: 1,
-              dashArray: [6, 4],
+              color: AppColors.critical.withValues(alpha: 0.7),
+              strokeWidth: 1.2,
+              dashArray: [5, 4],
               label: HorizontalLineLabel(
                 show: true,
                 alignment: Alignment.topRight,
+                padding: const EdgeInsets.only(right: 6, bottom: 2),
                 style: const TextStyle(
                   fontSize: 10,
                   color: AppColors.critical,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w700,
                 ),
-                labelResolver: (_) => 'Crit',
+                labelResolver: (_) => 'Crit (${crit.toInt()}${TemperatureUtils.unitSuffix(unit)})',
               ),
             ),
           ],
@@ -1094,40 +1141,68 @@ class _HistoryChart extends StatelessWidget {
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            curveSmoothness: 0.3,
+            curveSmoothness: 0.35,
+            preventCurveOverShooting: true,
             color: lineColor,
-            barWidth: 1.5,
-            dotData: const FlDotData(show: false),
+            barWidth: 2.5,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: spots.length < 25,
+              getDotPainter: (spot, percent, barData, index) {
+                final isLast = index == spots.length - 1;
+                return FlDotCirclePainter(
+                  radius: isLast ? 4 : 2,
+                  color: isLast ? Colors.white : lineColor,
+                  strokeWidth: isLast ? 2.5 : 1.5,
+                  strokeColor: lineColor,
+                );
+              },
+            ),
             belowBarData: BarAreaData(
               show: true,
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  lineColor.withValues(alpha: 0.15),
-                  lineColor.withValues(alpha: 0.0),
+                  lineColor.withValues(alpha: isDark ? 0.28 : 0.20),
+                  lineColor.withValues(alpha: 0.02),
                 ],
               ),
             ),
           ),
         ],
         lineTouchData: LineTouchData(
+          handleBuiltInTouches: true,
           touchTooltipData: LineTouchTooltipData(
             getTooltipColor: (_) =>
-                isDark ? AppColors.bg3 : AppColors.lightCard,
-            tooltipRoundedRadius: AppRadius.sm,
-            getTooltipItems: (touchedSpots) => touchedSpots
-                .map(
-                  (s) => LineTooltipItem(
-                    '${s.y.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)}',
-                    const TextStyle(
-                      color: lineColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                isDark ? const Color(0xFF1E1E22) : Colors.white,
+            tooltipRoundedRadius: AppRadius.md,
+            tooltipBorder: BorderSide(
+              color: isDark ? AppColors.border : AppColors.lightBorder,
+            ),
+            tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
+              final secondsAgo = (maxSeconds - s.x).round();
+              final timeStr = secondsAgo <= 5 ? 'Just now' : '${secondsAgo}s ago';
+              return LineTooltipItem(
+                '${s.y.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)}\n',
+                const TextStyle(
+                  color: lineColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+                children: [
+                  TextSpan(
+                    text: timeStr,
+                    style: TextStyle(
+                      color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.normal,
                     ),
                   ),
-                )
-                .toList(),
+                ],
+              );
+            }).toList(),
           ),
         ),
       ),

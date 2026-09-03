@@ -58,8 +58,8 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
     final args = widget.initialArgs;
     final x = (args['x'] as num?)?.toDouble() ?? 100;
     final y = (args['y'] as num?)?.toDouble() ?? 100;
-    final width = (args['width'] as num?)?.toDouble() ?? 260;
-    final height = (args['height'] as num?)?.toDouble() ?? 180;
+    final width = (args['width'] as num?)?.toDouble() ?? 290;
+    final height = (args['height'] as num?)?.toDouble() ?? 250;
     final opacity = (args['opacity'] as num?)?.toDouble() ?? 0.95;
     final alwaysOnTop = args['alwaysOnTop'] as bool? ?? true;
     final compact = args['compact'] as bool? ?? false;
@@ -114,6 +114,15 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
     }
   }
 
+  Future<void> _onClose() async {
+    if (_closing) return;
+    _closing = true;
+    try {
+      await kWidgetChannel.invokeMethod('widget_closed');
+    } catch (_) {}
+    await windowManager.close();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -121,7 +130,11 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
       theme: ThemeData.dark(),
       home: Scaffold(
         backgroundColor: Colors.transparent,
-        body: MiniMonitorView(snapshot: _snapshot, onExpand: _onExpand),
+        body: MiniMonitorView(
+          snapshot: _snapshot,
+          onExpand: _onExpand,
+          onClose: _onClose,
+        ),
       ),
     );
   }

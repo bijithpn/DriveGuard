@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/errors/storage_exceptions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/utils/safe_process_runner.dart';
@@ -53,13 +54,19 @@ if (\$null -eq \$disk) { exit 2 }
   Future<Object?> _runPowerShellJson(
     String script, {
     String? deviceIdForError,
+    Duration timeout = AppConstants.externalCommandTimeout,
   }) async {
-    final result = await SafeProcessRunner.instance.run('powershell', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      script,
-    ], requireZeroExit: false);
+    final result = await SafeProcessRunner.instance.run(
+      'powershell',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        script,
+      ],
+      timeout: timeout,
+      requireZeroExit: false,
+    );
     final text = result.stdout.trim();
     if (text.isEmpty) return null;
     try {
@@ -366,14 +373,20 @@ if (\$null -eq \$disk) { exit 2 }
   Stream<StorageActivity> watchActivity() {
     late final StreamController<StorageActivity> controller;
     Timer? timer;
+    bool inFlight = false;
 
     Future<void> pollDiskActivity() async {
+      if (inFlight) return;
+      inFlight = true;
       try {
         final script =
             r'Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | '
             r'Select-Object Name, DiskReadBytesPerSec, DiskWriteBytesPerSec, PercentDiskTime | '
             r'ConvertTo-Json -Compress';
-        final raw = await _runPowerShellJson(script);
+        final raw = await _runPowerShellJson(
+          script,
+          timeout: const Duration(seconds: 4),
+        );
         if (raw == null) return;
         final list = raw is List ? raw : [raw];
         for (final item in list) {
@@ -405,6 +418,8 @@ if (\$null -eq \$disk) { exit 2 }
         }
       } catch (e) {
         AppLogger.instance.debug(_tag, 'Activity polling failed: $e');
+      } finally {
+        inFlight = false;
       }
     }
 
@@ -412,7 +427,7 @@ if (\$null -eq \$disk) { exit 2 }
       onListen: () {
         pollDiskActivity();
         timer = Timer.periodic(
-          const Duration(seconds: 2),
+          const Duration(seconds: 3),
           (_) => pollDiskActivity(),
         );
       },

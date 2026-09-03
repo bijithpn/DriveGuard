@@ -43,6 +43,7 @@ class AppLogger {
       _entries.removeFirst();
     }
 
+    // ignore: avoid_print
     print(entry);
   }
 

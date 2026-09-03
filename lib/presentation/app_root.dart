@@ -48,6 +48,8 @@ class _AppRootState extends ConsumerState<AppRoot>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     windowManager.addListener(this);
+    widget.windowController.onCloseHandler = () async => onWindowClose();
+    widget.windowController.onMinimizeHandler = () async => onWindowMinimize();
 
     kWidgetChannel.setMethodCallHandler(_handleWidgetChannelCall);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initTray());
@@ -77,6 +79,11 @@ class _AppRootState extends ConsumerState<AppRoot>
             ? jsonDecode(raw) as Map<String, dynamic>
             : null;
         await _syncWidgetMode(false, geometry: geometry);
+      case 'widget_closed':
+        ref.read(widgetModeActiveProvider.notifier).state = false;
+        ref
+            .read(settingsProvider.notifier)
+            .updateWith((s) => s.copyWith(widget: s.widget.copyWith(enabled: false)));
       case 'ready':
         await _pushSnapshotToMiniWindowIfActive();
     }
@@ -183,12 +190,35 @@ class _AppRootState extends ConsumerState<AppRoot>
     final settings = ref.read(settingsProvider);
     final deviceList = ref.read(devicesProvider);
     final snapshotDevices = <MiniWidgetDeviceSnapshot>[];
+    final activityMap = ref.read(activityProvider);
     for (final d in deviceList) {
       final presentation = DevicePresentation.of(
         d,
         settings.thresholdsFor(d.id),
         settings.temperatureUnit,
       );
+      final activity = activityMap[d.id];
+      final readSpeed = activity?.readBytesPerSecond != null
+          ? '${(activity!.readBytesPerSecond! / (1024 * 1024)).toStringAsFixed(1)} MB/s'
+          : null;
+      final writeSpeed = activity?.writeBytesPerSecond != null
+          ? '${(activity!.writeBytesPerSecond! / (1024 * 1024)).toStringAsFixed(1)} MB/s'
+          : null;
+      final freeCapacity = d.capacity.freeBytes != null
+          ? '${(d.capacity.freeBytes! / (1024 * 1024 * 1024)).toStringAsFixed(0)} GB free'
+          : null;
+      final lifePercent = d.health.percentageUsed != null
+          ? (100 - d.health.percentageUsed!).clamp(0, 100)
+          : null;
+      final tbwBytes = d.health.totalBytesWritten;
+      final tbwText = tbwBytes != null
+          ? '${(tbwBytes / (1024 * 1024 * 1024 * 1024)).toStringAsFixed(1)} TBW'
+          : null;
+      final powerOnHours = d.health.powerOnHours;
+      final powerOnHoursText = powerOnHours != null
+          ? '${powerOnHours}h on'
+          : null;
+
       snapshotDevices.add(
         MiniWidgetDeviceSnapshot(
           id: d.id,
@@ -196,6 +226,14 @@ class _AppRootState extends ConsumerState<AppRoot>
           valueText: presentation.valueText,
           fraction: presentation.fraction,
           severity: _combinedSeverity(d.id, presentation.severity),
+          type: d.type,
+          healthStatus: d.health.status.name.toUpperCase(),
+          lifePercent: lifePercent,
+          freeCapacityText: freeCapacity,
+          readSpeedText: readSpeed,
+          writeSpeedText: writeSpeed,
+          tbwText: tbwText,
+          powerOnHoursText: powerOnHoursText,
         ),
       );
     }
@@ -225,7 +263,9 @@ class _AppRootState extends ConsumerState<AppRoot>
   @override
   void onWindowClose() async {
     final settings = ref.read(settingsProvider);
-    if (settings.closeToTray) {
+    final isWidgetActive = ref.read(widgetModeActiveProvider);
+    // If widget mode is active or closeToTray is enabled, keep background monitoring alive and hide main window
+    if (settings.closeToTray || isWidgetActive) {
       await windowManager.hide();
     } else {
       try {
@@ -256,6 +296,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       if (shouldBeActive) {
         await widget.windowController.enterWidgetMode(settings.widget);
         ref.read(widgetModeActiveProvider.notifier).state = true;
+        await windowManager.hide();
 
         await _pushSnapshotToMiniWindowIfActive();
       } else {
