@@ -5,7 +5,6 @@ import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../theme/app_theme.dart';
 import 'device_presentation.dart';
-import 'temperature_gauge.dart';
 
 class DriveCard extends StatefulWidget {
   const DriveCard({

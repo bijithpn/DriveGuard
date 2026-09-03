@@ -31,6 +31,6 @@ void main() {
     // No devices are discovered yet because the monitoring service was
     // never started in this test - the empty state must render, not a
     // crash or a blank screen.
-    expect(find.textContaining('Scanning for storage devices'), findsOneWidget);
+    expect(find.textContaining('No storage devices found'), findsOneWidget);
   });
 }
