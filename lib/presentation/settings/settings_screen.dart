@@ -8,494 +8,149 @@ import '../../core/logging/app_logger.dart';
 import '../../domain/entities/device_capabilities.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
+import '../app_root.dart' show widgetModeActiveProvider;
 import '../theme/app_theme.dart';
 
-class SettingsScreen extends ConsumerWidget {
+enum _Section {
+  general,
+  monitoring,
+  alerts,
+  thresholds,
+  appearance,
+  widget,
+  advanced;
+
+  String get label => switch (this) {
+    _Section.general => 'General',
+    _Section.monitoring => 'Monitoring',
+    _Section.alerts => 'Alerts',
+    _Section.thresholds => 'Thresholds',
+    _Section.appearance => 'Appearance',
+    _Section.widget => 'Widget',
+    _Section.advanced => 'Advanced',
+  };
+
+  IconData get icon => switch (this) {
+    _Section.general => Icons.tune_rounded,
+    _Section.monitoring => Icons.monitor_heart_outlined,
+    _Section.alerts => Icons.notifications_outlined,
+    _Section.thresholds => Icons.device_thermostat_rounded,
+    _Section.appearance => Icons.palette_outlined,
+    _Section.widget => Icons.widgets_outlined,
+    _Section.advanced => Icons.build_outlined,
+  };
+}
+
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider);
-    final notifier = ref.read(settingsProvider.notifier);
-    final devices = ref.watch(devicesProvider);
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  _Section _selectedSection = _Section.general;
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
-      body: Column(
+      body: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.bg0 : AppColors.lightBg,
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? AppColors.divider : AppColors.lightBorder,
-                  width: 1,
-                ),
+          _SettingsSidebar(
+            selected: _selectedSection,
+            isDark: isDark,
+            onSelect: (s) => setState(() => _selectedSection = s),
+          ),
+
+          Expanded(
+            child: _ContentPanel(section: _selectedSection, isDark: isDark),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsSidebar extends StatelessWidget {
+  const _SettingsSidebar({
+    required this.selected,
+    required this.isDark,
+    required this.onSelect,
+  });
+
+  final _Section selected;
+  final bool isDark;
+  final ValueChanged<_Section> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: AppLayout.sidebarWidth,
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
+        border: Border(
+          right: BorderSide(
+            color: isDark ? AppColors.border : AppColors.lightBorder,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sidebarPad,
+                AppSpacing.md,
+                AppSpacing.sidebarPad,
+                AppSpacing.sm,
               ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.sm + 2,
-                ),
-                child: Row(
-                  children: [
-                    _BackButton(isDark: isDark),
-                    const SizedBox(width: AppSpacing.md),
-                    Text(
-                      'Settings',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textPrimary
-                            : AppColors.lightText,
-                      ),
+              child: Row(
+                children: [
+                  _SidebarBackButton(isDark: isDark),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    'Settings',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimary
+                          : AppColors.lightText,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
 
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: isDark ? AppColors.divider : AppColors.lightBorder,
+          ),
+
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              children: [
-                _Section(
-                  title: 'General',
-                  isDark: isDark,
-                  children: [
-                    _Tile(
-                      icon: Icons.launch_rounded,
-                      title: 'Start with OS',
-                      subtitle: 'Launch DriveGuard automatically at login',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.startWithOS,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(startWithOS: v),
-                        ),
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.minimize_rounded,
-                      title: 'Start minimized',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.startMinimized,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(startMinimized: v),
-                        ),
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.open_in_full_rounded,
-                      title: 'Minimize to tray',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.minimizeToTray,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(minimizeToTray: v),
-                        ),
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.close_rounded,
-                      title: 'Close to tray',
-                      subtitle:
-                          'Closing the window keeps DriveGuard running in the tray',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.closeToTray,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(closeToTray: v),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                _Section(
-                  title: 'Monitoring',
-                  isDark: isDark,
-                  children: [
-                    _Tile(
-                      icon: Icons.timer_outlined,
-                      title: 'Polling interval',
-                      isDark: isDark,
-                      trailing: _NativeDropdown<Duration>(
-                        value: settings.pollingInterval,
-                        items: AppConstants.allowedPollingIntervals
-                            .map(
-                              (d) => DropdownMenuItem(
-                                value: d,
-                                child: Text(
-                                  '${d.inSeconds}s',
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? AppColors.textPrimary
-                                        : AppColors.lightText,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            notifier.updateWith(
-                              (s) => s.copyWith(pollingInterval: v),
-                            );
-                          }
-                        },
-                        isDark: isDark,
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.thermostat_rounded,
-                      title: 'Temperature unit',
-                      isDark: isDark,
-                      trailing: _SegmentedControl<TemperatureUnit>(
-                        options: const [
-                          (TemperatureUnit.celsius, 'C'),
-                          (TemperatureUnit.fahrenheit, 'F'),
-                        ],
-                        selected: settings.temperatureUnit,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(temperatureUnit: v),
-                        ),
-                        isDark: isDark,
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.monitor_heart_outlined,
-                      title: 'Enable monitoring',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.monitoringEnabled,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(monitoringEnabled: v),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                _Section(
-                  title: 'Alerts & Notifications',
-                  isDark: isDark,
-                  children: [
-                    _Tile(
-                      icon: Icons.notifications_outlined,
-                      title: 'Enable notifications',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.notificationsEnabled,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(notificationsEnabled: v),
-                        ),
-                      ),
-                    ),
-                    _ThresholdTile(
-                      icon: Icons.warning_amber_rounded,
-                      title: 'Warning threshold',
-                      isDark: isDark,
-                      value: settings.globalThresholds.warningCelsius,
-                      color: AppColors.warning,
-                      onSubmit: (v) => _submitThreshold(
-                        context,
-                        notifier,
-                        current: settings.globalThresholds,
-                        rawValue: v,
-                        isWarningField: true,
-                        apply: (s, updated) =>
-                            s.copyWith(globalThresholds: updated),
-                      ),
-                    ),
-                    _ThresholdTile(
-                      icon: Icons.error_outline_rounded,
-                      title: 'Critical threshold',
-                      isDark: isDark,
-                      value: settings.globalThresholds.criticalCelsius,
-                      color: AppColors.critical,
-                      onSubmit: (v) => _submitThreshold(
-                        context,
-                        notifier,
-                        current: settings.globalThresholds,
-                        rawValue: v,
-                        isWarningField: false,
-                        apply: (s, updated) =>
-                            s.copyWith(globalThresholds: updated),
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.timer_outlined,
-                      title: 'Notification cooldown',
-                      isDark: isDark,
-                      trailing: _NativeDropdown<Duration>(
-                        value: settings.notificationCooldown,
-                        items: AppConstants.allowedNotificationCooldowns
-                            .map(
-                              (d) => DropdownMenuItem(
-                                value: d,
-                                child: Text(
-                                  d.inMinutes < 60
-                                      ? '${d.inMinutes} min'
-                                      : '${d.inHours} hr',
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? AppColors.textPrimary
-                                        : AppColors.lightText,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            notifier.updateWith(
-                              (s) => s.copyWith(notificationCooldown: v),
-                            );
-                          }
-                        },
-                        isDark: isDark,
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.check_circle_outline_rounded,
-                      title: 'Recovery notifications',
-                      subtitle:
-                          'Notify when a drive returns to normal temperature',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.recoveryNotificationsEnabled,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(recoveryNotificationsEnabled: v),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                _Section(
-                  title: 'Per-Device Thresholds',
-                  isDark: isDark,
-                  children: devices.isEmpty
-                      ? [_EmptyDevicesHint(isDark: isDark)]
-                      : devices.map((d) {
-                          final thresholdOverride =
-                              settings.perDeviceThresholds[d.id];
-                          return _PerDeviceTile(
-                            device: d,
-                            thresholdOverride: thresholdOverride,
-                            settings: settings,
-                            notifier: notifier,
-                            isDark: isDark,
-                            onEdit: () => _editDeviceThresholds(
-                              context,
-                              notifier,
-                              deviceId: d.id,
-                              current: settings.thresholdsFor(d.id),
-                              currentOverrides: settings.perDeviceThresholds,
-                            ),
-                            onReset: thresholdOverride != null
-                                ? () {
-                                    final overrides = Map.of(
-                                      settings.perDeviceThresholds,
-                                    )..remove(d.id);
-                                    notifier.updateWith(
-                                      (s) => s.copyWith(
-                                        perDeviceThresholds: overrides,
-                                      ),
-                                    );
-                                  }
-                                : null,
-                          );
-                        }).toList(),
-                ),
-
-                _Section(
-                  title: 'Appearance',
-                  isDark: isDark,
-                  children: [
-                    _Tile(
-                      icon: Icons.palette_outlined,
-                      title: 'Theme',
-                      isDark: isDark,
-                      trailing: _SegmentedControl<ThemeMode>(
-                        options: const [
-                          (ThemeMode.system, 'System'),
-                          (ThemeMode.light, 'Light'),
-                          (ThemeMode.dark, 'Dark'),
-                        ],
-                        selected: settings.themeMode,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(themeMode: v),
-                        ),
-                        isDark: isDark,
-                      ),
-                    ),
-                  ],
-                ),
-
-                _Section(
-                  title: 'Desktop Widget',
-                  isDark: isDark,
-                  children: [
-                    _Tile(
-                      icon: Icons.widgets_outlined,
-                      title: 'Enable mini monitor widget',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.widget.enabled,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) =>
-                              s.copyWith(widget: s.widget.copyWith(enabled: v)),
-                        ),
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.push_pin_outlined,
-                      title: 'Always on top',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.widget.alwaysOnTop,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(
-                            widget: s.widget.copyWith(alwaysOnTop: v),
-                          ),
-                        ),
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.compress_rounded,
-                      title: 'Compact mode',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.widget.compact,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) =>
-                              s.copyWith(widget: s.widget.copyWith(compact: v)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                _Section(
-                  title: 'Advanced',
-                  isDark: isDark,
-                  children: [
-                    _Tile(
-                      icon: Icons.bug_report_outlined,
-                      title: 'Diagnostic logging',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.diagnosticLoggingEnabled,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(diagnosticLoggingEnabled: v),
-                        ),
-                      ),
-                    ),
-                    _Tile(
-                      icon: Icons.science_outlined,
-                      title: 'Use simulated devices (developer mode)',
-                      isDark: isDark,
-                      trailing: Switch(
-                        value: settings.mockBackendForced,
-                        onChanged: (v) => notifier.updateWith(
-                          (s) => s.copyWith(mockBackendForced: v),
-                        ),
-                      ),
-                    ),
-                    _ActionTile(
-                      icon: Icons.refresh_rounded,
-                      title: 'Rescan drives',
-                      isDark: isDark,
-                      onTap: () => ref.read(monitoringServiceProvider).rescan(),
-                    ),
-                    FutureBuilder(
-                      future: ref
-                          .read(storageMonitorProvider)
-                          .getCapabilities(),
-                      builder: (context, snapshot) {
-                        final caps = snapshot.data;
-                        if (caps == null) return const SizedBox.shrink();
-                        return _Tile(
-                          icon: Icons.info_outline_rounded,
-                          title: 'Backend: ${caps.backendName}',
-                          subtitle: caps.missingTools.isEmpty
-                              ? 'All required tools available'
-                              : 'Missing: ${caps.missingTools.join(', ')}',
-                          isDark: isDark,
-                          trailing: Icon(
-                            caps.missingTools.isEmpty
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.warning_amber_rounded,
-                            color: caps.missingTools.isEmpty
-                                ? AppColors.normal
-                                : AppColors.warning,
-                            size: 18,
-                          ),
-                        );
-                      },
-                    ),
-                    _ActionTile(
-                      icon: Icons.download_outlined,
-                      title: 'Export diagnostic report',
-                      subtitle:
-                          'Copies OS, backend and device info to the clipboard',
-                      isDark: isDark,
-                      onTap: () async {
-                        final caps = await ref
-                            .read(storageMonitorProvider)
-                            .getCapabilities();
-                        final report = StringBuffer()
-                          ..writeln('DriveGuard diagnostic report')
-                          ..writeln('Backend: ${caps.backendName}')
-                          ..writeln(
-                            'Can enumerate devices: ${caps.canEnumerateDevices}',
-                          )
-                          ..writeln(
-                            'Can read temperature: ${caps.canReadTemperature}',
-                          )
-                          ..writeln('Can read health: ${caps.canReadHealth}')
-                          ..writeln(
-                            'Missing tools: ${caps.missingTools.isEmpty ? 'None' : caps.missingTools.join(', ')}',
-                          );
-                        if (caps.notes.isNotEmpty) {
-                          report.writeln('Notes:');
-                          for (final note in caps.notes) {
-                            report.writeln('  - $note');
-                          }
-                        }
-                        report.writeln('Devices:');
-                        for (final d in devices) {
-                          final capabilities = DeviceCapabilities.derive(d);
-                          report.writeln(
-                            '  - ${d.type.name}/${d.interfaceType.name} status=${d.monitoringStatus.name} sensor=${d.sensorAvailability.name}',
-                          );
-                          report.writeln(
-                            '      capabilities: ${capabilities.entries.map((e) => '${e.$1}=${e.$2 ? 'yes' : 'no'}').join(', ')}',
-                          );
-                        }
-                        report.writeln('--- Log ---');
-                        report.writeln(AppLogger.instance.exportAsText());
-                        if (context.mounted) {
-                          await showDialog<void>(
-                            context: context,
-                            builder: (context) =>
-                                _DiagnosticDialog(report: report.toString()),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: AppSpacing.xl),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+                vertical: AppSpacing.sm,
+              ),
+              child: Column(
+                children: _Section.values.map((s) {
+                  return _SidebarNavItem(
+                    section: s,
+                    isSelected: s == selected,
+                    isDark: isDark,
+                    onTap: () => onSelect(s),
+                  );
+                }).toList(),
+              ),
             ),
           ),
         ],
@@ -504,8 +159,8 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _BackButton extends StatelessWidget {
-  const _BackButton({required this.isDark});
+class _SidebarBackButton extends StatelessWidget {
+  const _SidebarBackButton({required this.isDark});
   final bool isDark;
 
   @override
@@ -516,8 +171,8 @@ class _BackButton extends StatelessWidget {
         onTap: () => Navigator.of(context).pop(),
         borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Container(
-          width: 32,
-          height: 32,
+          width: 28,
+          height: 28,
           decoration: BoxDecoration(
             color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
             borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -527,7 +182,7 @@ class _BackButton extends StatelessWidget {
           ),
           child: Icon(
             Icons.arrow_back_rounded,
-            size: 16,
+            size: 14,
             color: isDark
                 ? AppColors.textSecondary
                 : AppColors.lightTextSecondary,
@@ -538,236 +193,78 @@ class _BackButton extends StatelessWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.children,
-    required this.isDark,
-  });
-  final String title;
-  final List<Widget> children;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(
-              left: AppSpacing.xs,
-              bottom: AppSpacing.xs,
-            ),
-            child: Text(
-              title.toUpperCase(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isDark
-                    ? AppColors.textMuted
-                    : AppColors.lightTextSecondary,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.bg1 : AppColors.lightCard,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: isDark ? AppColors.border : AppColors.lightBorder,
-              ),
-            ),
-            child: Column(
-              children: children.asMap().entries.map((entry) {
-                final index = entry.key;
-                final child = entry.value;
-                final isLast = index == children.length - 1;
-                return Column(
-                  children: [
-                    child,
-                    if (!isLast)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                        ),
-                        child: Divider(
-                          height: 1,
-                          color: isDark
-                              ? AppColors.divider
-                              : AppColors.lightBorder,
-                        ),
-                      ),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tile extends StatelessWidget {
-  const _Tile({
-    required this.icon,
-    required this.title,
-    required this.isDark,
-    this.subtitle,
-    this.trailing,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.bg3 : AppColors.lightSurfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Icon(
-              icon,
-              size: 15,
-              color: isDark
-                  ? AppColors.textSecondary
-                  : AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? AppColors.textPrimary : AppColors.lightText,
-                  ),
-                ),
-                if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? AppColors.textSecondary
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: AppSpacing.sm),
-            trailing!,
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.title,
+class _SidebarNavItem extends StatefulWidget {
+  const _SidebarNavItem({
+    required this.section,
+    required this.isSelected,
     required this.isDark,
     required this.onTap,
-    this.subtitle,
   });
 
-  final IconData icon;
-  final String title;
-  final String? subtitle;
+  final _Section section;
+  final bool isSelected;
   final bool isDark;
   final VoidCallback onTap;
 
   @override
+  State<_SidebarNavItem> createState() => _SidebarNavItemState();
+}
+
+class _SidebarNavItemState extends State<_SidebarNavItem> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        child: Padding(
+    final isSelected = widget.isSelected;
+    final isDark = widget.isDark;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          margin: const EdgeInsets.only(bottom: 2),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
+            horizontal: AppSpacing.sidebarPad,
+            vertical: 9,
           ),
+          decoration: isSelected
+              ? AppDecorations.sidebarItem(selected: true, isDark: isDark)
+              : BoxDecoration(
+                  color: _hovered
+                      ? (isDark
+                            ? AppColors.bg2.withValues(alpha: 0.6)
+                            : AppColors.lightSurfaceMuted.withValues(
+                                alpha: 0.7,
+                              ))
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
           child: Row(
             children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.bg3 : AppColors.lightSurfaceMuted,
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-                child: Icon(
-                  icon,
-                  size: 15,
-                  color: isDark
-                      ? AppColors.textSecondary
-                      : AppColors.lightTextSecondary,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: isDark
-                            ? AppColors.textPrimary
-                            : AppColors.lightText,
-                      ),
-                    ),
-                    if (subtitle != null)
-                      Text(
-                        subtitle!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? AppColors.textSecondary
-                              : AppColors.lightTextSecondary,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
               Icon(
-                Icons.chevron_right_rounded,
-                size: 16,
-                color: isDark
-                    ? AppColors.textMuted
-                    : AppColors.lightTextSecondary,
+                widget.section.icon,
+                size: 15,
+                color: isSelected
+                    ? AppColors.accent
+                    : (isDark
+                          ? AppColors.textSecondary
+                          : AppColors.lightTextSecondary),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                widget.section.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected
+                      ? (isDark ? AppColors.textPrimary : AppColors.lightText)
+                      : (isDark
+                            ? AppColors.textSecondary
+                            : AppColors.lightTextSecondary),
+                ),
               ),
             ],
           ),
@@ -777,188 +274,733 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-class _ThresholdTile extends StatelessWidget {
-  const _ThresholdTile({
-    required this.icon,
-    required this.title,
-    required this.isDark,
-    required this.value,
-    required this.color,
-    required this.onSubmit,
-  });
+class _ContentPanel extends ConsumerWidget {
+  const _ContentPanel({required this.section, required this.isDark});
 
-  final IconData icon;
-  final String title;
+  final _Section section;
   final bool isDark;
-  final double value;
-  final Color color;
-  final ValueChanged<String> onSubmit;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      child: Row(
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ColoredBox(
+      color: isDark ? AppColors.bg0 : AppColors.lightBg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+          SafeArea(
+            bottom: false,
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? AppColors.divider : AppColors.lightBorder,
+                    width: 1,
+                  ),
+                ),
+              ),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                section.label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.textPrimary : AppColors.lightText,
+                ),
+              ),
             ),
-            child: Icon(icon, size: 15, color: color),
           ),
-          const SizedBox(width: AppSpacing.md),
+
           Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isDark ? AppColors.textPrimary : AppColors.lightText,
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 84,
-            child: TextFormField(
-              key: ValueKey('threshold-$value'),
-              initialValue: value.toStringAsFixed(0),
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-              decoration: InputDecoration(
-                suffixText: 'C',
-                suffixStyle: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w500,
-                ),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 7,
-                ),
-                filled: true,
-                fillColor: color.withValues(alpha: 0.07),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  borderSide: BorderSide(color: color.withValues(alpha: 0.25)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  borderSide: BorderSide(color: color.withValues(alpha: 0.25)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  borderSide: BorderSide(color: color, width: 1.5),
-                ),
-              ),
-              onFieldSubmitted: onSubmit,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: _buildSection(context, ref, section),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildSection(BuildContext context, WidgetRef ref, _Section section) {
+    return switch (section) {
+      _Section.general => _GeneralSection(isDark: isDark),
+      _Section.monitoring => _MonitoringSection(isDark: isDark),
+      _Section.alerts => _AlertsSection(isDark: isDark),
+      _Section.thresholds => _ThresholdsSection(isDark: isDark),
+      _Section.appearance => _AppearanceSection(isDark: isDark),
+      _Section.widget => _WidgetSection(isDark: isDark),
+      _Section.advanced => _AdvancedSection(isDark: isDark),
+    };
+  }
 }
 
-class _PerDeviceTile extends StatelessWidget {
-  const _PerDeviceTile({
-    required this.device,
-    required this.thresholdOverride,
-    required this.settings,
-    required this.notifier,
+class _SettingRow extends StatelessWidget {
+  const _SettingRow({
+    required this.label,
     required this.isDark,
-    required this.onEdit,
-    this.onReset,
+    this.subtitle,
+    this.trailing,
+    this.isLast = false,
+    this.onTap,
   });
 
-  final dynamic device;
-  final dynamic thresholdOverride;
-  final dynamic settings;
-  final dynamic notifier;
+  final String label;
+  final String? subtitle;
+  final Widget? trailing;
   final bool isDark;
-  final VoidCallback onEdit;
-  final VoidCallback? onReset;
+  final bool isLast;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    Widget content = Container(
+      constraints: const BoxConstraints(minHeight: 44),
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
+        horizontal: 20,
         vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : Border(
+                bottom: BorderSide(
+                  color: isDark ? AppColors.divider : AppColors.lightBorder,
+                  width: 1,
+                ),
+              ),
       ),
       child: Row(
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.bg3 : AppColors.lightSurfaceMuted,
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Icon(
-              Icons.storage_rounded,
-              size: 15,
-              color: isDark
-                  ? AppColors.textSecondary
-                  : AppColors.lightTextSecondary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  device.displayName,
+                  label,
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: isDark ? AppColors.textPrimary : AppColors.lightText,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  thresholdOverride != null
-                      ? 'Custom: warn ${thresholdOverride.warningCelsius.toStringAsFixed(0)} C / crit ${thresholdOverride.criticalCelsius.toStringAsFixed(0)} C'
-                      : 'Using global defaults',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.textMuted
-                        : AppColors.lightTextSecondary,
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.textSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
-          Row(
-            children: [
-              _SmallButton(
-                label: thresholdOverride != null ? 'Edit' : 'Override',
-                onTap: onEdit,
-                isDark: isDark,
-                useAccent: true,
-              ),
-              if (onReset != null) ...[
-                const SizedBox(width: AppSpacing.xs),
-                _SmallButton(label: 'Reset', onTap: onReset!, isDark: isDark),
-              ],
-            ],
+          if (trailing != null) ...[
+            const SizedBox(width: AppSpacing.sm),
+            trailing!,
+          ],
+          if (onTap != null && trailing == null)
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 16,
+              color: isDark
+                  ? AppColors.textMuted
+                  : AppColors.lightTextSecondary,
+            ),
+        ],
+      ),
+    );
+
+    if (onTap != null) {
+      content = Material(
+        color: Colors.transparent,
+        child: InkWell(onTap: onTap, child: content),
+      );
+    }
+
+    return content;
+  }
+}
+
+class _SectionGroup extends StatelessWidget {
+  const _SectionGroup({required this.children, required this.isDark});
+
+  final List<Widget> children;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: List.generate(children.length, (i) {
+          return children[i];
+        }),
+      ),
+    );
+  }
+}
+
+class _GeneralSection extends ConsumerWidget {
+  const _GeneralSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+
+    final rows = [
+      _SettingRow(
+        label: 'Start with OS',
+        subtitle: 'Launch DriveGuard automatically at login',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.startWithOS,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(startWithOS: v)),
+        ),
+      ),
+      _SettingRow(
+        label: 'Start minimized',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.startMinimized,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(startMinimized: v)),
+        ),
+      ),
+      _SettingRow(
+        label: 'Minimize to tray',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.minimizeToTray,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(minimizeToTray: v)),
+        ),
+      ),
+      _SettingRow(
+        label: 'Close to tray',
+        subtitle: 'Closing the window keeps DriveGuard running in the tray',
+        isDark: isDark,
+        isLast: true,
+        trailing: Switch(
+          value: settings.closeToTray,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(closeToTray: v)),
+        ),
+      ),
+    ];
+
+    return _SectionGroup(isDark: isDark, children: rows);
+  }
+}
+
+class _MonitoringSection extends ConsumerWidget {
+  const _MonitoringSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+
+    final rows = [
+      _SettingRow(
+        label: 'Polling interval',
+        isDark: isDark,
+        trailing: _NativeDropdown<Duration>(
+          value: settings.pollingInterval,
+          items: AppConstants.allowedPollingIntervals
+              .map(
+                (d) => DropdownMenuItem(
+                  value: d,
+                  child: Text(
+                    '${d.inSeconds}s',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textPrimary
+                          : AppColors.lightText,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) {
+              notifier.updateWith((s) => s.copyWith(pollingInterval: v));
+            }
+          },
+          isDark: isDark,
+        ),
+      ),
+      _SettingRow(
+        label: 'Temperature unit',
+        isDark: isDark,
+        trailing: _SegmentedControl<TemperatureUnit>(
+          options: const [
+            (TemperatureUnit.celsius, 'C'),
+            (TemperatureUnit.fahrenheit, 'F'),
+          ],
+          selected: settings.temperatureUnit,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(temperatureUnit: v)),
+          isDark: isDark,
+        ),
+      ),
+      _SettingRow(
+        label: 'Enable monitoring',
+        isDark: isDark,
+        isLast: true,
+        trailing: Switch(
+          value: settings.monitoringEnabled,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(monitoringEnabled: v)),
+        ),
+      ),
+    ];
+
+    return _SectionGroup(isDark: isDark, children: rows);
+  }
+}
+
+class _AlertsSection extends ConsumerWidget {
+  const _AlertsSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+
+    final rows = [
+      _SettingRow(
+        label: 'Enable notifications',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.notificationsEnabled,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(notificationsEnabled: v)),
+        ),
+      ),
+      _SettingRow(
+        label: 'Warning threshold',
+        isDark: isDark,
+        trailing: _ThresholdField(
+          key: ValueKey('warning-${settings.globalThresholds.warningCelsius}'),
+          value: settings.globalThresholds.warningCelsius,
+          color: AppColors.warning,
+          onSubmit: (v) => _submitThreshold(
+            context,
+            notifier,
+            current: settings.globalThresholds,
+            rawValue: v,
+            isWarningField: true,
+            apply: (s, updated) => s.copyWith(globalThresholds: updated),
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Critical threshold',
+        isDark: isDark,
+        trailing: _ThresholdField(
+          key: ValueKey(
+            'critical-${settings.globalThresholds.criticalCelsius}',
+          ),
+          value: settings.globalThresholds.criticalCelsius,
+          color: AppColors.critical,
+          onSubmit: (v) => _submitThreshold(
+            context,
+            notifier,
+            current: settings.globalThresholds,
+            rawValue: v,
+            isWarningField: false,
+            apply: (s, updated) => s.copyWith(globalThresholds: updated),
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Notification cooldown',
+        isDark: isDark,
+        trailing: _NativeDropdown<Duration>(
+          value: settings.notificationCooldown,
+          items: AppConstants.allowedNotificationCooldowns
+              .map(
+                (d) => DropdownMenuItem(
+                  value: d,
+                  child: Text(
+                    d.inMinutes < 60 ? '${d.inMinutes} min' : '${d.inHours} hr',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textPrimary
+                          : AppColors.lightText,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) {
+              notifier.updateWith((s) => s.copyWith(notificationCooldown: v));
+            }
+          },
+          isDark: isDark,
+        ),
+      ),
+      _SettingRow(
+        label: 'Recovery notifications',
+        subtitle: 'Notify when a drive returns to normal temperature',
+        isDark: isDark,
+        isLast: true,
+        trailing: Switch(
+          value: settings.recoveryNotificationsEnabled,
+          onChanged: (v) => notifier.updateWith(
+            (s) => s.copyWith(recoveryNotificationsEnabled: v),
+          ),
+        ),
+      ),
+    ];
+
+    return _SectionGroup(isDark: isDark, children: rows);
+  }
+}
+
+class _ThresholdsSection extends ConsumerWidget {
+  const _ThresholdsSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    final devices = ref.watch(devicesProvider);
+
+    if (devices.isEmpty) {
+      return _SectionGroup(
+        isDark: isDark,
+        children: [
+          _SettingRow(
+            label: 'No devices detected yet',
+            subtitle:
+                'Per-device overrides will appear here once drives are found.',
+            isDark: isDark,
+            isLast: true,
           ),
         ],
+      );
+    }
+
+    final rows = List.generate(devices.length, (i) {
+      final d = devices[i];
+      final override = settings.perDeviceThresholds[d.id];
+      final isLast = i == devices.length - 1;
+
+      return _SettingRow(
+        label: d.displayName,
+        subtitle: override != null
+            ? 'Custom: warn ${override.warningCelsius.toStringAsFixed(0)} °C / crit ${override.criticalCelsius.toStringAsFixed(0)} °C'
+            : 'Using global defaults',
+        isDark: isDark,
+        isLast: isLast,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SmallButton(
+              label: override != null ? 'Edit' : 'Override',
+              onTap: () => _editDeviceThresholds(
+                context,
+                notifier,
+                deviceId: d.id,
+                current: settings.thresholdsFor(d.id),
+                currentOverrides: settings.perDeviceThresholds,
+              ),
+              isDark: isDark,
+              useAccent: true,
+            ),
+            if (override != null) ...[
+              const SizedBox(width: AppSpacing.xs),
+              _SmallButton(
+                label: 'Reset',
+                onTap: () {
+                  final overrides = Map.of(settings.perDeviceThresholds)
+                    ..remove(d.id);
+                  notifier.updateWith(
+                    (s) => s.copyWith(perDeviceThresholds: overrides),
+                  );
+                },
+                isDark: isDark,
+              ),
+            ],
+          ],
+        ),
+      );
+    });
+
+    return _SectionGroup(isDark: isDark, children: rows);
+  }
+}
+
+class _AppearanceSection extends ConsumerWidget {
+  const _AppearanceSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+
+    return _SectionGroup(
+      isDark: isDark,
+      children: [
+        _SettingRow(
+          label: 'Theme',
+          isDark: isDark,
+          isLast: true,
+          trailing: _SegmentedControl<ThemeMode>(
+            options: const [
+              (ThemeMode.system, 'System'),
+              (ThemeMode.light, 'Light'),
+              (ThemeMode.dark, 'Dark'),
+            ],
+            selected: settings.themeMode,
+            onChanged: (v) =>
+                notifier.updateWith((s) => s.copyWith(themeMode: v)),
+            isDark: isDark,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WidgetSection extends ConsumerWidget {
+  const _WidgetSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    final widgetActive = ref.watch(widgetModeActiveProvider);
+
+    final rows = [
+      _SettingRow(
+        label: 'Enable mini monitor widget',
+        isDark: isDark,
+        trailing: Switch(
+          value: widgetActive,
+          onChanged: (v) => notifier.updateWith(
+            (s) => s.copyWith(widget: s.widget.copyWith(enabled: v)),
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Always on top',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.widget.alwaysOnTop,
+          onChanged: (v) => notifier.updateWith(
+            (s) => s.copyWith(widget: s.widget.copyWith(alwaysOnTop: v)),
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Compact mode',
+        isDark: isDark,
+        isLast: true,
+        trailing: Switch(
+          value: settings.widget.compact,
+          onChanged: (v) => notifier.updateWith(
+            (s) => s.copyWith(widget: s.widget.copyWith(compact: v)),
+          ),
+        ),
+      ),
+    ];
+
+    return _SectionGroup(isDark: isDark, children: rows);
+  }
+}
+
+class _AdvancedSection extends ConsumerWidget {
+  const _AdvancedSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    final devices = ref.watch(devicesProvider);
+
+    return _SectionGroup(
+      isDark: isDark,
+      children: [
+        _SettingRow(
+          label: 'Diagnostic logging',
+          isDark: isDark,
+          trailing: Switch(
+            value: settings.diagnosticLoggingEnabled,
+            onChanged: (v) => notifier.updateWith(
+              (s) => s.copyWith(diagnosticLoggingEnabled: v),
+            ),
+          ),
+        ),
+        _SettingRow(
+          label: 'Simulated devices',
+          subtitle: 'Developer mode — use mock data instead of real drives',
+          isDark: isDark,
+          trailing: Switch(
+            value: settings.mockBackendForced,
+            onChanged: (v) =>
+                notifier.updateWith((s) => s.copyWith(mockBackendForced: v)),
+          ),
+        ),
+        _SettingRow(
+          label: 'Rescan drives',
+          isDark: isDark,
+          onTap: () => ref.read(monitoringServiceProvider).rescan(),
+        ),
+        FutureBuilder(
+          future: ref.read(storageMonitorProvider).getCapabilities(),
+          builder: (context, snapshot) {
+            final caps = snapshot.data;
+            final backendText = caps != null
+                ? 'Backend: ${caps.backendName}'
+                : 'Backend: detecting…';
+            final subtitleText = caps == null
+                ? null
+                : caps.missingTools.isEmpty
+                ? 'All required tools available'
+                : 'Missing: ${caps.missingTools.join(', ')}';
+            return _SettingRow(
+              label: backendText,
+              subtitle: subtitleText,
+              isDark: isDark,
+              trailing: caps != null
+                  ? Icon(
+                      caps.missingTools.isEmpty
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.warning_amber_rounded,
+                      color: caps.missingTools.isEmpty
+                          ? AppColors.normal
+                          : AppColors.warning,
+                      size: 18,
+                    )
+                  : null,
+            );
+          },
+        ),
+        _SettingRow(
+          label: 'Export diagnostic report',
+          subtitle: 'Copies OS, backend and device info to the clipboard',
+          isDark: isDark,
+          isLast: true,
+          onTap: () async {
+            final caps = await ref
+                .read(storageMonitorProvider)
+                .getCapabilities();
+            final report = StringBuffer()
+              ..writeln('DriveGuard diagnostic report')
+              ..writeln('Backend: ${caps.backendName}')
+              ..writeln('Can enumerate devices: ${caps.canEnumerateDevices}')
+              ..writeln('Can read temperature: ${caps.canReadTemperature}')
+              ..writeln('Can read health: ${caps.canReadHealth}')
+              ..writeln(
+                'Missing tools: ${caps.missingTools.isEmpty ? 'None' : caps.missingTools.join(', ')}',
+              );
+            if (caps.notes.isNotEmpty) {
+              report.writeln('Notes:');
+              for (final note in caps.notes) {
+                report.writeln('  - $note');
+              }
+            }
+            report.writeln('Devices:');
+            for (final d in devices) {
+              final capabilities = DeviceCapabilities.derive(d);
+              report.writeln(
+                '  - ${d.type.name}/${d.interfaceType.name} status=${d.monitoringStatus.name} sensor=${d.sensorAvailability.name}',
+              );
+              report.writeln(
+                '      capabilities: ${capabilities.entries.map((e) => '${e.$1}=${e.$2 ? 'yes' : 'no'}').join(', ')}',
+              );
+            }
+            report.writeln('--- Log ---');
+            report.writeln(AppLogger.instance.exportAsText());
+            if (context.mounted) {
+              await showDialog<void>(
+                context: context,
+                builder: (ctx) => _DiagnosticDialog(report: report.toString()),
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ThresholdField extends StatelessWidget {
+  const _ThresholdField({
+    super.key,
+    required this.value,
+    required this.color,
+    required this.onSubmit,
+  });
+
+  final double value;
+  final Color color;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 84,
+      child: TextFormField(
+        initialValue: value.toStringAsFixed(0),
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.end,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+        decoration: InputDecoration(
+          suffixText: 'C',
+          suffixStyle: TextStyle(color: color, fontWeight: FontWeight.w500),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 7,
+          ),
+          filled: true,
+          fillColor: color.withValues(alpha: 0.07),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(color: color.withValues(alpha: 0.25)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(color: color.withValues(alpha: 0.25)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(color: color, width: 1.5),
+          ),
+        ),
+        onFieldSubmitted: onSubmit,
       ),
     );
   }
@@ -998,25 +1040,6 @@ class _SmallButton extends StatelessWidget {
             fontWeight: FontWeight.w500,
             color: color,
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyDevicesHint extends StatelessWidget {
-  const _EmptyDevicesHint({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Text(
-        'No devices detected yet. Per-device overrides will appear here once drives are found.',
-        style: TextStyle(
-          fontSize: 12,
-          color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
         ),
       ),
     );
@@ -1342,13 +1365,13 @@ class _ThresholdEditorDialogState extends State<_ThresholdEditorDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _ThresholdField(
+          _ThresholdEditorField(
             controller: _warningController,
             label: 'Warning',
             color: AppColors.warning,
           ),
           const SizedBox(height: AppSpacing.sm),
-          _ThresholdField(
+          _ThresholdEditorField(
             controller: _criticalController,
             label: 'Critical',
             color: AppColors.critical,
@@ -1371,8 +1394,8 @@ class _ThresholdEditorDialogState extends State<_ThresholdEditorDialog> {
   }
 }
 
-class _ThresholdField extends StatelessWidget {
-  const _ThresholdField({
+class _ThresholdEditorField extends StatelessWidget {
+  const _ThresholdEditorField({
     required this.controller,
     required this.label,
     required this.color,

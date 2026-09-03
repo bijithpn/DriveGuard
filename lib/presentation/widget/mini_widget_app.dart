@@ -45,8 +45,9 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
       case 'snapshot':
         final payload =
             jsonDecode(call.arguments as String) as Map<String, dynamic>;
-        if (mounted)
+        if (mounted) {
           setState(() => _snapshot = MiniWidgetSnapshot.fromJson(payload));
+        }
       case 'close':
         await windowManager.close();
     }

@@ -7,49 +7,10 @@ import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../components/device_presentation.dart';
 import '../components/drive_card.dart';
-import '../components/temperature_gauge.dart';
+
 import '../device_details/device_details_screen.dart';
 import '../settings/settings_screen.dart';
 import '../theme/app_theme.dart';
-
-class DashboardScreen extends ConsumerWidget {
-  const DashboardScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final devices = ref.watch(devicesProvider);
-    final settings = ref.watch(settingsProvider);
-    final monitoringService = ref.watch(monitoringServiceProvider);
-
-    return Scaffold(
-      body: Column(
-        children: [
-          _DashboardHeader(
-            deviceCount: devices.length,
-            monitoringEnabled: settings.monitoringEnabled,
-            onToggleMonitoring: () => ref
-                .read(settingsProvider.notifier)
-                .updateWith(
-                  (s) => s.copyWith(monitoringEnabled: !s.monitoringEnabled),
-                ),
-            onRescan: monitoringService.rescan,
-            onOpenSettings: () =>
-                Navigator.of(context).push(_slideRoute(const SettingsScreen())),
-            compactView: settings.dashboardCompactView,
-            onToggleCompactView: (value) => ref
-                .read(settingsProvider.notifier)
-                .updateWith((s) => s.copyWith(dashboardCompactView: value)),
-            devices: devices,
-            settings: settings,
-          ),
-          Expanded(
-            child: _Body(devices: devices, settings: settings),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 Route<void> _slideRoute(Widget page) {
   return PageRouteBuilder(
@@ -67,28 +28,72 @@ Route<void> _slideRoute(Widget page) {
   );
 }
 
-class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({
-    required this.deviceCount,
+class DashboardScreen extends ConsumerWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final devices = ref.watch(devicesProvider);
+    final settings = ref.watch(settingsProvider);
+    final monitoringService = ref.watch(monitoringServiceProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _Sidebar(
+            devices: devices,
+            settings: settings,
+            isDark: isDark,
+            monitoringEnabled: settings.monitoringEnabled,
+            onToggleMonitoring: () => ref
+                .read(settingsProvider.notifier)
+                .updateWith(
+                  (s) => s.copyWith(monitoringEnabled: !s.monitoringEnabled),
+                ),
+            onRescan: monitoringService.rescan,
+            onOpenSettings: () =>
+                Navigator.of(context).push(_slideRoute(const SettingsScreen())),
+          ),
+
+          Expanded(
+            child: _DriveListPane(
+              devices: devices,
+              settings: settings,
+              isDark: isDark,
+              onOpenDevice: (deviceId) => Navigator.of(
+                context,
+              ).push(_slideRoute(DeviceDetailsScreen(deviceId: deviceId))),
+              onToggleCompactView: (value) => ref
+                  .read(settingsProvider.notifier)
+                  .updateWith((s) => s.copyWith(dashboardCompactView: value)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Sidebar extends StatelessWidget {
+  const _Sidebar({
+    required this.devices,
+    required this.settings,
+    required this.isDark,
     required this.monitoringEnabled,
     required this.onToggleMonitoring,
     required this.onRescan,
     required this.onOpenSettings,
-    required this.compactView,
-    required this.onToggleCompactView,
-    required this.devices,
-    required this.settings,
   });
 
-  final int deviceCount;
+  final List<StorageDevice> devices;
+  final dynamic settings;
+  final bool isDark;
   final bool monitoringEnabled;
   final VoidCallback onToggleMonitoring;
   final VoidCallback onRescan;
   final VoidCallback onOpenSettings;
-  final bool compactView;
-  final ValueChanged<bool> onToggleCompactView;
-  final List<StorageDevice> devices;
-  final dynamic settings;
 
   TemperatureSeverity _overallSeverity() {
     if (devices.isEmpty) return TemperatureSeverity.unavailable;
@@ -110,113 +115,283 @@ class _DashboardHeader extends StatelessWidget {
     return worst;
   }
 
-  String _statusText(TemperatureSeverity severity) {
+  String _overallStatusText(TemperatureSeverity severity) {
+    final count = devices.length;
+    if (count == 0) return 'No drives found';
     switch (severity) {
       case TemperatureSeverity.critical:
-        return 'Critical temperature detected';
+        return '$count drive${count == 1 ? '' : 's'} — critical';
       case TemperatureSeverity.warning:
-        return 'Temperature warning';
+        return '$count drive${count == 1 ? '' : 's'} — warning';
       case TemperatureSeverity.normal:
       case TemperatureSeverity.warm:
-        return 'All drives normal';
+        return '$count drive${count == 1 ? '' : 's'} normal';
       case TemperatureSeverity.unavailable:
-        return 'Scanning for devices...';
+        return 'Scanning…';
+    }
+  }
+
+  Color _severityColor(TemperatureSeverity severity, BuildContext context) {
+    switch (severity) {
+      case TemperatureSeverity.normal:
+      case TemperatureSeverity.warm:
+        return AppColors.normal;
+      case TemperatureSeverity.warning:
+        return AppColors.warning;
+      case TemperatureSeverity.critical:
+        return AppColors.critical;
+      case TemperatureSeverity.unavailable:
+        return Theme.of(context).colorScheme.outline;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final severity = _overallSeverity();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final style = SeverityStyle.of(severity, context);
+    final statusColor = _severityColor(severity, context);
+    final statusText = _overallStatusText(severity);
 
     return Container(
+      width: AppLayout.sidebarWidth,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg0 : AppColors.lightBg,
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
         border: Border(
-          bottom: BorderSide(
+          right: BorderSide(
             color: isDark ? AppColors.divider : AppColors.lightBorder,
             width: 1,
           ),
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm + 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sidebarPad,
+              AppSpacing.md,
+              AppSpacing.sidebarPad,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(
+                      alpha: isDark ? 0.15 : 0.10,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.30),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.storage_rounded,
+                    color: AppColors.accent,
+                    size: 14,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs + 2),
+                Text(
+                  'DriveGuard',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.textPrimary : AppColors.lightText,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ],
+            ),
           ),
+
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: isDark ? AppColors.divider : AppColors.lightBorder,
+          ),
+
+          const SizedBox(height: AppSpacing.xs),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs + 2),
+            child: _SidebarNavItem(
+              icon: Icons.storage_rounded,
+              label: 'Drives',
+              selected: true,
+              isDark: isDark,
+              onTap: () {},
+            ),
+          ),
+
+          const Spacer(),
+
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: isDark ? AppColors.divider : AppColors.lightBorder,
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sidebarPad,
+              AppSpacing.sm,
+              AppSpacing.sidebarPad,
+              AppSpacing.xs,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    statusText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: isDark
+                          ? AppColors.textSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xs + 2,
+              AppSpacing.xxs,
+              AppSpacing.xs + 2,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                _SidebarIconButton(
+                  icon: monitoringEnabled
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                  tooltip: monitoringEnabled
+                      ? 'Pause monitoring'
+                      : 'Resume monitoring',
+                  isActive: !monitoringEnabled,
+                  isDark: isDark,
+                  onPressed: onToggleMonitoring,
+                ),
+                const SizedBox(width: AppSpacing.xxs),
+                _SidebarIconButton(
+                  icon: Icons.refresh_rounded,
+                  tooltip: 'Rescan drives',
+                  isDark: isDark,
+                  onPressed: onRescan,
+                ),
+                const SizedBox(width: AppSpacing.xxs),
+                _SidebarIconButton(
+                  icon: Icons.settings_outlined,
+                  tooltip: 'Settings',
+                  isDark: isDark,
+                  onPressed: onOpenSettings,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarNavItem extends StatefulWidget {
+  const _SidebarNavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  State<_SidebarNavItem> createState() => _SidebarNavItemState();
+}
+
+class _SidebarNavItemState extends State<_SidebarNavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighlighted = widget.selected || _hovered;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          height: 32,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sidebarPad - 2,
+          ),
+          decoration: widget.selected
+              ? AppDecorations.sidebarItem(
+                  selected: true,
+                  isDark: widget.isDark,
+                )
+              : BoxDecoration(
+                  color: _hovered
+                      ? AppColors.accent.withValues(alpha: 0.06)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
           child: Row(
             children: [
-              _AppLogo(),
-              const SizedBox(width: AppSpacing.md),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'DriveGuard',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textPrimary
-                            : AppColors.lightText,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Row(
-                      children: [
-                        Container(
-                          width: 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: style.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          deviceCount == 0
-                              ? 'No devices'
-                              : '$deviceCount drive${deviceCount == 1 ? '' : 's'} · ${_statusText(severity)}',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: isDark
-                                    ? AppColors.textSecondary
-                                    : AppColors.lightTextSecondary,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ],
+              Icon(
+                widget.icon,
+                size: 15,
+                color: widget.selected
+                    ? AppColors.accent
+                    : (isHighlighted
+                          ? (widget.isDark
+                                ? AppColors.textPrimary
+                                : AppColors.lightText)
+                          : (widget.isDark
+                                ? AppColors.textSecondary
+                                : AppColors.lightTextSecondary)),
+              ),
+              const SizedBox(width: AppSpacing.xs + 2),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: widget.selected
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  color: widget.selected
+                      ? AppColors.accent
+                      : (widget.isDark
+                            ? AppColors.textSecondary
+                            : AppColors.lightTextSecondary),
                 ),
-              ),
-
-              _ViewToggle(compact: compactView, onChanged: onToggleCompactView),
-              const SizedBox(width: AppSpacing.xs),
-              _HeaderIconButton(
-                icon: monitoringEnabled
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                tooltip: monitoringEnabled
-                    ? 'Pause monitoring'
-                    : 'Resume monitoring',
-                onPressed: onToggleMonitoring,
-                isActive: !monitoringEnabled,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              _HeaderIconButton(
-                icon: Icons.refresh_rounded,
-                tooltip: 'Rescan drives',
-                onPressed: onRescan,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              _HeaderIconButton(
-                icon: Icons.settings_outlined,
-                tooltip: 'Settings',
-                onPressed: onOpenSettings,
               ),
             ],
           ),
@@ -226,130 +401,23 @@ class _DashboardHeader extends StatelessWidget {
   }
 }
 
-class _AppLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: isDark ? 0.15 : 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: const Icon(
-        Icons.storage_rounded,
-        color: AppColors.accent,
-        size: 18,
-      ),
-    );
-  }
-}
-
-class _ViewToggle extends StatelessWidget {
-  const _ViewToggle({required this.compact, required this.onChanged});
-
-  final bool compact;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      height: 32,
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: isDark ? AppColors.border : AppColors.lightBorder,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ViewToggleButton(
-            icon: Icons.grid_view_rounded,
-            tooltip: 'Grid view',
-            selected: !compact,
-            onTap: () => onChanged(false),
-          ),
-          _ViewToggleButton(
-            icon: Icons.view_list_rounded,
-            tooltip: 'List view',
-            selected: compact,
-            onTap: () => onChanged(true),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ViewToggleButton extends StatelessWidget {
-  const _ViewToggleButton({
+class _SidebarIconButton extends StatelessWidget {
+  const _SidebarIconButton({
     required this.icon,
     required this.tooltip,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: AppDurations.fast,
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            color: selected
-                ? (isDark ? AppColors.bg3 : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.sm - 2),
-          ),
-          child: Icon(
-            icon,
-            size: 15,
-            color: selected
-                ? (isDark ? AppColors.textPrimary : AppColors.lightText)
-                : (isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  const _HeaderIconButton({
-    required this.icon,
-    required this.tooltip,
+    required this.isDark,
     required this.onPressed,
     this.isActive = false,
   });
 
   final IconData icon;
   final String tooltip;
+  final bool isDark;
   final VoidCallback onPressed;
   final bool isActive;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -359,23 +427,23 @@ class _HeaderIconButton extends StatelessWidget {
           onTap: onPressed,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           child: Container(
-            width: 32,
-            height: 32,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: isActive
-                  ? AppColors.accent.withValues(alpha: 0.15)
-                  : (isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted),
+                  ? AppColors.accent.withValues(alpha: 0.14)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(
-                color: isActive
-                    ? AppColors.accent.withValues(alpha: 0.35)
-                    : (isDark ? AppColors.border : AppColors.lightBorder),
-                width: 1,
-              ),
+              border: isActive
+                  ? Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.30),
+                      width: 1,
+                    )
+                  : null,
             ),
             child: Icon(
               icon,
-              size: 16,
+              size: 15,
               color: isActive
                   ? AppColors.accent
                   : (isDark
@@ -389,145 +457,354 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-class _Body extends StatelessWidget {
-  const _Body({required this.devices, required this.settings});
+class _DriveListPane extends StatelessWidget {
+  const _DriveListPane({
+    required this.devices,
+    required this.settings,
+    required this.isDark,
+    required this.onOpenDevice,
+    required this.onToggleCompactView,
+  });
+
   final List<StorageDevice> devices;
   final dynamic settings;
+  final bool isDark;
+  final ValueChanged<String> onOpenDevice;
+  final ValueChanged<bool> onToggleCompactView;
 
   @override
   Widget build(BuildContext context) {
-    if (devices.isEmpty) {
-      return const _EmptyState();
-    }
+    final compactView = settings.dashboardCompactView as bool;
 
-    return Consumer(
-      builder: (context, ref, _) {
-        final settings = ref.watch(settingsProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DriveListToolbar(
+          deviceCount: devices.length,
+          compactView: compactView,
+          isDark: isDark,
+          onToggleCompactView: onToggleCompactView,
+        ),
 
-        Widget entranceAnimated({required int index, required Widget child}) {
-          return TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: Duration(milliseconds: 200 + index * 40),
-            curve: Curves.easeOutCubic,
-            builder: (context, value, child) => Opacity(
-              opacity: value,
-              child: Transform.translate(
-                offset: Offset(0, (1 - value) * 12),
-                child: child,
+        Divider(
+          height: 1,
+          thickness: 1,
+          color: isDark ? AppColors.divider : AppColors.lightBorder,
+        ),
+
+        Expanded(
+          child: devices.isEmpty
+              ? const _EmptyState()
+              : _DriveScrollBody(
+                  devices: devices,
+                  settings: settings,
+                  isDark: isDark,
+                  compactView: compactView,
+                  onOpenDevice: onOpenDevice,
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DriveListToolbar extends StatelessWidget {
+  const _DriveListToolbar({
+    required this.deviceCount,
+    required this.compactView,
+    required this.isDark,
+    required this.onToggleCompactView,
+  });
+
+  final int deviceCount;
+  final bool compactView;
+  final bool isDark;
+  final ValueChanged<bool> onToggleCompactView;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      color: isDark ? AppColors.bg0 : AppColors.lightBg,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Storage Devices',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.textPrimary : AppColors.lightText,
+              letterSpacing: -0.1,
+            ),
+          ),
+
+          const SizedBox(width: AppSpacing.sm),
+
+          if (deviceCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(
+                  color: isDark ? AppColors.border : AppColors.lightBorder,
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                '$deviceCount',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: isDark
+                      ? AppColors.textSecondary
+                      : AppColors.lightTextSecondary,
+                ),
               ),
             ),
-            child: child,
-          );
+
+          const Spacer(),
+
+          _ViewToggleSegment(
+            compactView: compactView,
+            isDark: isDark,
+            onToggle: onToggleCompactView,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ViewToggleSegment extends StatelessWidget {
+  const _ViewToggleSegment({
+    required this.compactView,
+    required this.isDark,
+    required this.onToggle,
+  });
+
+  final bool compactView;
+  final bool isDark;
+  final ValueChanged<bool> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 26,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SegmentButton(
+            icon: Icons.grid_view_rounded,
+            tooltip: 'Grid view',
+            selected: !compactView,
+            isDark: isDark,
+            onTap: () => onToggle(false),
+          ),
+          _SegmentButton(
+            icon: Icons.view_list_rounded,
+            tooltip: 'List view',
+            selected: compactView,
+            isDark: isDark,
+            onTap: () => onToggle(true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SegmentButton extends StatelessWidget {
+  const _SegmentButton({
+    required this.icon,
+    required this.tooltip,
+    required this.selected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool selected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark ? AppColors.bg3 : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.sm - 2),
+          ),
+          child: Icon(
+            icon,
+            size: 13,
+            color: selected
+                ? (isDark ? AppColors.textPrimary : AppColors.lightText)
+                : (isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriveScrollBody extends StatelessWidget {
+  const _DriveScrollBody({
+    required this.devices,
+    required this.settings,
+    required this.isDark,
+    required this.compactView,
+    required this.onOpenDevice,
+  });
+
+  final List<StorageDevice> devices;
+  final dynamic settings;
+  final bool isDark;
+  final bool compactView;
+  final ValueChanged<String> onOpenDevice;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compactView) {
+      return _DriveListView(
+        devices: devices,
+        settings: settings,
+        isDark: isDark,
+        onOpenDevice: onOpenDevice,
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final double cardWidth;
+        if (width >= 1400) {
+          cardWidth = 300;
+        } else if (width >= 1000) {
+          cardWidth = 280;
+        } else if (width >= 650) {
+          cardWidth = 260;
+        } else {
+          cardWidth = width - AppSpacing.lg * 2;
         }
 
-        if (settings.dashboardCompactView) {
-          return CustomScrollView(
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                sliver: SliverList.separated(
-                  itemCount: devices.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: AppSpacing.xs),
-                  itemBuilder: (context, index) {
-                    final device = devices[index];
-                    return entranceAnimated(
-                      index: index,
-                      child: KeyedSubtree(
-                        key: ValueKey(device.id),
-                        child: _CompactDriveRow(
-                          device: device,
-                          thresholds: settings.thresholdsFor(device.id),
-                          unit: settings.temperatureUnit,
-                          onTap: () => Navigator.of(context).push(
-                            _slideRoute(
-                              DeviceDetailsScreen(deviceId: device.id),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+        return CustomScrollView(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: cardWidth,
+                  mainAxisExtent: 288,
+                  crossAxisSpacing: AppSpacing.sm,
+                  mainAxisSpacing: AppSpacing.sm,
                 ),
-              ),
-            ],
-          );
-        }
-
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            double cardWidth;
-            if (width >= 1400) {
-              cardWidth = 300;
-            } else if (width >= 1000) {
-              cardWidth = 280;
-            } else if (width >= 650) {
-              cardWidth = 260;
-            } else {
-              cardWidth = width - AppSpacing.lg * 2;
-            }
-
-            return CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: cardWidth,
-                      mainAxisExtent: 288,
-                      crossAxisSpacing: AppSpacing.sm,
-                      mainAxisSpacing: AppSpacing.sm,
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final device = devices[index];
+                  return KeyedSubtree(
+                    key: ValueKey(device.id),
+                    child: DriveCard(
+                      device: device,
+                      thresholds: settings.thresholdsFor(device.id),
+                      unit: settings.temperatureUnit,
+                      onTap: () => onOpenDevice(device.id),
                     ),
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final device = devices[index];
-                      return entranceAnimated(
-                        index: index,
-                        child: KeyedSubtree(
-                          key: ValueKey(device.id),
-                          child: DriveCard(
-                            device: device,
-                            thresholds: settings.thresholdsFor(device.id),
-                            unit: settings.temperatureUnit,
-                            onTap: () => Navigator.of(context).push(
-                              _slideRoute(
-                                DeviceDetailsScreen(deviceId: device.id),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }, childCount: devices.length),
-                  ),
-                ),
-              ],
-            );
-          },
+                  );
+                }, childCount: devices.length),
+              ),
+            ),
+          ],
         );
       },
     );
   }
 }
 
-class _CompactDriveRow extends StatefulWidget {
-  const _CompactDriveRow({
+class _DriveListView extends StatelessWidget {
+  const _DriveListView({
+    required this.devices,
+    required this.settings,
+    required this.isDark,
+    required this.onOpenDevice,
+  });
+
+  final List<StorageDevice> devices;
+  final dynamic settings;
+  final bool isDark;
+  final ValueChanged<String> onOpenDevice;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          sliver: SliverList.separated(
+            itemCount: devices.length,
+            separatorBuilder: (context, index) =>
+                const SizedBox(height: AppSpacing.xs),
+            itemBuilder: (context, index) {
+              final device = devices[index];
+              return KeyedSubtree(
+                key: ValueKey(device.id),
+                child: _DriveListItem(
+                  device: device,
+                  thresholds: settings.thresholdsFor(device.id),
+                  unit: settings.temperatureUnit,
+                  isDark: isDark,
+                  onTap: () => onOpenDevice(device.id),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DriveListItem extends StatefulWidget {
+  const _DriveListItem({
     required this.device,
     required this.thresholds,
     required this.unit,
+    required this.isDark,
     required this.onTap,
   });
 
   final StorageDevice device;
   final TemperatureThresholds thresholds;
   final TemperatureUnit unit;
+  final bool isDark;
   final VoidCallback onTap;
 
   @override
-  State<_CompactDriveRow> createState() => _CompactDriveRowState();
+  State<_DriveListItem> createState() => _DriveListItemState();
 }
 
-class _CompactDriveRowState extends State<_CompactDriveRow> {
-  bool _isHovered = false;
+class _DriveListItemState extends State<_DriveListItem> {
+  bool _hovered = false;
 
   String _typeLabel(StorageDeviceType type) {
     switch (type) {
@@ -563,17 +840,21 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
       widget.unit,
     );
     final style = SeverityStyle.of(presentation.severity, context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Semantics(
       button: true,
       label:
-          '${widget.device.displayName}, ${_typeLabel(widget.device.type)}, ${style.label}, ${presentation.valueText}',
+          '${widget.device.displayName}, '
+          '${_typeLabel(widget.device.type)}, '
+          '${style.label}, '
+          '${presentation.valueText}',
       child: MouseRegion(
-        onEnter: (_) => setState(() => _isHovered = true),
-        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
         child: Material(
           color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           child: InkWell(
             onTap: widget.onTap,
             borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -584,16 +865,20 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
                 vertical: AppSpacing.sm + 2,
               ),
               decoration: BoxDecoration(
-                color: isDark
-                    ? (_isHovered ? AppColors.bg2 : AppColors.bg1)
-                    : (_isHovered
+                color: widget.isDark
+                    ? (_hovered ? AppColors.bg2 : AppColors.bg1)
+                    : (_hovered
                           ? AppColors.lightSurfaceMuted
                           : AppColors.lightCard),
                 borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(
-                  color: _isHovered
-                      ? (isDark ? AppColors.border : AppColors.lightBorder)
-                      : (isDark ? AppColors.divider : AppColors.lightBorder),
+                  color: _hovered
+                      ? (widget.isDark
+                            ? AppColors.border
+                            : AppColors.lightBorder)
+                      : (widget.isDark
+                            ? AppColors.divider
+                            : AppColors.lightBorder),
                   width: 1,
                 ),
               ),
@@ -604,11 +889,11 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
                     height: 34,
                     decoration: BoxDecoration(
                       color: style.color.withValues(
-                        alpha: isDark ? 0.12 : 0.08,
+                        alpha: widget.isDark ? 0.12 : 0.08,
                       ),
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                       border: Border.all(
-                        color: style.color.withValues(alpha: 0.2),
+                        color: style.color.withValues(alpha: 0.20),
                         width: 1,
                       ),
                     ),
@@ -623,47 +908,52 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           widget.device.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(
-                                color: isDark
-                                    ? AppColors.textPrimary
-                                    : AppColors.lightText,
-                              ),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: widget.isDark
+                                ? AppColors.textPrimary
+                                : AppColors.lightText,
+                          ),
                         ),
                         const SizedBox(height: 1),
                         Text(
                           '${_typeLabel(widget.device.type)} · ${style.label}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: isDark
-                                    ? AppColors.textSecondary
-                                    : AppColors.lightTextSecondary,
-                              ),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: widget.isDark
+                                ? AppColors.textSecondary
+                                : AppColors.lightTextSecondary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
 
-                  TemperatureGauge(
-                    valueText: presentation.valueText,
-                    fraction: presentation.fraction,
-                    severity: presentation.severity,
-                    size: 44,
-                    showLabel: false,
+                  Text(
+                    presentation.valueText,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: style.color,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
+
                   Icon(
                     Icons.chevron_right_rounded,
                     size: 16,
-                    color: isDark
+                    color: widget.isDark
                         ? AppColors.textMuted
                         : AppColors.lightTextSecondary,
                   ),
@@ -683,6 +973,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
@@ -690,8 +981,8 @@ class _EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
                 borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -702,7 +993,7 @@ class _EmptyState extends StatelessWidget {
               ),
               child: Icon(
                 Icons.storage_rounded,
-                size: 28,
+                size: 24,
                 color: isDark
                     ? AppColors.textMuted
                     : AppColors.lightTextSecondary,
@@ -710,8 +1001,10 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Scanning for storage devices',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              'No storage devices found',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
                 color: isDark ? AppColors.textPrimary : AppColors.lightText,
               ),
             ),
@@ -719,21 +1012,12 @@ class _EmptyState extends StatelessWidget {
             Text(
               'DriveGuard detects NVMe, SATA, and USB drives automatically.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
                 color: isDark
                     ? AppColors.textSecondary
                     : AppColors.lightTextSecondary,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            SizedBox(
-              width: 180,
-              child: LinearProgressIndicator(
-                backgroundColor: isDark ? AppColors.bg3 : AppColors.lightBorder,
-                valueColor: const AlwaysStoppedAnimation<Color>(
-                  AppColors.accent,
-                ),
-                borderRadius: BorderRadius.circular(4),
               ),
             ),
           ],

@@ -17,7 +17,6 @@ class TemperatureGauge extends StatefulWidget {
   });
 
   final String valueText;
-
   final double fraction;
   final TemperatureSeverity severity;
   final double size;
@@ -133,14 +132,15 @@ class _GaugePainter extends CustomPainter {
   final Color color;
   final Color trackColor;
 
-  static const _startAngle = -pi / 2 - pi * 0.75;
-  static const _sweepTotal = pi * 1.5;
+  static const double _startAngle = -pi / 2 - pi * 0.75;
+  static const double _sweepTotal = pi * 1.5;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.width / 2 - 8;
-    final strokeWidth = size.width * 0.06;
+
+    final strokeWidth = size.width * 0.055;
 
     final trackPaint = Paint()
       ..color = trackColor

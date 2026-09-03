@@ -2,8 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../../domain/enums/storage_enums.dart';
 
+class AppLayout {
+  const AppLayout._();
+
+  static const double sidebarWidth = 220.0;
+
+  static const double sidebarCollapsedWidth = 56.0;
+}
+
 class AppSpacing {
   const AppSpacing._();
+
   static const double xxs = 2;
   static const double xs = 4;
   static const double sm = 8;
@@ -11,20 +20,25 @@ class AppSpacing {
   static const double lg = 24;
   static const double xl = 32;
   static const double xxl = 48;
+
+  static const double sidebarPad = 12.0;
 }
 
 class AppRadius {
   const AppRadius._();
-  static const double sm = 8;
-  static const double md = 10;
-  static const double lg = 12;
-  static const double xl = 16;
+
+  static const double sm = 6;
+  static const double md = 8;
+  static const double lg = 10;
+  static const double xl = 14;
+
   static const Radius mdRadius = Radius.circular(md);
   static const Radius lgRadius = Radius.circular(lg);
 }
 
 class AppDurations {
   const AppDurations._();
+
   static const Duration fast = Duration(milliseconds: 120);
   static const Duration medium = Duration(milliseconds: 250);
   static const Duration slow = Duration(milliseconds: 500);
@@ -53,6 +67,7 @@ class AppColors {
   static const Color textPrimary = Color(0xFFEEEEF0);
   static const Color textSecondary = Color(0xFF98989D);
   static const Color textMuted = Color(0xFF636366);
+
   static const Color divider = Color(0xFF38383A);
   static const Color border = Color(0xFF3A3A3C);
 
@@ -230,6 +245,7 @@ class AppTheme {
           outline: AppColors.lightTextSecondary,
           outlineVariant: AppColors.lightBorder,
         );
+
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
@@ -377,8 +393,6 @@ class AppTheme {
 }
 
 class AppDecorations {
-  const AppDecorations._();
-
   static BoxDecoration card({
     Color? color,
     double radius = AppRadius.lg,
@@ -403,4 +417,23 @@ class AppDecorations {
     borderRadius: BorderRadius.circular(radius),
     border: Border.all(color: color.withValues(alpha: 0.22), width: 1),
   );
+
+  static BoxDecoration sidebarItem({
+    required bool selected,
+    required bool isDark,
+  }) {
+    if (selected) {
+      return BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border(
+          left: const BorderSide(color: AppColors.accent, width: 2),
+          top: BorderSide.none,
+          right: BorderSide.none,
+          bottom: BorderSide.none,
+        ),
+      );
+    }
+    return const BoxDecoration(color: Colors.transparent);
+  }
 }

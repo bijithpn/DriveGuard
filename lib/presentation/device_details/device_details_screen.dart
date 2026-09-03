@@ -102,31 +102,43 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
-      body: Column(
+      body: Row(
         children: [
-          _DeviceHeader(
-            device: device,
-            presentation: presentation,
-            isDark: isDark,
+          SizedBox(
+            width: 300,
+            child: _DeviceInfoPanel(
+              device: device,
+              presentation: presentation,
+              settings: settings,
+              isDark: isDark,
+            ),
           ),
-          _NativeTabBar(controller: _tabController, isDark: isDark),
+
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: Column(
               children: [
-                _TemperatureTab(
-                  device: device,
-                  windowLabel: _windowLabel,
-                  onWindowChanged: (w) => setState(() => _windowLabel = w),
-                  thresholds: thresholds,
-                  unit: settings.temperatureUnit,
-                  isDark: isDark,
-                ),
-                _HealthTab(device: device, isDark: isDark),
-                _DiagnosticsTab(
-                  device: device,
-                  settings: settings,
-                  isDark: isDark,
+                _NativeTabBar(controller: _tabController, isDark: isDark),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _TemperatureTab(
+                        device: device,
+                        windowLabel: _windowLabel,
+                        onWindowChanged: (w) =>
+                            setState(() => _windowLabel = w),
+                        thresholds: thresholds,
+                        unit: settings.temperatureUnit,
+                        isDark: isDark,
+                      ),
+                      _HealthTab(device: device, isDark: isDark),
+                      _DiagnosticsTab(
+                        device: device,
+                        settings: settings,
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -137,15 +149,17 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
   }
 }
 
-class _DeviceHeader extends StatelessWidget {
-  const _DeviceHeader({
+class _DeviceInfoPanel extends StatelessWidget {
+  const _DeviceInfoPanel({
     required this.device,
     required this.presentation,
+    required this.settings,
     required this.isDark,
   });
 
   final StorageDevice device;
   final DevicePresentation presentation;
+  final dynamic settings;
   final bool isDark;
 
   String _typeLabel() {
@@ -158,19 +172,6 @@ class _DeviceHeader extends StatelessWidget {
         return 'Hard Drive';
       case StorageDeviceType.unknown:
         return 'Storage Device';
-    }
-  }
-
-  IconData _typeIcon() {
-    switch (device.type) {
-      case StorageDeviceType.nvme:
-        return Icons.memory_rounded;
-      case StorageDeviceType.ssd:
-        return Icons.storage_rounded;
-      case StorageDeviceType.hdd:
-        return Icons.album_rounded;
-      case StorageDeviceType.unknown:
-        return Icons.device_unknown_rounded;
     }
   }
 
@@ -187,166 +188,224 @@ class _DeviceHeader extends StatelessWidget {
     return '${size.toStringAsFixed(1)} ${units[unitIndex]}';
   }
 
+  String _healthLabel() {
+    switch (device.health.status) {
+      case DeviceHealthStatus.healthy:
+        return 'Healthy';
+      case DeviceHealthStatus.warning:
+        return 'Warning';
+      case DeviceHealthStatus.critical:
+        return 'Critical';
+      case DeviceHealthStatus.unknown:
+        return 'Unknown';
+      case DeviceHealthStatus.unavailable:
+        return 'Unavailable';
+    }
+  }
+
+  String _lastUpdatedText() {
+    final t = device.lastUpdated;
+    if (t == null) return 'Never';
+    final diff = DateTime.now().difference(t);
+    if (diff.inSeconds < 5) return 'Just now';
+    if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    return '${diff.inHours}h ago';
+  }
+
   @override
   Widget build(BuildContext context) {
     final style = SeverityStyle.of(presentation.severity, context);
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg0 : AppColors.lightBg,
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
         border: Border(
-          bottom: BorderSide(
+          right: BorderSide(
             color: isDark ? AppColors.divider : AppColors.lightBorder,
             width: 1,
           ),
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.sm + 2,
-          ),
-          child: Row(
-            children: [
-              _BackButton(isDark: isDark),
-              const SizedBox(width: AppSpacing.md),
-
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: style.color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: style.color.withValues(alpha: 0.2)),
-                ),
-                child: Icon(_typeIcon(), color: style.color, size: 20),
-              ),
-              const SizedBox(width: AppSpacing.md),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      device.displayName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: isDark
-                            ? AppColors.textPrimary
-                            : AppColors.lightText,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 18,
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      color: isDark
+                          ? AppColors.textSecondary
+                          : AppColors.lightTextSecondary,
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Text(
-                          _typeLabel(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? AppColors.textSecondary
-                                : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                        if (device.capacityBytes != null) ...[
-                          Text(
-                            '  ·  ',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? AppColors.textMuted
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                          Text(
-                            _capacityText(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark
-                                  ? AppColors.textSecondary
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'Back',
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    presentation.valueText,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    device.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: style.color,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimary
+                          : AppColors.lightText,
                     ),
                   ),
-                  Row(
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: isDark ? AppColors.divider : AppColors.lightBorder,
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  presentation.valueText,
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w800,
+                    color: style.color,
+                    letterSpacing: -1.5,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: style.color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    border: Border.all(
+                      color: style.color.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(style.icon, size: 11, color: style.color),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 5),
                       Text(
                         style.label,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: style.color,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 16),
+
+                Center(
+                  child: TemperatureGauge(
+                    valueText: presentation.valueText,
+                    fraction: presentation.fraction,
+                    severity: presentation.severity,
+                    size: 148,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
-        ),
+
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: isDark ? AppColors.divider : AppColors.lightBorder,
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              children: [
+                _InfoRow(label: 'Type', value: _typeLabel(), isDark: isDark),
+                const SizedBox(height: 10),
+                _InfoRow(
+                  label: 'Capacity',
+                  value: _capacityText(),
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 10),
+                _InfoRow(
+                  label: 'Health',
+                  value: _healthLabel(),
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 10),
+                _InfoRow(
+                  label: 'Last Updated',
+                  value: _lastUpdatedText(),
+                  isDark: isDark,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _BackButton extends StatelessWidget {
-  const _BackButton({required this.isDark});
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    required this.isDark,
+  });
+
+  final String label;
+  final String value;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => Navigator.of(context).pop(),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: Border.all(
-              color: isDark ? AppColors.border : AppColors.lightBorder,
-            ),
-          ),
-          child: Icon(
-            Icons.arrow_back_rounded,
-            size: 16,
-            color: isDark
-                ? AppColors.textSecondary
-                : AppColors.lightTextSecondary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
           ),
         ),
-      ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppColors.textPrimary : AppColors.lightText,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -433,13 +492,6 @@ class _TemperatureTab extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              TemperatureGauge(
-                valueText: presentation.valueText,
-                fraction: presentation.fraction,
-                severity: presentation.severity,
-                size: 148,
-              ),
-              const SizedBox(width: AppSpacing.xl),
               Expanded(
                 child: Column(
                   children: [
@@ -727,6 +779,7 @@ class _SourceRow extends StatelessWidget {
     required this.timestamp,
     required this.isDark,
   });
+
   final String source;
   final DateTime? timestamp;
   final bool isDark;
@@ -832,7 +885,7 @@ class _HistoryChart extends StatelessWidget {
       unit,
     );
 
-    final lineColor = isDark ? AppColors.accent : AppColors.accent;
+    const lineColor = AppColors.accent;
 
     return LineChart(
       LineChartData(
@@ -939,7 +992,7 @@ class _HistoryChart extends StatelessWidget {
                 .map(
                   (s) => LineTooltipItem(
                     '${s.y.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)}',
-                    TextStyle(
+                    const TextStyle(
                       color: lineColor,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
@@ -961,6 +1014,7 @@ class _SensorsList extends ConsumerStatefulWidget {
     required this.unit,
     required this.isDark,
   });
+
   final String deviceId;
   final TemperatureUnit unit;
   final bool isDark;
@@ -1142,6 +1196,7 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
 
 class _HealthTab extends StatelessWidget {
   const _HealthTab({required this.device, required this.isDark});
+
   final StorageDevice device;
   final bool isDark;
 
@@ -1158,6 +1213,21 @@ class _HealthTab extends StatelessWidget {
       case DeviceHealthStatus.unknown:
       case DeviceHealthStatus.unavailable:
         return AppColors.textMuted;
+    }
+  }
+
+  String _healthDescription(DeviceHealthStatus status) {
+    switch (status) {
+      case DeviceHealthStatus.healthy:
+        return 'Drive is operating normally';
+      case DeviceHealthStatus.warning:
+        return 'Drive may be showing early warning signs';
+      case DeviceHealthStatus.critical:
+        return 'Drive health is in a critical state';
+      case DeviceHealthStatus.unknown:
+        return 'Health status could not be determined';
+      case DeviceHealthStatus.unavailable:
+        return 'SMART health data is not available for this device';
     }
   }
 
@@ -1297,21 +1367,6 @@ class _HealthTab extends StatelessWidget {
       ),
     );
   }
-
-  String _healthDescription(DeviceHealthStatus status) {
-    switch (status) {
-      case DeviceHealthStatus.healthy:
-        return 'Drive is operating normally';
-      case DeviceHealthStatus.warning:
-        return 'Drive may be showing early warning signs';
-      case DeviceHealthStatus.critical:
-        return 'Drive health is in a critical state';
-      case DeviceHealthStatus.unknown:
-        return 'Health status could not be determined';
-      case DeviceHealthStatus.unavailable:
-        return 'SMART health data is not available for this device';
-    }
-  }
 }
 
 class _HealthEntry {
@@ -1322,6 +1377,7 @@ class _HealthEntry {
     this.statusColor,
     this.available = true,
   });
+
   final String label;
   final String value;
   final IconData icon;
@@ -1331,6 +1387,7 @@ class _HealthEntry {
 
 class _HealthGrid extends StatelessWidget {
   const _HealthGrid({required this.entries, required this.isDark});
+
   final List<_HealthEntry> entries;
   final bool isDark;
 
@@ -1352,6 +1409,7 @@ class _HealthGrid extends StatelessWidget {
 
 class _HealthTile extends StatelessWidget {
   const _HealthTile({required this.entry, required this.isDark});
+
   final _HealthEntry entry;
   final bool isDark;
 
@@ -1420,6 +1478,7 @@ class _DiagnosticsTab extends StatelessWidget {
     required this.settings,
     required this.isDark,
   });
+
   final StorageDevice device;
   final dynamic settings;
   final bool isDark;
@@ -1537,6 +1596,7 @@ class _DiagnosticsTab extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           _SectionLabel(title: 'Capabilities', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
+
           _CapabilitiesGrid(
             capabilities: DeviceCapabilities.derive(device),
             startIndex: statusRows.length,
@@ -1589,7 +1649,9 @@ class _DiagnosticsTab extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           device.lastError ??
-                              'This device requires additional permissions to read temperature data. Check your system settings or run the application with elevated privileges.',
+                              'This device requires additional permissions to '
+                                  'read temperature data. Check your system settings '
+                                  'or run the application with elevated privileges.',
                           style: const TextStyle(
                             color: AppColors.warning,
                             fontSize: 12,
@@ -1616,6 +1678,7 @@ class _DiagRow extends StatelessWidget {
     required this.isDark,
     this.statusColor,
   });
+
   final String label;
   final String value;
   final IconData icon;

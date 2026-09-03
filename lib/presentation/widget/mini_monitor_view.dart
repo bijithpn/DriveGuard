@@ -44,29 +44,32 @@ class MiniMonitorView extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: _WidgetShell(
-        child: DragToMoveArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _Header(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DragToMoveArea(
+              child: _Header(
                 statusColor: statusColor,
                 deviceCount: devices.length,
                 onExpand: onExpand,
                 compact: compact,
               ),
-              if (devices.isEmpty)
-                _EmptyBody(compact: compact)
-              else
-                _DeviceList(devices: devices, compact: compact),
-              if (devices.isNotEmpty)
-                _Footer(
-                  worstSeverity: worstSeverity,
-                  statusColor: statusColor,
-                  compact: compact,
+            ),
+            if (devices.isEmpty)
+              _EmptyBody(compact: compact)
+            else
+              Flexible(
+                child: SingleChildScrollView(
+                  child: _DeviceList(devices: devices, compact: compact),
                 ),
-            ],
-          ),
+              ),
+            if (devices.isNotEmpty)
+              _Footer(
+                worstSeverity: worstSeverity,
+                statusColor: statusColor,
+                compact: compact,
+              ),
+          ],
         ),
       ),
     );

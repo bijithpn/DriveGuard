@@ -11,19 +11,6 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-/// Linux backend.
-///
-/// Enumeration: `/sys/block` (always present, no permissions needed, no
-/// external tool dependency) - filters out loop/ram/virtual devices.
-///
-/// Temperature, in priority order:
-///  1. sysfs hwmon (`/sys/class/nvme/<dev>/device/hwmon*/temp1_input`) -
-///     kernel-native, no external tool, works unprivileged when exposed.
-///  2. `nvme-cli` (`nvme smart-log`) for NVMe devices when hwmon isn't
-///     exposed - checked for presence first.
-///  3. `smartctl` for SATA/USB-bridged devices - checked for presence
-///     first, and permission failures (common without root/disk group)
-///     are surfaced explicitly rather than silently ignored.
 class LinuxStorageMonitor implements StorageMonitor {
   static const _tag = 'LinuxStorageMonitor';
 
@@ -37,7 +24,7 @@ class LinuxStorageMonitor implements StorageMonitor {
     return BackendCapabilities(
       backendName: 'Linux (sysfs + smartctl/nvme-cli)',
       canEnumerateDevices: true,
-      canReadTemperature: true, // sysfs alone can satisfy this for many NVMe
+      canReadTemperature: true,
       canReadHealth: hasSmartctl || hasNvmeCli,
       missingTools: [
         if (!hasSmartctl) 'smartctl',
@@ -60,8 +47,7 @@ class LinuxStorageMonitor implements StorageMonitor {
     for (final entry in blockDir.listSync()) {
       final name = entry.uri.pathSegments.where((s) => s.isNotEmpty).last;
       if (RegExp(r'^(loop|ram|zram|dm-|sr|fd)').hasMatch(name)) continue;
-      // Partitions have a numeric suffix and a parent whole-disk entry;
-      // skip them - we monitor whole physical devices only.
+
       final removableFile = File('/sys/block/$name/removable');
       final isRemovable =
           removableFile.existsSync() &&
@@ -127,21 +113,12 @@ class LinuxStorageMonitor implements StorageMonitor {
 
   String _sysName(String deviceId) => deviceId.replaceFirst('linux-', '');
 
-  /// Extracts the NVMe controller name ("nvme0") from a namespace block
-  /// device name ("nvme0n1"). Naively splitting on 'n' breaks because
-  /// "nvme" itself contains an 'n' - this matches the numeric controller
-  /// index explicitly instead.
   String _nvmeControllerName(String blockDeviceName) {
     final match = RegExp(r'^(nvme\d+)n\d+$').firstMatch(blockDeviceName);
     return match?.group(1) ?? blockDeviceName;
   }
 
   Future<double?> _readHwmonCelsius(String sysName) async {
-    // /sys/block/<dev>/device is a symlink to the underlying controller
-    // device (the NVMe PCI device, or the SCSI/ATA device) for both NVMe
-    // namespaces and SATA/USB disks alike - hwmon subdirectories appear
-    // under that same path in both cases, so no NVMe-specific path is
-    // needed here.
     final hwmonRoot = Directory('/sys/block/$sysName/device');
     if (!hwmonRoot.existsSync()) return null;
     try {
@@ -177,8 +154,7 @@ class LinuxStorageMonitor implements StorageMonitor {
       ], requireZeroExit: false);
       final json = jsonDecode(result.stdout) as Map<String, dynamic>;
       final temp = json['temperature'];
-      if (temp is num)
-        return temp.toDouble() - 273; // some builds report Kelvin
+      if (temp is num) return temp.toDouble() - 273;
       return null;
     } catch (e) {
       AppLogger.instance.debug(_tag, 'nvme-cli read failed for $sysName: $e');
@@ -262,9 +238,6 @@ class LinuxStorageMonitor implements StorageMonitor {
       ),
     ];
 
-    // NVMe drives can expose several distinct sensors (spec section 12).
-    // nvme-cli's `smart-log -o json` reports these as individual
-    // "temperature_sensor_N" keys alongside the composite reading.
     final sysName = _sysName(deviceId);
     if (sysName.startsWith('nvme') &&
         await SafeProcessRunner.instance.exists('nvme')) {
@@ -279,10 +252,9 @@ class LinuxStorageMonitor implements StorageMonitor {
         for (var i = 1; i <= 8; i++) {
           final raw = json['temperature_sensor_$i'];
           if (raw is! num) continue;
-          // nvme-cli reports these in Kelvin, same as the composite field.
+
           var celsius = raw.toDouble();
-          if (celsius > 200)
-            celsius -= 273; // Kelvin, matching _readNvmeCliCelsius's convention
+          if (celsius > 200) celsius -= 273;
           if (celsius == 0) continue;
           sensors.add(
             StorageSensor(
