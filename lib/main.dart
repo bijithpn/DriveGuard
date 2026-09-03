@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
@@ -13,6 +15,7 @@ import 'infrastructure/persistence/settings_repository.dart';
 import 'infrastructure/storage/storage_monitor_factory.dart';
 import 'infrastructure/tray/desktop_window_controller.dart';
 import 'presentation/app_root.dart';
+import 'presentation/widget/mini_widget_app.dart';
 
 void main() {
   // Framework-caught widget-build errors (thrown during build/layout/paint)
@@ -35,14 +38,41 @@ void main() {
     return true;
   };
 
-  runZonedGuarded(_bootstrap, (error, stack) {
+  // Everything - including `WidgetsFlutterBinding.ensureInitialized()` -
+  // has to run inside this same zone. Calling `ensureInitialized()` before
+  // `runZonedGuarded` (as an earlier version of this file did, to decide
+  // between the two branches below) binds the framework to the root zone
+  // while `runApp` for the dashboard path then runs inside this child zone
+  // instead - a real "Zone mismatch" Flutter warns about, not just a
+  // style nit.
+  runZonedGuarded(_run, (error, stack) {
     AppLogger.instance.error('main', 'Uncaught zone error during bootstrap', error);
   });
 }
 
-Future<void> _bootstrap() async {
+Future<void> _run() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // `desktop_multi_window` gives every window - including this process's
+  // very first one - a `WindowController`. The mini-widget window is
+  // created with JSON `arguments` (see DesktopWindowController.
+  // enterWidgetMode); the main window's own controller has none. That's
+  // the only signal available this early to tell which one this process
+  // instance is - it must branch before any of the normal bootstrap below
+  // runs, since the widget window is a separate engine/isolate with no
+  // access to the main window's ProviderScope, storage backend, or
+  // monitoring service, and must never re-run any of that.
+  final windowController = await WindowController.fromCurrentEngine();
+  if (windowController.arguments.isNotEmpty) {
+    final initialArgs = jsonDecode(windowController.arguments) as Map<String, dynamic>;
+    runApp(MiniWidgetApp(controller: windowController, initialArgs: initialArgs));
+    return;
+  }
+
+  await _bootstrap();
+}
+
+Future<void> _bootstrap() async {
   try {
     final settingsRepository = SettingsRepository();
     final settings = await settingsRepository.load();

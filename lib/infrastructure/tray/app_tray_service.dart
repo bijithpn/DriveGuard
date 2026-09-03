@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -13,8 +14,10 @@ import '../../domain/enums/storage_enums.dart';
 /// (e.g. "48°C" or "unavailable") by the caller - this layer never formats
 /// or converts temperatures itself.
 class TrayDeviceSummary {
-  const TrayDeviceSummary({required this.name, required this.valueText, required this.severity});
+  const TrayDeviceSummary(
+      {required this.id, required this.name, required this.valueText, required this.severity});
 
+  final String id;
   final String name;
   final String valueText;
   final TemperatureSeverity severity;
@@ -43,6 +46,12 @@ class AppTrayService {
   List<TrayDeviceSummary> _devices = const [];
   final Map<TemperatureSeverity, String> _iconPathCache = {};
 
+  /// Which drive's reading is shown as the menu-bar title text. Defaults to
+  /// the hottest/worst drive; the user can pin it to a specific one by
+  /// clicking that drive's row in the tray menu (see [_rebuildMenu]).
+  String? _selectedDeviceId;
+  bool _selectionIsExplicit = false;
+
   Future<void> initialize() async {
     await _applyIcon(TemperatureSeverity.normal);
     await _rebuildMenu();
@@ -69,8 +78,32 @@ class AppTrayService {
   /// updates the visible numbers without redundantly re-touching the icon.
   Future<void> updateDevices(List<TrayDeviceSummary> devices) async {
     _devices = devices;
+    // If the explicitly-picked drive disconnected, or nothing was ever
+    // picked, fall back to auto-following the hottest/worst drive.
+    if (_selectionIsExplicit && !devices.any((d) => d.id == _selectedDeviceId)) {
+      _selectionIsExplicit = false;
+    }
     await _applyIcon(_lastSeverity);
     await _rebuildMenu();
+  }
+
+  /// User picked a specific drive's row in the tray menu - pin the
+  /// menu-bar title to that drive until they pick another one.
+  void _selectDevice(String id) {
+    _selectedDeviceId = id;
+    _selectionIsExplicit = true;
+    unawaited(_applyIcon(_lastSeverity));
+    unawaited(_rebuildMenu());
+  }
+
+  TrayDeviceSummary? get _displayedDevice {
+    if (_devices.isEmpty) return null;
+    if (_selectionIsExplicit) {
+      for (final d in _devices) {
+        if (d.id == _selectedDeviceId) return d;
+      }
+    }
+    return _devices.reduce((a, b) => _rank(a.severity) >= _rank(b.severity) ? a : b);
   }
 
   Future<void> _applyIcon(TemperatureSeverity severity) async {
@@ -78,6 +111,12 @@ class AppTrayService {
       final path = await _iconPathFor(severity);
       await trayManager.setIcon(path);
       await trayManager.setToolTip('DriveGuard - ${_tooltipSummary(severity)}');
+      // Menu-bar title text next to the icon (macOS NSStatusItem.title) -
+      // shows the picked (or hottest) drive's live reading directly in the
+      // bar, not just on hover/click. No-op where the platform/tray backend
+      // doesn't support it (Windows/Linux tray icons have no title slot).
+      final displayed = _displayedDevice;
+      await trayManager.setTitle(displayed == null ? '' : displayed.valueText);
     } catch (e) {
       // A missing/unwritable icon file must not take the whole tray (and
       // therefore close-to-tray) down - the menu below still works even if
@@ -147,17 +186,34 @@ class AppTrayService {
     const double size = 64;
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
-    final paint = ui.Paint()
+
+    // A solid rounded-square badge, not a thin ring - the old ring all but
+    // disappeared once macOS downscaled it to real menu-bar size
+    // (16-22px). A filled shape holds its color and shape at that size,
+    // and now pairs with the live temperature text next to it
+    // (see _applyIcon's trayManager.setTitle call) instead of trying to
+    // carry the reading on its own.
+    final badgeRect = ui.RRect.fromRectAndRadius(
+      const ui.Rect.fromLTWH(4, 4, size - 8, size - 8),
+      const ui.Radius.circular(18),
+    );
+    final badgePaint = ui.Paint()
       ..color = color
       ..isAntiAlias = true;
-    // A solid ring rather than a filled disc reads better at menu-bar/tray
-    // sizes (16-22px after OS downscaling) against both light and dark
-    // system tray backgrounds.
-    canvas.drawCircle(const ui.Offset(size / 2, size / 2), size / 2 - 4, paint);
-    final hole = ui.Paint()
+    canvas.drawRRect(badgeRect, badgePaint);
+
+    // A simple stacked-drive glyph cut out of the badge (rather than drawn
+    // on top in flat white) so it stays legible against both light and
+    // dark menu bars and any translucency the OS applies.
+    final glyphPaint = ui.Paint()
       ..blendMode = ui.BlendMode.clear
+      ..style = ui.PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = ui.StrokeCap.round
       ..isAntiAlias = true;
-    canvas.drawCircle(const ui.Offset(size / 2, size / 2), size / 2 - 14, hole);
+    for (final y in [23.0, 32.0, 41.0]) {
+      canvas.drawLine(ui.Offset(17, y), ui.Offset(size - 17, y), glyphPaint);
+    }
 
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
@@ -180,12 +236,20 @@ class AppTrayService {
   }
 
   Future<void> _rebuildMenu() async {
+    final displayed = _displayedDevice;
     final menu = Menu(items: [
       if (_devices.isEmpty)
         MenuItem(disabled: true, label: 'Scanning for drives…')
       else ...[
+        // Clickable + checked, not just a disabled label: this is how the
+        // user picks which drive's reading shows next to the tray icon
+        // when there's more than one.
         for (final d in _devices)
-          MenuItem(disabled: true, label: '${d.name}   ${d.valueText}'),
+          MenuItem.checkbox(
+            key: 'device:${d.id}',
+            label: '${d.name}   ${d.valueText}',
+            checked: displayed?.id == d.id,
+          ),
       ],
       MenuItem.separator(),
       MenuItem(key: 'open', label: 'Open Dashboard'),
@@ -199,6 +263,10 @@ class AppTrayService {
   }
 
   void handleMenuClick(String key) {
+    if (key.startsWith('device:')) {
+      _selectDevice(key.substring('device:'.length));
+      return;
+    }
     switch (key) {
       case 'open':
         onOpenDashboard();

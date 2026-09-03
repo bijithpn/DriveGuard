@@ -36,7 +36,7 @@ class SettingsScreen extends ConsumerWidget {
                   : LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [const Color(0xFFEDE8FF), AppColors.lightBg],
+                      colors: [const Color(0xFFF2F2F5), AppColors.lightBg],
                     ),
               border: Border(
                   bottom: BorderSide(
@@ -450,7 +450,7 @@ class _BackButton extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.bg2 : const Color(0xFFEDE8FF),
+            color: isDark ? AppColors.bg2 : const Color(0xFFF2F2F5),
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
           ),
@@ -553,7 +553,7 @@ class _SettingsTile extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: isDark ? AppColors.bg3 : const Color(0xFFEDE8FF),
+              color: isDark ? AppColors.bg3 : const Color(0xFFF2F2F5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon,
@@ -624,7 +624,7 @@ class _ActionTile extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.bg3 : const Color(0xFFEDE8FF),
+                  color: isDark ? AppColors.bg3 : const Color(0xFFF2F2F5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon,
@@ -774,7 +774,7 @@ class _PerDeviceTile extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: isDark ? AppColors.bg3 : const Color(0xFFEDE8FF),
+              color: isDark ? AppColors.bg3 : const Color(0xFFF2F2F5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(Icons.storage_rounded,
@@ -904,7 +904,7 @@ class _PremiumDropdown<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg2 : const Color(0xFFF0EDFF),
+        color: isDark ? AppColors.bg2 : const Color(0xFFF2F2F5),
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
       ),
@@ -944,7 +944,7 @@ class _SegmentedControl<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg2 : const Color(0xFFF0EDFF),
+        color: isDark ? AppColors.bg2 : const Color(0xFFF2F2F5),
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
       ),
@@ -1008,7 +1008,7 @@ class _DiagnosticDialog extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: isDark ? AppColors.bg0 : const Color(0xFFF5F3FF),
+            color: isDark ? AppColors.bg0 : const Color(0xFFF5F5F7),
             borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
           ),

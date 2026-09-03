@@ -156,7 +156,7 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
                           AppColors.bg2.withValues(alpha: _isHovered ? 1.0 : 0.9),
                           AppColors.bg1,
                         ]
-                      : [Colors.white, const Color(0xFFFAF8FF)],
+                      : [Colors.white, const Color(0xFFFAFAFC)],
                 ),
                 borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(
@@ -173,7 +173,15 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
                           spreadRadius: 0,
                         ),
                       ]
-                    : [],
+                    : (isDark
+                        ? const []
+                        : const [
+                            BoxShadow(
+                              color: AppColors.lightShadow,
+                              blurRadius: 16,
+                              offset: Offset(0, 4),
+                            ),
+                          ]),
               ),
               child: child,
             );

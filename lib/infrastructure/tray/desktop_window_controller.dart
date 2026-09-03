@@ -1,23 +1,51 @@
+import 'dart:convert';
 import 'dart:ui';
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../application/settings/app_settings.dart';
+import '../../application/widget/mini_widget_snapshot.dart';
 import '../../core/logging/app_logger.dart';
 
-/// Wraps `window_manager` to provide the two window "shapes" the app needs
-/// (section 21): the normal dashboard window, and a compact, optionally
-/// borderless/always-on-top "mini monitor" - implemented as a mode of the
-/// single app window rather than a second OS-level window, since no
-/// single widget API exists uniformly across Windows/macOS/Linux.
+/// One bidirectional channel shared by the main window and the mini-widget
+/// window - up to two engines can pair on a `WindowMethodChannel`, which is
+/// exactly this pair. Both sides register a handler (becoming "paired")
+/// and can then `invokeMethod` on each other: main -> widget pushes
+/// `'snapshot'` updates and a `'close'` request; widget -> main sends
+/// `'expand_requested'` with the widget's last position/size. Defined here
+/// (infrastructure), not in the presentation-layer widget, so both that
+/// widget and this controller can depend on it without infrastructure
+/// having to import presentation.
+const kWidgetChannel = WindowMethodChannel('driveguard.widget');
+
+/// Floor so the widget can never be shrunk into overflowing itself - the
+/// legacy "compact" mode multiplies the configured size by 0.7, which
+/// produced a window too small for even its own header + one device row.
+const kWidgetMinimumSize = Size(220, 170);
+
+/// Wraps `window_manager` for the main dashboard window, and
+/// `desktop_multi_window` for the compact, optionally borderless/
+/// always-on-top "mini monitor" widget (section 21/28) - a genuinely
+/// separate OS-level window/Flutter engine on Windows, macOS and Linux,
+/// not the main window resized down.
+///
+/// Note on package version: `desktop_multi_window: ^0.2.1` was tried first
+/// and reverted - creating a second window/engine through it corrupted the
+/// main window's engine on this Flutter version ("Running with merged UI
+/// and platform thread. Experimental" - that plugin predates Flutter's
+/// merged UI/platform-thread mode). `^0.3.1` is a from-scratch rewrite
+/// (published well after that engine change existed) and is what's in use
+/// now. If this starts crashing again, that incompatibility is the first
+/// thing to suspect.
 class DesktopWindowController {
   static const _tag = 'DesktopWindowController';
   static const Size _defaultDashboardSize = Size(1100, 760);
   static const Size _dashboardMinimumSize = Size(720, 480);
-  static const Size _widgetMinimumSize = Size(150, 110);
 
-  Offset? _savedDashboardPosition;
-  Size _savedDashboardSize = _defaultDashboardSize;
+  WindowController? _miniWindow;
+
+  bool get isMiniWindowOpen => _miniWindow != null;
 
   Future<void> initialize({required bool startMinimized}) async {
     await windowManager.ensureInitialized();
@@ -48,63 +76,68 @@ class DesktopWindowController {
     await windowManager.setPreventClose(true);
   }
 
+  /// Opens the mini-widget as its own window (spawns a second Flutter
+  /// engine - see `main()`'s branch on `WindowController.arguments` and
+  /// `MiniWidgetApp`). A no-op if it's already open. The new window is
+  /// created hidden and applies its own frame/always-on-top/opacity from
+  /// [widgetSettings] itself, once its isolate starts
+  /// (`MiniWidgetApp._applyInitialWindowState`, which calls
+  /// `windowManager.show()` last) - so it never flashes a default-styled,
+  /// default-sized window on screen first.
   Future<void> enterWidgetMode(WidgetSettings widgetSettings) async {
+    if (_miniWindow != null) return;
     try {
-      _savedDashboardPosition = await windowManager.getPosition();
-      _savedDashboardSize = await windowManager.getSize();
-      await windowManager.setAsFrameless();
-      await windowManager.setAlwaysOnTop(widgetSettings.alwaysOnTop);
-      await windowManager.setOpacity(widgetSettings.opacity);
-      // Widget mode allows a much smaller window than the dashboard, but
-      // still needs a floor so its own layout never gets squeezed into a
-      // RenderFlex overflow.
-      await windowManager.setMinimumSize(_widgetMinimumSize);
-      final requestedSize = widgetSettings.compact
-          ? Size(widgetSettings.width * 0.7, widgetSettings.height * 0.7)
-          : Size(widgetSettings.width, widgetSettings.height);
-      final size = Size(
-        requestedSize.width < _widgetMinimumSize.width
-            ? _widgetMinimumSize.width
-            : requestedSize.width,
-        requestedSize.height < _widgetMinimumSize.height
-            ? _widgetMinimumSize.height
-            : requestedSize.height,
+      _miniWindow = await WindowController.create(
+        WindowConfiguration(
+          arguments: jsonEncode(widgetSettings.toJson()),
+          hiddenAtLaunch: true,
+        ),
       );
-      await windowManager.setSize(size);
-      await windowManager.setPosition(Offset(widgetSettings.x, widgetSettings.y));
-      await windowManager.setResizable(true);
     } catch (e) {
-      AppLogger.instance.error(_tag, 'Failed entering widget mode', e);
+      AppLogger.instance.error(_tag, 'Failed opening mini widget window', e);
+      _miniWindow = null;
     }
   }
 
-  Future<WidgetSettings> exitWidgetMode(WidgetSettings widgetSettings) async {
-    try {
-      final position = await windowManager.getPosition();
-      await windowManager.setAlwaysOnTop(false);
-      await windowManager.setOpacity(1.0);
-      await windowManager.setMinimumSize(_dashboardMinimumSize);
-      await windowManager.setSize(_savedDashboardSize);
-      if (_savedDashboardPosition != null) {
-        await windowManager.setPosition(_savedDashboardPosition!);
+  /// Closes the mini-widget window, if open. [geometry], when supplied
+  /// (the widget reports its own last position/size on its way down - see
+  /// `MiniWidgetApp._onExpand`), is merged into the returned settings so
+  /// the widget reopens in the same place next time.
+  Future<WidgetSettings> exitWidgetMode(
+    WidgetSettings widgetSettings, {
+    Map<String, dynamic>? geometry,
+  }) async {
+    if (_miniWindow != null) {
+      try {
+        // The widget usually closes itself (see MiniWidgetApp._onExpand)
+        // before this runs - this covers the other path, where the main
+        // window is telling an already-open widget to go away (e.g. "Open
+        // Dashboard" from the tray). A widget that's already gone by the
+        // time this arrives just means nothing is listening; harmless.
+        await kWidgetChannel.invokeMethod('close');
+      } catch (e) {
+        AppLogger.instance.warning(_tag, 'Failed asking mini widget to close: $e');
       }
-      // titleBarStyle cannot be toggled back to normal on every platform
-      // once frameless; a full frame restore may require a window
-      // recreate on some platforms (documented limitation).
-      return widgetSettings.copyWith(x: position.dx, y: position.dy);
-    } catch (e) {
-      AppLogger.instance.error(_tag, 'Failed exiting widget mode', e);
-      return widgetSettings;
     }
+    _miniWindow = null;
+    if (geometry == null) return widgetSettings;
+    return widgetSettings.copyWith(
+      x: (geometry['x'] as num?)?.toDouble(),
+      y: (geometry['y'] as num?)?.toDouble(),
+      width: (geometry['width'] as num?)?.toDouble(),
+      height: (geometry['height'] as num?)?.toDouble(),
+    );
   }
 
-  Future<WidgetSettings> captureWidgetGeometry(WidgetSettings widgetSettings) async {
+  /// Pushes a fresh device/settings snapshot to the mini-widget window, if
+  /// it's open - the only way it learns about new readings, since it has
+  /// no access to the main window's provider container.
+  Future<void> updateMiniWindowSnapshot(MiniWidgetSnapshot snapshot) async {
+    if (_miniWindow == null) return;
     try {
-      final position = await windowManager.getPosition();
-      final size = await windowManager.getSize();
-      return widgetSettings.copyWith(x: position.dx, y: position.dy, width: size.width, height: size.height);
-    } catch (_) {
-      return widgetSettings;
+      await kWidgetChannel.invokeMethod('snapshot', jsonEncode(snapshot.toJson()));
+    } catch (e) {
+      AppLogger.instance.warning(_tag, 'Failed pushing snapshot to mini widget: $e');
     }
   }
 

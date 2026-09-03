@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "desktop_multi_window/desktop_multi_window_plugin.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -27,6 +28,19 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   storage_native_channel_ = std::make_unique<driveguard::StorageNativeChannel>(
       flutter_controller_->engine()->messenger());
+
+  // The mini-widget window (see DesktopWindowController/MiniWidgetApp in
+  // Dart) is a genuinely separate FlutterViewController/engine created by
+  // desktop_multi_window, not a reshaped main window. It needs its own
+  // plugin registrations - notably window_manager, so that window sets its
+  // own frameless/always-on-top/position independent of the main dashboard
+  // window - which only happens via this callback.
+  DesktopMultiWindowSetWindowCreatedCallback([](void *controller) {
+    auto *flutter_view_controller =
+        reinterpret_cast<flutter::FlutterViewController *>(controller);
+    RegisterPlugins(flutter_view_controller->engine());
+  });
+
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

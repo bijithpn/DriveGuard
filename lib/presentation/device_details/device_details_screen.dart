@@ -203,7 +203,7 @@ class _DeviceHero extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFFEDE8FF),
+                  const Color(0xFFF2F2F5),
                   AppColors.lightBg,
                 ],
               ),
@@ -335,7 +335,7 @@ class _BackButton extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.bg2 : const Color(0xFFEDE8FF),
+            color: isDark ? AppColors.bg2 : const Color(0xFFF2F2F5),
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: isDark ? AppColors.border : AppColors.lightBorder,

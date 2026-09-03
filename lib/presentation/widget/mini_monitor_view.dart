@@ -1,35 +1,37 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
-import '../../application/providers.dart';
+import '../../application/widget/mini_widget_snapshot.dart';
 import '../../domain/enums/storage_enums.dart';
-import '../components/device_presentation.dart';
 import '../theme/app_theme.dart';
 
 /// Premium compact always-on-top mini-monitor widget.
 /// Borderless, draggable, low-chrome, fully themed.
-class MiniMonitorView extends ConsumerWidget {
-  const MiniMonitorView({super.key, required this.onExpand});
+///
+/// Pure data-in, no Riverpod: this runs inside the mini-widget's own
+/// separate window/isolate (see `MiniWidgetApp`), which has no access to
+/// the main window's provider container. [snapshot] arrives over
+/// `desktop_multi_window`'s method channel instead.
+class MiniMonitorView extends StatelessWidget {
+  const MiniMonitorView({super.key, required this.snapshot, required this.onExpand});
+  final MiniWidgetSnapshot snapshot;
   final VoidCallback onExpand;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final devices = ref.watch(devicesProvider);
-    final settings = ref.watch(settingsProvider);
+  Widget build(BuildContext context) {
+    final devices = snapshot.devices;
 
     // Derive overall health
     bool anyWarning = false;
     bool anyCritical = false;
     for (final d in devices) {
-      final p = DevicePresentation.of(d, settings.thresholdsFor(d.id), settings.temperatureUnit);
-      if (p.severity == TemperatureSeverity.critical) {
+      if (d.severity == TemperatureSeverity.critical) {
         anyCritical = true;
         break;
       }
-      if (p.severity == TemperatureSeverity.warning) anyWarning = true;
+      if (d.severity == TemperatureSeverity.warning) anyWarning = true;
     }
 
     final statusColor = anyCritical
@@ -128,27 +130,22 @@ class MiniMonitorView extends ConsumerWidget {
                         itemCount: devices.length,
                         itemBuilder: (context, index) {
                           final device = devices[index];
-                          final presentation = DevicePresentation.of(
-                            device,
-                            settings.thresholdsFor(device.id),
-                            settings.temperatureUnit,
-                          );
-                          final style = SeverityStyle.of(presentation.severity, context);
-                          final compact = settings.widget.compact;
+                          final style = SeverityStyle.of(device.severity, context);
+                          final compact = snapshot.compact;
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                             child: Row(
                               children: [
                                 _MiniTempMeter(
-                                  fraction: presentation.fraction,
+                                  fraction: device.fraction,
                                   color: style.color,
                                   size: compact ? 14 : 18,
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    device.displayName,
+                                    device.name,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -158,7 +155,7 @@ class MiniMonitorView extends ConsumerWidget {
                                   ),
                                 ),
                                 Text(
-                                  presentation.valueText,
+                                  device.valueText,
                                   style: TextStyle(
                                     color: style.color,
                                     fontSize: compact ? 11 : 12,

@@ -91,12 +91,17 @@ class AppColors {
     colors: [Color(0xFF14103A), Color(0xFF0A0817)],
   );
 
-  // Light theme
-  static const Color lightBg = Color(0xFFF5F3FF);
+  // Light theme — neutral, CleanMyMac-style: near-white window chrome,
+  // white floating cards, soft grey hairlines/shadows instead of a purple
+  // wash, near-black text. The purple brand shows up as accents (logo,
+  // selection, primary actions), not as a tint over every surface.
+  static const Color lightBg = Color(0xFFF5F5F7);
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightBorder = Color(0xFFE0DAFF);
-  static const Color lightText = Color(0xFF1A1240);
-  static const Color lightTextSecondary = Color(0xFF6B5EA8);
+  static const Color lightSurfaceMuted = Color(0xFFF2F2F5);
+  static const Color lightBorder = Color(0xFFE6E6EA);
+  static const Color lightText = Color(0xFF1D1D1F);
+  static const Color lightTextSecondary = Color(0xFF6E6E73);
+  static const Color lightShadow = Color(0x14000000);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,6 +263,11 @@ class AppTheme {
     final scheme = ColorScheme.fromSeed(
       seedColor: seed,
       brightness: Brightness.light,
+    ).copyWith(
+      surface: AppColors.lightCard,
+      primary: AppColors.purpleMid,
+      outline: AppColors.lightTextSecondary,
+      outlineVariant: AppColors.lightBorder,
     );
     return ThemeData(
       useMaterial3: true,
@@ -268,6 +278,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: AppColors.lightCard,
+        shadowColor: AppColors.lightShadow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           side: BorderSide(color: AppColors.lightBorder, width: 1),
@@ -284,13 +295,30 @@ class AppTheme {
           fontWeight: FontWeight.w600,
           letterSpacing: -0.3,
         ),
+        iconTheme: const IconThemeData(color: AppColors.lightTextSecondary),
       ),
-      textTheme: _buildTextTheme(AppColors.lightText, AppColors.lightTextSecondary),
       dividerTheme: DividerThemeData(
         color: AppColors.lightBorder,
         space: 1,
         thickness: 1,
       ),
+      iconTheme: const IconThemeData(color: AppColors.lightTextSecondary),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected) ? AppColors.purpleMid : Colors.white),
+        trackColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? AppColors.purpleMid.withValues(alpha: 0.35)
+                : AppColors.lightSurfaceMuted),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.lightSurfaceMuted,
+        selectedColor: AppColors.purpleMid,
+        labelStyle: const TextStyle(color: AppColors.lightTextSecondary, fontSize: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+        side: const BorderSide(color: AppColors.lightBorder),
+      ),
+      textTheme: _buildTextTheme(AppColors.lightText, AppColors.lightTextSecondary),
       visualDensity: VisualDensity.standard,
       splashFactory: InkSparkle.splashFactory,
     );

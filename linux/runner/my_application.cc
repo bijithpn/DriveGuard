@@ -7,6 +7,7 @@
 
 #include "flutter/generated_plugin_registrant.h"
 #include "native_storage/storage_native_channel.h"
+#include "desktop_multi_window/desktop_multi_window_plugin.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -76,6 +77,15 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   storage_native_channel_register(fl_engine_get_binary_messenger(fl_view_get_engine(view)));
+
+  // The mini-widget window (see DesktopWindowController/MiniWidgetApp in
+  // Dart) is a genuinely separate FlView/engine created by
+  // desktop_multi_window, not a reshaped main window. It needs its own
+  // plugin registrations - notably window_manager, so that window sets its
+  // own frameless/always-on-top/position independent of the main dashboard
+  // window - which only happens via this callback.
+  desktop_multi_window_plugin_set_window_created_callback(
+      [](FlPluginRegistry* registry) { fl_register_plugins(registry); });
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
