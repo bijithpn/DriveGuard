@@ -1,9 +1,5 @@
 enum CapacitySeverity { normal, warning, critical, unavailable }
 
-
-
-
-
 class StorageThresholds {
   const StorageThresholds({
     this.warningPercent = 85,

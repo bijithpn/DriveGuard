@@ -1,13 +1,5 @@
 import '../enums/storage_enums.dart';
 
-
-
-
-
-
-
-
-
 class StorageActivity {
   const StorageActivity({
     required this.deviceId,
@@ -29,8 +21,5 @@ class StorageActivity {
   final double? readOperationsPerSecond;
   final double? writeOperationsPerSecond;
 
-  
-  
-  
   final double? utilizationPercent;
 }

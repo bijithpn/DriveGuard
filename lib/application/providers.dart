@@ -78,10 +78,6 @@ final devicesProvider = NotifierProvider<DevicesNotifier, List<StorageDevice>>(
   DevicesNotifier.new,
 );
 
-
-
-
-
 class ActivityNotifier extends Notifier<Map<String, StorageActivity>> {
   StreamSubscription<StorageActivity>? _subscription;
 

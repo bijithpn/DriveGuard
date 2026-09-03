@@ -61,9 +61,11 @@ class LinuxStorageMonitor extends StorageMonitor {
           );
       final serial = _readSysfsString('/sys/block/$name/device/serial');
       final sizeSectors = _readSysfsString('/sys/block/$name/size');
-      final capacityBytes = sizeSectors != null
-          ? (int.tryParse(sizeSectors) ?? 0) * 512
+
+      final parsedSectors = sizeSectors != null
+          ? int.tryParse(sizeSectors)
           : null;
+      final capacityBytes = parsedSectors != null ? parsedSectors * 512 : null;
       final rotational = _readSysfsString('/sys/block/$name/queue/rotational');
 
       StorageDeviceType type;
@@ -303,9 +305,7 @@ class LinuxStorageMonitor extends StorageMonitor {
               : DeviceHealthStatus.warning,
           percentageUsed: (json['percentage_used'] as num?)?.toInt(),
           availableSparePercent: (json['avail_spare'] as num?)?.toInt(),
-          
-          
-          
+
           availableSpareThreshold:
               (json['spare_thresh'] as num?)?.toInt() ??
               (json['avail_spare_threshold'] as num?)?.toInt(),

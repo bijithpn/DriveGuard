@@ -564,6 +564,35 @@ class _MonitoringSection extends ConsumerWidget {
         ),
       ),
       _SettingRow(
+        label: 'Health/SMART polling interval',
+        subtitle: 'How often wear, power-on hours, etc. are refreshed',
+        isDark: isDark,
+        trailing: _NativeDropdown<Duration>(
+          value: settings.healthPollingInterval,
+          items: AppConstants.allowedHealthPollingIntervals
+              .map(
+                (d) => DropdownMenuItem(
+                  value: d,
+                  child: Text(
+                    d.inSeconds < 60 ? '${d.inSeconds}s' : '${d.inMinutes}m',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textPrimary
+                          : AppColors.lightText,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) {
+              notifier.updateWith((s) => s.copyWith(healthPollingInterval: v));
+            }
+          },
+          isDark: isDark,
+        ),
+      ),
+      _SettingRow(
         label: 'Enable monitoring',
         isDark: isDark,
         isLast: true,
@@ -653,6 +682,46 @@ class _AlertsSection extends ConsumerWidget {
           value: settings.rapidRiseDeltaCelsius,
           color: AppColors.warning,
           onSubmit: (v) => _submitRapidRiseDelta(context, notifier, v),
+        ),
+      ),
+      _SettingRow(
+        label: 'Rapid rise window',
+        subtitle: 'Time span the delta above is measured over',
+        isDark: isDark,
+        trailing: _NativeDropdown<Duration>(
+          value: settings.rapidRiseWindow,
+          items: AppConstants.allowedRapidRiseWindows
+              .map(
+                (d) => DropdownMenuItem(
+                  value: d,
+                  child: Text(
+                    '${d.inMinutes} min',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppColors.textPrimary
+                          : AppColors.lightText,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) {
+              notifier.updateWith((s) => s.copyWith(rapidRiseWindow: v));
+            }
+          },
+          isDark: isDark,
+        ),
+      ),
+      _SettingRow(
+        label: 'Health/SMART alerts',
+        subtitle:
+            'Notify on a health downgrade, wear jump, or new media errors',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.healthAlertsEnabled,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(healthAlertsEnabled: v)),
         ),
       ),
       _SettingRow(
@@ -776,13 +845,28 @@ class _ThresholdsSection extends ConsumerWidget {
 
     final rows = List.generate(devices.length, (i) {
       final d = devices[i];
-      final override = settings.perDeviceThresholds[d.id];
+      final tempOverride = settings.perDeviceThresholds[d.id];
+      final storageOverride = settings.perDeviceStorageThresholds[d.id];
+      final rapidRiseOverride = settings.perDeviceRapidRiseDelta[d.id];
+      final hasOverride =
+          tempOverride != null ||
+          storageOverride != null ||
+          rapidRiseOverride != null;
       final isLast = i == devices.length - 1;
+
+      final subtitleParts = <String>[
+        if (tempOverride != null)
+          'temp ${tempOverride.warningCelsius.toStringAsFixed(0)}°/${tempOverride.criticalCelsius.toStringAsFixed(0)}°',
+        if (storageOverride != null)
+          'disk ${storageOverride.warningPercent.toStringAsFixed(0)}%/${storageOverride.criticalPercent.toStringAsFixed(0)}%',
+        if (rapidRiseOverride != null)
+          'rise +${rapidRiseOverride.toStringAsFixed(0)}°',
+      ];
 
       return _SettingRow(
         label: d.displayName,
-        subtitle: override != null
-            ? 'Custom: warn ${override.warningCelsius.toStringAsFixed(0)} °C / crit ${override.criticalCelsius.toStringAsFixed(0)} °C'
+        subtitle: hasOverride
+            ? 'Custom: ${subtitleParts.join(' · ')}'
             : 'Using global defaults',
         isDark: isDark,
         isLast: isLast,
@@ -790,26 +874,33 @@ class _ThresholdsSection extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _SmallButton(
-              label: override != null ? 'Edit' : 'Override',
+              label: hasOverride ? 'Edit' : 'Override',
               onTap: () => _editDeviceThresholds(
                 context,
                 notifier,
                 deviceId: d.id,
-                current: settings.thresholdsFor(d.id),
-                currentOverrides: settings.perDeviceThresholds,
+                settings: settings,
               ),
               isDark: isDark,
               useAccent: true,
             ),
-            if (override != null) ...[
+            if (hasOverride) ...[
               const SizedBox(width: AppSpacing.xs),
               _SmallButton(
                 label: 'Reset',
                 onTap: () {
-                  final overrides = Map.of(settings.perDeviceThresholds)
+                  final temp = Map.of(settings.perDeviceThresholds)
+                    ..remove(d.id);
+                  final storage = Map.of(settings.perDeviceStorageThresholds)
+                    ..remove(d.id);
+                  final rapidRise = Map.of(settings.perDeviceRapidRiseDelta)
                     ..remove(d.id);
                   notifier.updateWith(
-                    (s) => s.copyWith(perDeviceThresholds: overrides),
+                    (s) => s.copyWith(
+                      perDeviceThresholds: temp,
+                      perDeviceStorageThresholds: storage,
+                      perDeviceRapidRiseDelta: rapidRise,
+                    ),
                   );
                 },
                 isDark: isDark,
@@ -1401,30 +1492,54 @@ void _showThresholdError(BuildContext context, String message) {
     );
 }
 
+typedef _DeviceOverrideResult = ({
+  TemperatureThresholds temperature,
+  StorageThresholds storage,
+  double rapidRiseDelta,
+});
+
 Future<void> _editDeviceThresholds(
   BuildContext context,
   SettingsNotifier notifier, {
   required String deviceId,
-  required TemperatureThresholds current,
-  required Map<String, TemperatureThresholds> currentOverrides,
+  required AppSettings settings,
 }) async {
-  final result = await showDialog<TemperatureThresholds>(
+  final result = await showDialog<_DeviceOverrideResult>(
     context: context,
-    builder: (dialogContext) => _ThresholdEditorDialog(current: current),
+    builder: (dialogContext) => _ThresholdEditorDialog(
+      temperature: settings.thresholdsFor(deviceId),
+      storage: settings.storageThresholdsFor(deviceId),
+      rapidRiseDelta: settings.rapidRiseDeltaFor(deviceId),
+    ),
   );
 
   if (result != null) {
-    final overrides = Map.of(currentOverrides)..[deviceId] = result;
+    final temp = Map.of(settings.perDeviceThresholds)
+      ..[deviceId] = result.temperature;
+    final storage = Map.of(settings.perDeviceStorageThresholds)
+      ..[deviceId] = result.storage;
+    final rapidRise = Map.of(settings.perDeviceRapidRiseDelta)
+      ..[deviceId] = result.rapidRiseDelta;
     await notifier.updateWith(
-      (s) => s.copyWith(perDeviceThresholds: overrides),
+      (s) => s.copyWith(
+        perDeviceThresholds: temp,
+        perDeviceStorageThresholds: storage,
+        perDeviceRapidRiseDelta: rapidRise,
+      ),
     );
   }
 }
 
 class _ThresholdEditorDialog extends StatefulWidget {
-  const _ThresholdEditorDialog({required this.current});
+  const _ThresholdEditorDialog({
+    required this.temperature,
+    required this.storage,
+    required this.rapidRiseDelta,
+  });
 
-  final TemperatureThresholds current;
+  final TemperatureThresholds temperature;
+  final StorageThresholds storage;
+  final double rapidRiseDelta;
 
   @override
   State<_ThresholdEditorDialog> createState() => _ThresholdEditorDialogState();
@@ -1432,16 +1547,28 @@ class _ThresholdEditorDialog extends StatefulWidget {
 
 class _ThresholdEditorDialogState extends State<_ThresholdEditorDialog> {
   late final _warningController = TextEditingController(
-    text: widget.current.warningCelsius.toStringAsFixed(0),
+    text: widget.temperature.warningCelsius.toStringAsFixed(0),
   );
   late final _criticalController = TextEditingController(
-    text: widget.current.criticalCelsius.toStringAsFixed(0),
+    text: widget.temperature.criticalCelsius.toStringAsFixed(0),
+  );
+  late final _storageWarningController = TextEditingController(
+    text: widget.storage.warningPercent.toStringAsFixed(0),
+  );
+  late final _storageCriticalController = TextEditingController(
+    text: widget.storage.criticalPercent.toStringAsFixed(0),
+  );
+  late final _rapidRiseController = TextEditingController(
+    text: widget.rapidRiseDelta.toStringAsFixed(0),
   );
 
   @override
   void dispose() {
     _warningController.dispose();
     _criticalController.dispose();
+    _storageWarningController.dispose();
+    _storageCriticalController.dispose();
+    _rapidRiseController.dispose();
     super.dispose();
   }
 
@@ -1459,12 +1586,48 @@ class _ThresholdEditorDialogState extends State<_ThresholdEditorDialog> {
       );
       return;
     }
-    Navigator.of(context).pop(
-      widget.current.copyWith(
+
+    final storageWarning = double.tryParse(
+      _storageWarningController.text.trim(),
+    );
+    final storageCritical = double.tryParse(
+      _storageCriticalController.text.trim(),
+    );
+    if (storageWarning == null ||
+        storageCritical == null ||
+        storageWarning <= 0 ||
+        storageWarning > 100 ||
+        storageCritical <= 0 ||
+        storageCritical > 100) {
+      _showThresholdError(context, 'Enter disk percentages between 1 and 100.');
+      return;
+    }
+    if (storageCritical - storageWarning <
+        _minStorageThresholdSeparationPercent) {
+      _showThresholdError(
+        context,
+        'Disk critical threshold must be higher than warning threshold.',
+      );
+      return;
+    }
+
+    final rapidRise = double.tryParse(_rapidRiseController.text.trim());
+    if (rapidRise == null || rapidRise <= 0) {
+      _showThresholdError(context, 'Enter a positive rapid-rise delta.');
+      return;
+    }
+
+    Navigator.of(context).pop((
+      temperature: widget.temperature.copyWith(
         warningCelsius: warning,
         criticalCelsius: critical,
       ),
-    );
+      storage: widget.storage.copyWith(
+        warningPercent: storageWarning,
+        criticalPercent: storageCritical,
+      ),
+      rapidRiseDelta: rapidRise,
+    ));
   }
 
   @override
@@ -1486,21 +1649,50 @@ class _ThresholdEditorDialogState extends State<_ThresholdEditorDialog> {
           fontSize: 16,
         ),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _ThresholdEditorField(
-            controller: _warningController,
-            label: 'Warning',
-            color: AppColors.warning,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          _ThresholdEditorField(
-            controller: _criticalController,
-            label: 'Critical',
-            color: AppColors.critical,
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionLabel(title: 'Temperature', isDark: isDark),
+            const SizedBox(height: AppSpacing.xs),
+            _ThresholdEditorField(
+              controller: _warningController,
+              label: 'Warning',
+              color: AppColors.warning,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _ThresholdEditorField(
+              controller: _criticalController,
+              label: 'Critical',
+              color: AppColors.critical,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _SectionLabel(title: 'Disk usage', isDark: isDark),
+            const SizedBox(height: AppSpacing.xs),
+            _ThresholdEditorField(
+              controller: _storageWarningController,
+              label: 'Warning',
+              color: AppColors.warning,
+              suffixText: '%',
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _ThresholdEditorField(
+              controller: _storageCriticalController,
+              label: 'Critical',
+              color: AppColors.critical,
+              suffixText: '%',
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _SectionLabel(title: 'Rapid rise', isDark: isDark),
+            const SizedBox(height: AppSpacing.xs),
+            _ThresholdEditorField(
+              controller: _rapidRiseController,
+              label: 'Delta',
+              color: AppColors.warning,
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -1518,16 +1710,36 @@ class _ThresholdEditorDialogState extends State<_ThresholdEditorDialog> {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.title, required this.isDark});
+  final String title;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+      ),
+    );
+  }
+}
+
 class _ThresholdEditorField extends StatelessWidget {
   const _ThresholdEditorField({
     required this.controller,
     required this.label,
     required this.color,
+    this.suffixText = 'C',
   });
 
   final TextEditingController controller;
   final String label;
   final Color color;
+  final String suffixText;
 
   @override
   Widget build(BuildContext context) {
@@ -1538,7 +1750,7 @@ class _ThresholdEditorField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: color),
-        suffixText: 'C',
+        suffixText: suffixText,
         suffixStyle: TextStyle(color: color),
         filled: true,
         fillColor: color.withValues(alpha: 0.07),

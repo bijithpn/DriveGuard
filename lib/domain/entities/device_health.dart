@@ -21,10 +21,6 @@ class DeviceHealth {
   final int? percentageUsed;
   final int? availableSparePercent;
 
-  
-  
-  
-  
   final int? availableSpareThreshold;
   final String? criticalWarning;
   final int? mediaErrors;
@@ -32,11 +28,6 @@ class DeviceHealth {
   final int? powerOnHours;
   final int? unsafeShutdowns;
 
-  
-  
-  
-  
-  
   final int? dataUnitsRead;
   final int? dataUnitsWritten;
 

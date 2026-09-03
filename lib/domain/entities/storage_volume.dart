@@ -1,8 +1,3 @@
-
-
-
-
-
 class StorageVolume {
   const StorageVolume({
     required this.id,
@@ -18,8 +13,6 @@ class StorageVolume {
     this.freeBytes,
   });
 
-  
-  
   final String id;
 
   final String? mountPoint;
@@ -30,8 +23,6 @@ class StorageVolume {
   final bool isReadOnly;
   final bool isBootVolume;
 
-  
-  
   final bool? isEncrypted;
 
   final int? totalBytes;

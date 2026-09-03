@@ -22,6 +22,7 @@ class _ScriptedMonitor extends StorageMonitor {
   final Map<String, Object> nextReadingOrError = {};
   final Map<String, StorageCapacity> nextCapacity = {};
   final Map<String, List<StorageVolume>> nextVolumes = {};
+  final Map<String, DeviceHealth> nextHealth = {};
 
   _ScriptedMonitor(this.devices);
 
@@ -62,7 +63,7 @@ class _ScriptedMonitor extends StorageMonitor {
 
   @override
   Future<DeviceHealth?> getHealth(String deviceId) async =>
-      DeviceHealth.unavailable;
+      nextHealth[deviceId] ?? DeviceHealth.unavailable;
 
   @override
   Future<StorageCapacity> getCapacity(String deviceId) async =>
@@ -303,6 +304,91 @@ void main() {
           (s) => s.startsWith('warning:') || s.startsWith('critical:'),
         ),
         isFalse,
+      );
+
+      await service.dispose();
+    },
+  );
+
+  test(
+    'a SMART health downgrade triggers a health alert notification',
+    () async {
+      final backend = _ScriptedMonitor([_device('degrading')]);
+      backend.nextReadingOrError['degrading'] = 30.0;
+      backend.nextHealth['degrading'] = const DeviceHealth(
+        status: DeviceHealthStatus.healthy,
+        percentageUsed: 4,
+      );
+      final notifications = FakeNotificationService();
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: notifications,
+        historyStore: TemperatureHistoryStore(),
+      );
+
+      await service.start(
+        const AppSettings(
+          healthPollingInterval: Duration(milliseconds: 20),
+          notificationCooldown: Duration(seconds: 30),
+        ),
+      );
+      // The first health poll (fired once from start()) only seeds
+      // _lastKnownHealth - nothing to compare against yet.
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      backend.nextHealth['degrading'] = const DeviceHealth(
+        status: DeviceHealthStatus.warning,
+        percentageUsed: 4,
+        mediaErrors: 0,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+
+      expect(
+        notifications.shown.any((s) => s.startsWith('health-warning:')),
+        isTrue,
+      );
+
+      await service.dispose();
+    },
+  );
+
+  test(
+    'a sudden wear jump triggers a health alert even without a status change',
+    () async {
+      final backend = _ScriptedMonitor([_device('wearing')]);
+      backend.nextReadingOrError['wearing'] = 30.0;
+      backend.nextHealth['wearing'] = const DeviceHealth(
+        status: DeviceHealthStatus.healthy,
+        percentageUsed: 4,
+      );
+      final notifications = FakeNotificationService();
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: notifications,
+        historyStore: TemperatureHistoryStore(),
+      );
+
+      await service.start(
+        const AppSettings(
+          healthPollingInterval: Duration(milliseconds: 20),
+          notificationCooldown: Duration(seconds: 30),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      backend.nextHealth['wearing'] = const DeviceHealth(
+        status: DeviceHealthStatus.healthy,
+        percentageUsed: 9, // +5, above the default 3-point jump threshold
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+
+      expect(
+        notifications.shown.any(
+          (s) => s.startsWith('health-warning:') && s.contains('Wear'),
+        ),
+        isTrue,
       );
 
       await service.dispose();

@@ -1220,7 +1220,7 @@ class _HealthTab extends StatelessWidget {
   final StorageDevice device;
   final bool isDark;
 
-  String _na(Object? v) => v?.toString() ?? 'Not available';
+  String _na(Object? v) => v?.toString() ?? 'N/A';
 
   Color _statusColor() {
     switch (device.health.status) {
@@ -1324,7 +1324,7 @@ class _HealthTab extends StatelessWidget {
               _HealthEntry(
                 label: 'SMART Status',
                 value: health.smartPassed == null
-                    ? 'Not available'
+                    ? 'N/A'
                     : (health.smartPassed! ? 'Passed' : 'Failed'),
                 icon: Icons.verified_outlined,
                 statusColor: health.smartPassed == true
@@ -1516,10 +1516,6 @@ class _HealthTile extends StatelessWidget {
   }
 }
 
-
-
-
-
 class _StorageTab extends ConsumerWidget {
   const _StorageTab({required this.device, required this.isDark});
 
@@ -1639,7 +1635,7 @@ class _CapacityBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fraction = ((capacity.usagePercent ?? 0) / 100).clamp(0.0, 1.0);
+    final usagePercent = capacity.usagePercent;
     final total = capacity.totalBytes;
     final used = capacity.usedBytes;
     final free = capacity.freeBytes;
@@ -1683,17 +1679,28 @@ class _CapacityBar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: LinearProgressIndicator(
-              value: fraction,
-              minHeight: 6,
-              backgroundColor: isDark
-                  ? AppColors.bg2
-                  : AppColors.lightSurfaceMuted,
-              valueColor: AlwaysStoppedAnimation(AppColors.accent),
+          if (usagePercent != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: LinearProgressIndicator(
+                value: (usagePercent / 100).clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: isDark
+                    ? AppColors.bg2
+                    : AppColors.lightSurfaceMuted,
+                valueColor: AlwaysStoppedAnimation(AppColors.accent),
+              ),
+            )
+          else
+            Text(
+              'Usage percentage unavailable',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark
+                    ? AppColors.textMuted
+                    : AppColors.lightTextSecondary,
+              ),
             ),
-          ),
           if (free != null) ...[
             const SizedBox(height: AppSpacing.xs),
             Text(
@@ -1872,7 +1879,7 @@ class _DiagnosticsTab extends StatelessWidget {
       ),
       _DiagRow(
         label: 'Sensor Source',
-        value: device.primaryTemperature?.source.toString() ?? 'Not available',
+        value: device.primaryTemperature?.source.toString() ?? 'N/A',
         icon: Icons.sensors_rounded,
         isDark: isDark,
       ),

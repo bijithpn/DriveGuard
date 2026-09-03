@@ -306,11 +306,6 @@ class NativeStorageMonitor extends StorageMonitor {
         .map(_deviceEventFromMap)
         .where((e) => e != null)
         .cast<StorageDeviceEvent>()
-        
-        
-        
-        
-        
         .handleError((Object e) {
           if (e is! MissingPluginException) {
             AppLogger.instance.debug(_tag, 'Device event stream error: $e');

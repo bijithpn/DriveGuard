@@ -67,10 +67,6 @@ class _DriveCardState extends State<DriveCard> {
     return '${size.toStringAsFixed(1)} ${units[unitIndex]}';
   }
 
-  
-  
-  
-  
   String _capacityText() {
     final capacity = widget.device.capacity;
     if (capacity.isValid && capacity.freeBytes != null) {

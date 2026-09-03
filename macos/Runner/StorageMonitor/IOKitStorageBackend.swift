@@ -254,15 +254,23 @@ final class IOKitStorageBackend {
     // kIOBlockStorageDriverStatisticsReadsKey = "Operations (Read)",
     // kIOBlockStorageDriverStatisticsWritesKey = "Operations (Write)") -
     // IOKit vends them as plain string keys in the dictionary, not exported
-    // Swift constants.
-    func intValue(_ key: String) -> Int64 {
-      (stats[key] as? NSNumber)?.int64Value ?? 0
+    // Swift constants. A missing key means the driver doesn't publish that
+    // counter - the whole read is nil in that case, never a 0 standing in
+    // for "not reported" (a 0 here would read as a real, sustained zero
+    // rate once diffed against a later sample).
+    func intValue(_ key: String) -> Int64? {
+      (stats[key] as? NSNumber)?.int64Value
     }
+    guard let bytesRead = intValue("Bytes (Read)"),
+      let bytesWritten = intValue("Bytes (Write)"),
+      let operationsRead = intValue("Operations (Read)"),
+      let operationsWritten = intValue("Operations (Write)")
+    else { return nil }
     return ActivityCounters(
-      bytesRead: intValue("Bytes (Read)"),
-      bytesWritten: intValue("Bytes (Write)"),
-      operationsRead: intValue("Operations (Read)"),
-      operationsWritten: intValue("Operations (Write)")
+      bytesRead: bytesRead,
+      bytesWritten: bytesWritten,
+      operationsRead: operationsRead,
+      operationsWritten: operationsWritten
     )
   }
 

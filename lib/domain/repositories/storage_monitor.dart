@@ -25,11 +25,6 @@ class BackendCapabilities {
   final List<String> notes;
 }
 
-
-
-
-
-
 abstract class StorageMonitor {
   const StorageMonitor();
 
@@ -45,22 +40,12 @@ abstract class StorageMonitor {
 
   Future<DeviceHealth?> getHealth(String deviceId);
 
-  
-  
-  
   Future<StorageCapacity> getCapacity(String deviceId) async =>
       StorageCapacity.unavailable;
 
-  
   Future<List<StorageVolume>> getVolumes(String deviceId) async => const [];
 
-  
-  
-  
   Stream<StorageActivity> watchActivity() => const Stream.empty();
 
-  
-  
-  
   Stream<StorageDeviceEvent> watchDeviceEvents() => const Stream.empty();
 }

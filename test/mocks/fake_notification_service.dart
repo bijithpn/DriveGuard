@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:driveguard/application/notifications/notification_service.dart';
 
 /// No-op [NotificationService] for widget/unit tests - never touches the
@@ -5,11 +7,20 @@ import 'package:driveguard/application/notifications/notification_service.dart';
 class FakeNotificationService implements NotificationService {
   final List<String> shown = [];
 
+  final _clicksController = StreamController<String>.broadcast();
+  @override
+  Stream<String> get deviceClicks => _clicksController.stream;
+
+  /// Test helper: simulates the user clicking the most recent notification
+  /// shown for [deviceId].
+  void simulateClick(String deviceId) => _clicksController.add(deviceId);
+
   @override
   Future<void> initialize() async {}
 
   @override
   Future<void> showWarning({
+    required String deviceId,
     required String deviceName,
     required String temperatureText,
     String? detailsText,
@@ -19,6 +30,7 @@ class FakeNotificationService implements NotificationService {
 
   @override
   Future<void> showCritical({
+    required String deviceId,
     required String deviceName,
     required String temperatureText,
     String? detailsText,
@@ -28,6 +40,7 @@ class FakeNotificationService implements NotificationService {
 
   @override
   Future<void> showRecovered({
+    required String deviceId,
     required String deviceName,
     required String temperatureText,
     String? detailsText,
@@ -37,6 +50,7 @@ class FakeNotificationService implements NotificationService {
 
   @override
   Future<void> showRapidRise({
+    required String deviceId,
     required String deviceName,
     required String temperatureText,
     required String riseText,
@@ -49,6 +63,7 @@ class FakeNotificationService implements NotificationService {
 
   @override
   Future<void> showStorageWarning({
+    required String deviceId,
     required String deviceName,
     required String usageText,
   }) async {
@@ -57,6 +72,7 @@ class FakeNotificationService implements NotificationService {
 
   @override
   Future<void> showStorageCritical({
+    required String deviceId,
     required String deviceName,
     required String usageText,
   }) async {
@@ -65,9 +81,23 @@ class FakeNotificationService implements NotificationService {
 
   @override
   Future<void> showStorageRecovered({
+    required String deviceId,
     required String deviceName,
     required String usageText,
   }) async {
     shown.add('storage-recovered:$deviceName:$usageText');
+  }
+
+  @override
+  Future<void> showHealthAlert({
+    required String deviceId,
+    required String deviceName,
+    required bool critical,
+    required String message,
+    String? detailsText,
+  }) async {
+    shown.add(
+      'health-${critical ? 'critical' : 'warning'}:$deviceName:$message:${detailsText ?? ''}',
+    );
   }
 }

@@ -18,12 +18,6 @@ class StorageNativeChannel {
   );
   static const _tag = 'StorageNativeChannel';
 
-  
-  
-  
-  
-  
-  
   Stream<Map<String, dynamic>> activityEvents() {
     return _activityChannel.receiveBroadcastStream().map((raw) {
       final map = _asMap(raw);
@@ -31,12 +25,6 @@ class StorageNativeChannel {
     });
   }
 
-  
-  
-  
-  
-  
-  
   Stream<Map<String, dynamic>> deviceEvents() {
     return _deviceEventsChannel.receiveBroadcastStream().map((raw) {
       final map = _asMap(raw);

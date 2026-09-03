@@ -24,11 +24,6 @@ class TemperatureUtils {
   static String unitSuffix(TemperatureUnit unit) =>
       unit == TemperatureUnit.celsius ? '°C' : '°F';
 
-  
-  
-  
-  
-  
   static double convertDelta(double deltaCelsius, TemperatureUnit unit) {
     switch (unit) {
       case TemperatureUnit.celsius:

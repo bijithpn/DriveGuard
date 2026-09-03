@@ -118,15 +118,9 @@ class FallbackStorageMonitor extends StorageMonitor {
     return legacy.getVolumes(deviceId);
   }
 
-  
-  
-  
-  
   @override
   Stream<StorageDeviceEvent> watchDeviceEvents() => native.watchDeviceEvents();
 
-  
-  
   @override
   Stream<StorageActivity> watchActivity() => native.watchActivity();
 }

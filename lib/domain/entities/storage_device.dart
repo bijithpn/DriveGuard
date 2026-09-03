@@ -37,9 +37,6 @@ class StorageDevice {
   final String? serialNumber;
   final String? firmwareVersion;
 
-  
-  
-  
   final int? capacityBytes;
   final bool isRemovable;
 
@@ -48,14 +45,8 @@ class StorageDevice {
 
   final DeviceHealth health;
 
-  
-  
-  
   final StorageCapacity capacity;
 
-  
-  
-  
   final List<StorageVolume> volumes;
 
   final MonitoringStatus monitoringStatus;

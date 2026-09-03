@@ -1,10 +1,5 @@
 import '../enums/storage_enums.dart';
 
-
-
-
-
-
 class StorageCapacity {
   const StorageCapacity({
     required this.availability,
@@ -20,10 +15,8 @@ class StorageCapacity {
   final int? usedBytes;
   final int? freeBytes;
 
-  
   final int? allocatedBytes;
 
-  
   final int? unallocatedBytes;
 
   static const unavailable = StorageCapacity(

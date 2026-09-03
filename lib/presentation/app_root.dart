@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,12 +10,14 @@ import '../application/providers.dart';
 import '../application/widget/mini_widget_snapshot.dart';
 import '../core/logging/app_logger.dart';
 import '../domain/entities/storage_device.dart';
+import '../domain/entities/storage_thresholds.dart';
 import '../domain/enums/storage_enums.dart';
 import '../infrastructure/tray/app_tray_service.dart';
 import '../infrastructure/tray/desktop_window_controller.dart'
     show kWidgetChannel;
 import 'components/device_presentation.dart';
 import 'dashboard/dashboard_screen.dart';
+import 'device_details/device_details_screen.dart';
 import 'settings/settings_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -36,6 +39,7 @@ class _AppRootState extends ConsumerState<AppRoot>
 
   AppTrayService? _tray;
   bool _widgetModeSyncInFlight = false;
+  StreamSubscription<String>? _notificationClickSub;
 
   @override
   void initState() {
@@ -45,6 +49,22 @@ class _AppRootState extends ConsumerState<AppRoot>
 
     kWidgetChannel.setMethodCallHandler(_handleWidgetChannelCall);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initTray());
+
+    _notificationClickSub = ref
+        .read(notificationServiceProvider)
+        .deviceClicks
+        .listen(_onNotificationClicked);
+  }
+
+  Future<void> _onNotificationClicked(String deviceId) async {
+    await _syncWidgetMode(false);
+    await windowManager.show();
+    await windowManager.focus();
+    rootNavigatorKey.currentState?.push(
+      MaterialPageRoute<void>(
+        builder: (_) => DeviceDetailsScreen(deviceId: deviceId),
+      ),
+    );
   }
 
   Future<dynamic> _handleWidgetChannelCall(MethodCall call) async {
@@ -102,6 +122,26 @@ class _AppRootState extends ConsumerState<AppRoot>
     await _syncWidgetMode(ref.read(settingsProvider).widget.enabled);
   }
 
+  TemperatureSeverity _combinedSeverity(
+    String deviceId,
+    TemperatureSeverity tempSeverity,
+  ) {
+    final service = ref.read(monitoringServiceProvider);
+    final capacitySeverity = service.capacitySeverityFor(deviceId);
+    var result = tempSeverity;
+    if (capacitySeverity == CapacitySeverity.critical) {
+      result = TemperatureSeverity.critical;
+    } else if (capacitySeverity == CapacitySeverity.warning &&
+        result != TemperatureSeverity.critical) {
+      result = TemperatureSeverity.warning;
+    }
+    if (service.rapidRiseActiveFor(deviceId) &&
+        result != TemperatureSeverity.critical) {
+      result = TemperatureSeverity.warning;
+    }
+    return result;
+  }
+
   Future<void> _pushDeviceSummaryToTray(AppTrayService tray) async {
     final settings = ref.read(settingsProvider);
     final deviceList = ref.read(devicesProvider);
@@ -113,17 +153,18 @@ class _AppRootState extends ConsumerState<AppRoot>
         settings.thresholdsFor(d.id),
         settings.temperatureUnit,
       );
+      final severity = _combinedSeverity(d.id, presentation.severity);
       summaries.add(
         TrayDeviceSummary(
           id: d.id,
           name: d.displayName,
           valueText: presentation.valueText,
-          severity: presentation.severity,
+          severity: severity,
         ),
       );
-      if (presentation.severity == TemperatureSeverity.critical) {
+      if (severity == TemperatureSeverity.critical) {
         worst = TemperatureSeverity.critical;
-      } else if (presentation.severity == TemperatureSeverity.warning &&
+      } else if (severity == TemperatureSeverity.warning &&
           worst != TemperatureSeverity.critical) {
         worst = TemperatureSeverity.warning;
       }
@@ -149,7 +190,7 @@ class _AppRootState extends ConsumerState<AppRoot>
           name: d.displayName,
           valueText: presentation.valueText,
           fraction: presentation.fraction,
-          severity: presentation.severity,
+          severity: _combinedSeverity(d.id, presentation.severity),
         ),
       );
     }
@@ -165,6 +206,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     windowManager.removeListener(this);
+    unawaited(_notificationClickSub?.cancel());
     super.dispose();
   }
 

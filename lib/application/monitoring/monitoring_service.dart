@@ -5,6 +5,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/errors/storage_exceptions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/utils/temperature_utils.dart';
+import '../../domain/entities/device_health.dart';
 import '../../domain/entities/storage_activity.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
@@ -38,6 +39,7 @@ class MonitoringService {
   final Map<String, StorageAlertState> _capacityAlertStates = {};
   final Map<String, bool> _rapidRiseArmed = {};
   final Map<String, DateTime> _lastRapidRiseNotifiedAt = {};
+  final Map<String, DeviceHealth> _lastKnownHealth = {};
   final Set<String> _disconnectedOnce = {};
 
   final _devicesController = StreamController<List<StorageDevice>>.broadcast();
@@ -48,16 +50,13 @@ class MonitoringService {
   final Map<String, StorageActivity> _latestActivity = {};
   final _activityController = StreamController<StorageActivity>.broadcast();
 
-  
-  
-  
-  
   Stream<StorageActivity> get activityStream => _activityController.stream;
   StorageActivity? latestActivityFor(String deviceId) =>
       _latestActivity[deviceId];
 
   Timer? _pollTimer;
   Timer? _discoveryTimer;
+  Timer? _healthTimer;
   StreamSubscription<StorageDeviceEvent>? _deviceEventsSub;
   StreamSubscription<StorageActivity>? _activitySub;
   AppSettings _settings = const AppSettings();
@@ -73,13 +72,11 @@ class MonitoringService {
     _rescheduleTimers();
     _listenForHotplugEvents();
     _listenForActivity();
+    unawaited(_pollHealthAll());
     _started = true;
     AppLogger.instance.info(_tag, 'Monitoring started');
   }
 
-  
-  
-  
   void _listenForActivity() {
     _activitySub = _backend.watchActivity().listen(
       (activity) {
@@ -94,11 +91,6 @@ class MonitoringService {
     );
   }
 
-  
-  
-  
-  
-  
   void _listenForHotplugEvents() {
     _deviceEventsSub = _backend.watchDeviceEvents().listen(
       (event) {
@@ -117,7 +109,8 @@ class MonitoringService {
   void updateSettings(AppSettings settings) {
     final intervalsChanged =
         settings.pollingInterval != _settings.pollingInterval ||
-        settings.deviceDiscoveryInterval != _settings.deviceDiscoveryInterval;
+        settings.deviceDiscoveryInterval != _settings.deviceDiscoveryInterval ||
+        settings.healthPollingInterval != _settings.healthPollingInterval;
     _settings = settings;
     if (_started && intervalsChanged) _rescheduleTimers();
   }
@@ -125,10 +118,15 @@ class MonitoringService {
   void _rescheduleTimers() {
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
+    _healthTimer?.cancel();
     _pollTimer = Timer.periodic(_settings.pollingInterval, (_) => _pollAll());
     _discoveryTimer = Timer.periodic(
       _settings.deviceDiscoveryInterval,
       (_) => _discoverDevices(),
+    );
+    _healthTimer = Timer.periodic(
+      _settings.healthPollingInterval,
+      (_) => _pollHealthAll(),
     );
   }
 
@@ -190,6 +188,7 @@ class MonitoringService {
         _capacityAlertStates.remove(id);
         _rapidRiseArmed.remove(id);
         _lastRapidRiseNotifiedAt.remove(id);
+        _lastKnownHealth.remove(id);
         _historyStore.clearDevice(id);
         _latestActivity.remove(id);
         _disconnectedOnce.remove(id);
@@ -207,11 +206,6 @@ class MonitoringService {
     unawaited(_refreshCapacity());
   }
 
-  
-  
-  
-  
-  
   Future<void> _refreshCapacity() async {
     final ids = _devices.keys
         .where(
@@ -237,9 +231,7 @@ class MonitoringService {
             volumes: volumes,
           );
           _devices[id] = updated;
-          
-          
-          
+
           AppLogger.instance.debug(
             _tag,
             'Capacity for $id: ${capacity.availability.name}'
@@ -258,9 +250,6 @@ class MonitoringService {
     _emit();
   }
 
-  
-  
-  
   Future<void> _evaluateCapacityAlert(
     String id,
     StorageCapacity capacity,
@@ -273,7 +262,7 @@ class MonitoringService {
     );
     final result = alertState.evaluate(
       usagePercent: capacity.usagePercent,
-      thresholds: _settings.storageThresholds,
+      thresholds: _settings.storageThresholdsFor(id),
       cooldown: _settings.notificationCooldown,
       recoveryNotificationsEnabled: _settings.recoveryNotificationsEnabled,
     );
@@ -284,19 +273,114 @@ class MonitoringService {
         : 'Usage unavailable';
     if (result.isRecoveryNotification) {
       await _notifications.showStorageRecovered(
+        deviceId: id,
         deviceName: device.displayName,
         usageText: usageText,
       );
     } else if (result.severity == CapacitySeverity.critical) {
       await _notifications.showStorageCritical(
+        deviceId: id,
         deviceName: device.displayName,
         usageText: usageText,
       );
     } else if (result.severity == CapacitySeverity.warning) {
       await _notifications.showStorageWarning(
+        deviceId: id,
         deviceName: device.displayName,
         usageText: usageText,
       );
+    }
+  }
+
+  Future<void> _pollHealthAll() async {
+    final ids = _devices.keys
+        .where(
+          (id) =>
+              _devices[id]!.monitoringStatus != MonitoringStatus.disconnected,
+        )
+        .toList();
+    await Future.wait(ids.map(_pollHealthOne));
+    _emit();
+  }
+
+  Future<void> _pollHealthOne(String id) async {
+    if (_devices[id] == null) return;
+    try {
+      final health = await _backend.getHealth(id);
+      if (health == null) return;
+
+      final current = _devices[id];
+      if (current == null) return;
+      final updated = current.copyWith(health: health);
+      _devices[id] = updated;
+      await _evaluateHealthAlert(id, health, updated);
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'Health read failed for $id: $e');
+    }
+  }
+
+  Future<void> _evaluateHealthAlert(
+    String id,
+    DeviceHealth health,
+    StorageDevice device,
+  ) async {
+    final previous = _lastKnownHealth[id];
+    _lastKnownHealth[id] = health;
+    if (previous == null) return;
+    if (!_settings.healthAlertsEnabled || !_settings.notificationsEnabled) {
+      return;
+    }
+
+    String? message;
+    var critical = false;
+
+    final statusWorsened =
+        _healthRank(health.status) > _healthRank(previous.status);
+    if (statusWorsened &&
+        health.status != DeviceHealthStatus.unavailable &&
+        health.status != DeviceHealthStatus.unknown) {
+      critical = health.status == DeviceHealthStatus.critical;
+      message =
+          'Health status changed from ${previous.status.name} to '
+          '${health.status.name}.';
+    } else if (health.percentageUsed != null &&
+        previous.percentageUsed != null &&
+        health.percentageUsed! - previous.percentageUsed! >=
+            AppConstants.defaultWearJumpAlertPercent) {
+      message =
+          'Wear increased from ${previous.percentageUsed}% to '
+          '${health.percentageUsed}% since the last check.';
+    } else if (health.mediaErrors != null &&
+        previous.mediaErrors != null &&
+        health.mediaErrors! > previous.mediaErrors!) {
+      final newErrors = health.mediaErrors! - previous.mediaErrors!;
+      message =
+          '$newErrors new media/data error${newErrors == 1 ? '' : 's'} '
+          'detected since the last check.';
+    }
+
+    if (message == null) return;
+    AppLogger.instance.warning(_tag, 'Health alert for $id: $message');
+    await _notifications.showHealthAlert(
+      deviceId: id,
+      deviceName: device.displayName,
+      critical: critical,
+      message: message,
+      detailsText: _detailsFor(device),
+    );
+  }
+
+  int _healthRank(DeviceHealthStatus status) {
+    switch (status) {
+      case DeviceHealthStatus.critical:
+        return 3;
+      case DeviceHealthStatus.warning:
+        return 2;
+      case DeviceHealthStatus.healthy:
+        return 1;
+      case DeviceHealthStatus.unknown:
+      case DeviceHealthStatus.unavailable:
+        return 0;
     }
   }
 
@@ -316,11 +400,16 @@ class MonitoringService {
     final device = _devices[id];
     if (device == null) return;
 
+    final previousReading = device.primaryTemperature;
+
     try {
       final reading = await _backend.readTemperature(id);
 
+      final current = _devices[id];
+      if (current == null) return;
+
       if (reading == null) {
-        _devices[id] = device.copyWith(
+        _devices[id] = current.copyWith(
           sensorAvailability: SensorAvailability.unsupported,
           monitoringStatus: MonitoringStatus.sensorUnavailable,
           clearTemperature: true,
@@ -328,11 +417,10 @@ class MonitoringService {
           clearLastError: true,
         );
       } else {
-        final previous = device.primaryTemperature;
         var plausible = TemperatureUtils.isPlausibleValue(reading.celsius);
-        if (plausible && previous != null && previous.isValid) {
+        if (plausible && previousReading != null && previousReading.isValid) {
           plausible = TemperatureUtils.isPlausibleTransition(
-            previous.celsius,
+            previousReading.celsius,
             reading.celsius,
           );
         }
@@ -342,14 +430,14 @@ class MonitoringService {
             _tag,
             'Rejected implausible reading for $id: ${reading.celsius}C',
           );
-          _devices[id] = device.copyWith(
+          _devices[id] = current.copyWith(
             monitoringStatus: MonitoringStatus.error,
             lastError:
                 'Sensor returned an implausible value; reading discarded',
           );
         } else {
           _historyStore.record(id, reading);
-          final updated = device.copyWith(
+          final updated = current.copyWith(
             primaryTemperature: reading,
             sensorAvailability: SensorAvailability.available,
             monitoringStatus: MonitoringStatus.active,
@@ -362,23 +450,32 @@ class MonitoringService {
         }
       }
     } on PermissionDeniedException catch (e) {
-      _devices[id] = device.copyWith(
-        sensorAvailability: SensorAvailability.permissionDenied,
-        monitoringStatus: MonitoringStatus.permissionDenied,
-        lastError: e.message,
-      );
+      final current = _devices[id];
+      if (current != null) {
+        _devices[id] = current.copyWith(
+          sensorAvailability: SensorAvailability.permissionDenied,
+          monitoringStatus: MonitoringStatus.permissionDenied,
+          lastError: e.message,
+        );
+      }
     } on StorageMonitorException catch (e) {
       AppLogger.instance.warning(_tag, 'Read failed for $id: ${e.message}');
-      _devices[id] = device.copyWith(
-        monitoringStatus: MonitoringStatus.error,
-        lastError: e.message,
-      );
+      final current = _devices[id];
+      if (current != null) {
+        _devices[id] = current.copyWith(
+          monitoringStatus: MonitoringStatus.error,
+          lastError: e.message,
+        );
+      }
     } catch (e) {
       AppLogger.instance.error(_tag, 'Unexpected error polling $id', e);
-      _devices[id] = device.copyWith(
-        monitoringStatus: MonitoringStatus.error,
-        lastError: 'Unexpected error: $e',
-      );
+      final current = _devices[id];
+      if (current != null) {
+        _devices[id] = current.copyWith(
+          monitoringStatus: MonitoringStatus.error,
+          lastError: 'Unexpected error: $e',
+        );
+      }
     }
 
     _checkStale(id);
@@ -419,18 +516,21 @@ class MonitoringService {
     final details = _detailsFor(device);
     if (result.isRecoveryNotification) {
       await _notifications.showRecovered(
+        deviceId: id,
         deviceName: device.displayName,
         temperatureText: tempText,
         detailsText: details,
       );
     } else if (result.severity == TemperatureSeverity.critical) {
       await _notifications.showCritical(
+        deviceId: id,
         deviceName: device.displayName,
         temperatureText: tempText,
         detailsText: details,
       );
     } else if (result.severity == TemperatureSeverity.warning) {
       await _notifications.showWarning(
+        deviceId: id,
         deviceName: device.displayName,
         temperatureText: tempText,
         detailsText: details,
@@ -438,12 +538,6 @@ class MonitoringService {
     }
   }
 
-  
-  
-  
-  
-  
-  
   Future<void> _evaluateRapidRise(
     String id,
     double celsius,
@@ -452,9 +546,7 @@ class MonitoringService {
     if (!_settings.rapidRiseAlertsEnabled) return;
 
     final points = _historyStore.pointsFor(id, _settings.rapidRiseWindow);
-    
-    
-    
+
     if (points.length < 2) return;
     final windowStart = DateTime.now().subtract(_settings.rapidRiseWindow);
     if (points.first.timestamp.isAfter(
@@ -465,7 +557,7 @@ class MonitoringService {
 
     final baseline = points.map((p) => p.celsius).reduce(min);
     final delta = celsius - baseline;
-    final threshold = _settings.rapidRiseDeltaCelsius;
+    final threshold = _settings.rapidRiseDeltaFor(id);
     final armed = _rapidRiseArmed[id] ?? false;
 
     if (delta >= threshold) {
@@ -494,6 +586,7 @@ class MonitoringService {
             _settings.temperatureUnit,
           );
           await _notifications.showRapidRise(
+            deviceId: id,
             deviceName: device.displayName,
             temperatureText: tempText,
             riseText:
@@ -508,10 +601,6 @@ class MonitoringService {
     }
   }
 
-  
-  
-  
-  
   String? _detailsFor(StorageDevice device) {
     final parts = <String>[];
     switch (device.health.status) {
@@ -553,6 +642,9 @@ class MonitoringService {
   CapacitySeverity capacitySeverityFor(String deviceId) =>
       _capacityAlertStates[deviceId]?.lastSeverity ?? CapacitySeverity.normal;
 
+  bool rapidRiseActiveFor(String deviceId) =>
+      _rapidRiseArmed[deviceId] ?? false;
+
   void _emit() {
     if (!_devicesController.isClosed) {
       _devicesController.add(currentDevices);
@@ -562,6 +654,7 @@ class MonitoringService {
   Future<void> dispose() async {
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
+    _healthTimer?.cancel();
     await _deviceEventsSub?.cancel();
     await _activitySub?.cancel();
     await _devicesController.close();
