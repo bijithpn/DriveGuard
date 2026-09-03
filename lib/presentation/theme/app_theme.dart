@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/enums/storage_enums.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Design Tokens
-// ─────────────────────────────────────────────────────────────────────────────
 
 class AppSpacing {
   const AppSpacing._();
@@ -20,93 +18,64 @@ class AppSpacing {
 class AppRadius {
   const AppRadius._();
   static const double sm = 8;
-  static const double md = 14;
-  static const double lg = 20;
-  static const double xl = 28;
+  static const double md = 10;
+  static const double lg = 12;
+  static const double xl = 16;
   static const Radius mdRadius = Radius.circular(md);
   static const Radius lgRadius = Radius.circular(lg);
 }
 
 class AppDurations {
   const AppDurations._();
-  static const Duration fast = Duration(milliseconds: 150);
-  static const Duration medium = Duration(milliseconds: 300);
-  static const Duration slow = Duration(milliseconds: 600);
-  static const Duration verySlow = Duration(milliseconds: 900);
+  static const Duration fast = Duration(milliseconds: 120);
+  static const Duration medium = Duration(milliseconds: 250);
+  static const Duration slow = Duration(milliseconds: 500);
+  static const Duration verySlow = Duration(milliseconds: 800);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Brand Palette
-// ─────────────────────────────────────────────────────────────────────────────
+// Neutral palette: graphite-dark surfaces, single calm blue accent, status
+// colors carry all semantic meaning.
 
 class AppColors {
   const AppColors._();
 
-  // Dark background layers
-  static const Color bg0 = Color(0xFF0D0B1A); // deepest
-  static const Color bg1 = Color(0xFF13112B); // card bg
-  static const Color bg2 = Color(0xFF1A1740); // elevated card
-  static const Color bg3 = Color(0xFF201E4D); // hover/selected
+  // Dark surfaces
+  static const Color bg0 = Color(0xFF1C1C1E); // macOS-style dark background
+  static const Color bg1 = Color(0xFF2C2C2E); // card
+  static const Color bg2 = Color(0xFF3A3A3C); // elevated / hover
+  static const Color bg3 = Color(0xFF48484A); // selected
 
-  // Purple brand
-  static const Color purpleDeep = Color(0xFF3D2D9E);
-  static const Color purpleMid = Color(0xFF5B3FCE);
-  static const Color purpleLight = Color(0xFF7E5FF0);
-  static const Color purpleAccent = Color(0xFFA57BFF);
+  // Single restrained accent: calm steel blue
+  static const Color accent = Color(0xFF3E7BFA);
+  static const Color accentDim = Color(0xFF2B5ED6);
 
-  // Cyan accent
-  static const Color cyan = Color(0xFF3EEAFF);
-  static const Color cyanDim = Color(0xFF1DBBD0);
+  // Status colors: semantic only, not decorative
+  static const Color normal = Color(0xFF30D158); // green
+  static const Color normalDim = Color(0xFF248A3D);
+  static const Color warm = Color(0xFF7ED321); // yellow-green
+  static const Color warning = Color(0xFFFF9F0A); // amber
+  static const Color warningDim = Color(0xFFB97000);
+  static const Color critical = Color(0xFFFF453A); // red
+  static const Color criticalDim = Color(0xFFBF3228);
 
-  // State colors — temperature severity
-  static const Color normal = Color(0xFF3DD68C);
-  static const Color normalDim = Color(0xFF2BAE70);
-  static const Color warm = Color(0xFF8AE04B);
-  static const Color warning = Color(0xFFFFBC42);
-  static const Color warningDim = Color(0xFFCF8B0A);
-  static const Color critical = Color(0xFFFF4D4D);
-  static const Color criticalDim = Color(0xFFD1453B);
+  // Dark text
+  static const Color textPrimary = Color(0xFFEEEEF0);
+  static const Color textSecondary = Color(0xFF98989D);
+  static const Color textMuted = Color(0xFF636366);
+  static const Color divider = Color(0xFF38383A);
+  static const Color border = Color(0xFF3A3A3C);
 
-  // Neutral
-  static const Color textPrimary = Color(0xFFE8E3FF);
-  static const Color textSecondary = Color(0xFF9990CC);
-  static const Color textMuted = Color(0xFF5E587A);
-  static const Color divider = Color(0xFF2A2550);
-  static const Color border = Color(0xFF2E2A5A);
-
-  // Glass overlay
-  static const Color glassSurface = Color(0x1AFFFFFF);
-  static const Color glassHighlight = Color(0x0DFFFFFF);
-
-  // Gradient
-  static const LinearGradient purpleGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [purpleMid, purpleDeep],
-  );
-
-  static const LinearGradient bgGradient = LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [Color(0xFF14103A), Color(0xFF0A0817)],
-  );
-
-  // Light theme — neutral, CleanMyMac-style: near-white window chrome,
-  // white floating cards, soft grey hairlines/shadows instead of a purple
-  // wash, near-black text. The purple brand shows up as accents (logo,
-  // selection, primary actions), not as a tint over every surface.
-  static const Color lightBg = Color(0xFFF5F5F7);
+  // Light surfaces
+  static const Color lightBg = Color(0xFFF2F2F7); // macOS sidebar-like
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightSurfaceMuted = Color(0xFFF2F2F5);
-  static const Color lightBorder = Color(0xFFE6E6EA);
-  static const Color lightText = Color(0xFF1D1D1F);
-  static const Color lightTextSecondary = Color(0xFF6E6E73);
-  static const Color lightShadow = Color(0x14000000);
+  static const Color lightSurfaceMuted = Color(0xFFEFEFF4);
+  static const Color lightBorder = Color(0xFFD1D1D6);
+  static const Color lightText = Color(0xFF1C1C1E);
+  static const Color lightTextSecondary = Color(0xFF6C6C70);
+  static const Color lightShadow = Color(0x0C000000);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Severity Styling
-// ─────────────────────────────────────────────────────────────────────────────
+// Severity styling: no glow, no glassColor — just clean color+icon+label.
 
 class SeverityStyle {
   const SeverityStyle({
@@ -114,14 +83,12 @@ class SeverityStyle {
     required this.dimColor,
     required this.label,
     required this.icon,
-    required this.glowColor,
   });
 
   final Color color;
   final Color dimColor;
   final String label;
   final IconData icon;
-  final Color glowColor;
 
   static SeverityStyle of(TemperatureSeverity severity, BuildContext context) {
     switch (severity) {
@@ -130,16 +97,14 @@ class SeverityStyle {
           color: AppColors.normal,
           dimColor: AppColors.normalDim,
           label: 'Normal',
-          icon: Icons.check_circle_rounded,
-          glowColor: Color(0x553DD68C),
+          icon: Icons.check_circle_outline_rounded,
         );
       case TemperatureSeverity.warm:
         return const SeverityStyle(
           color: AppColors.warm,
           dimColor: AppColors.normalDim,
           label: 'Normal',
-          icon: Icons.check_circle_rounded,
-          glowColor: Color(0x558AE04B),
+          icon: Icons.check_circle_outline_rounded,
         );
       case TemperatureSeverity.warning:
         return const SeverityStyle(
@@ -147,15 +112,13 @@ class SeverityStyle {
           dimColor: AppColors.warningDim,
           label: 'Warning',
           icon: Icons.warning_amber_rounded,
-          glowColor: Color(0x55FFBC42),
         );
       case TemperatureSeverity.critical:
         return const SeverityStyle(
           color: AppColors.critical,
           dimColor: AppColors.criticalDim,
           label: 'Critical',
-          icon: Icons.error_rounded,
-          glowColor: Color(0x55FF4D4D),
+          icon: Icons.error_outline_rounded,
         );
       case TemperatureSeverity.unavailable:
         return SeverityStyle(
@@ -163,15 +126,12 @@ class SeverityStyle {
           dimColor: Theme.of(context).colorScheme.outlineVariant,
           label: 'Unavailable',
           icon: Icons.help_outline_rounded,
-          glowColor: Colors.transparent,
         );
     }
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Theme Builder
-// ─────────────────────────────────────────────────────────────────────────────
+// Theme builder
 
 class AppTheme {
   const AppTheme._();
@@ -180,25 +140,26 @@ class AppTheme {
   static ThemeData dark() => _buildDark();
 
   static ThemeData _buildDark() {
-    const seed = Color(0xFF5B3FCE);
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: Brightness.dark,
-    ).copyWith(
-      surface: AppColors.bg0,
-      onSurface: AppColors.textPrimary,
-      surfaceContainerLowest: AppColors.bg0,
-      surfaceContainerLow: AppColors.bg1,
-      surfaceContainer: AppColors.bg1,
-      surfaceContainerHigh: AppColors.bg2,
-      surfaceContainerHighest: AppColors.bg3,
-      primary: AppColors.purpleLight,
-      onPrimary: Colors.white,
-      secondary: AppColors.cyan,
-      onSecondary: AppColors.bg0,
-      outline: AppColors.textMuted,
-      outlineVariant: AppColors.divider,
-    );
+    const seed = Color(0xFF3E7BFA);
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.dark,
+        ).copyWith(
+          surface: AppColors.bg0,
+          onSurface: AppColors.textPrimary,
+          surfaceContainerLowest: AppColors.bg0,
+          surfaceContainerLow: AppColors.bg1,
+          surfaceContainer: AppColors.bg1,
+          surfaceContainerHigh: AppColors.bg2,
+          surfaceContainerHighest: AppColors.bg3,
+          primary: AppColors.accent,
+          onPrimary: Colors.white,
+          secondary: AppColors.accent,
+          onSecondary: Colors.white,
+          outline: AppColors.textMuted,
+          outlineVariant: AppColors.divider,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -221,9 +182,9 @@ class AppTheme {
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
+          letterSpacing: -0.2,
         ),
         iconTheme: IconThemeData(color: AppColors.textSecondary),
       ),
@@ -233,42 +194,56 @@ class AppTheme {
         thickness: 1,
       ),
       iconTheme: const IconThemeData(color: AppColors.textSecondary),
-      textTheme: _buildTextTheme(AppColors.textPrimary, AppColors.textSecondary),
+      textTheme: _buildTextTheme(
+        AppColors.textPrimary,
+        AppColors.textSecondary,
+      ),
       listTileTheme: const ListTileThemeData(
         tileColor: Colors.transparent,
         contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? AppColors.purpleLight : AppColors.textMuted),
-        trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? AppColors.purpleLight.withValues(alpha: 0.3)
-                : AppColors.bg3),
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.white
+              : AppColors.textMuted,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.accent
+              : AppColors.bg3,
+        ),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.bg2,
-        selectedColor: AppColors.purpleMid,
-        labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+        selectedColor: AppColors.accent,
+        labelStyle: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 12,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
         side: const BorderSide(color: AppColors.border),
       ),
       visualDensity: VisualDensity.standard,
-      splashFactory: InkSparkle.splashFactory,
+      splashFactory: InkRipple.splashFactory,
     );
   }
 
   static ThemeData _buildLight() {
-    const seed = Color(0xFF5B3FCE);
-    final scheme = ColorScheme.fromSeed(
-      seedColor: seed,
-      brightness: Brightness.light,
-    ).copyWith(
-      surface: AppColors.lightCard,
-      primary: AppColors.purpleMid,
-      outline: AppColors.lightTextSecondary,
-      outlineVariant: AppColors.lightBorder,
-    );
+    const seed = Color(0xFF3E7BFA);
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: seed,
+          brightness: Brightness.light,
+        ).copyWith(
+          surface: AppColors.lightCard,
+          primary: AppColors.accent,
+          onPrimary: Colors.white,
+          outline: AppColors.lightTextSecondary,
+          outlineVariant: AppColors.lightBorder,
+        );
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
@@ -281,50 +256,62 @@ class AppTheme {
         shadowColor: AppColors.lightShadow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: BorderSide(color: AppColors.lightBorder, width: 1),
+          side: const BorderSide(color: AppColors.lightBorder, width: 1),
         ),
         margin: EdgeInsets.zero,
       ),
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         titleTextStyle: TextStyle(
           color: AppColors.lightText,
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
+          letterSpacing: -0.2,
         ),
-        iconTheme: const IconThemeData(color: AppColors.lightTextSecondary),
+        iconTheme: IconThemeData(color: AppColors.lightTextSecondary),
       ),
-      dividerTheme: DividerThemeData(
+      dividerTheme: const DividerThemeData(
         color: AppColors.lightBorder,
         space: 1,
         thickness: 1,
       ),
       iconTheme: const IconThemeData(color: AppColors.lightTextSecondary),
       switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected) ? AppColors.purpleMid : Colors.white),
-        trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? AppColors.purpleMid.withValues(alpha: 0.35)
-                : AppColors.lightSurfaceMuted),
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? Colors.white
+              : Colors.white,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? AppColors.accent
+              : AppColors.lightBorder,
+        ),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.lightSurfaceMuted,
-        selectedColor: AppColors.purpleMid,
-        labelStyle: const TextStyle(color: AppColors.lightTextSecondary, fontSize: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+        selectedColor: AppColors.accent,
+        labelStyle: const TextStyle(
+          color: AppColors.lightTextSecondary,
+          fontSize: 12,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
         side: const BorderSide(color: AppColors.lightBorder),
       ),
-      textTheme: _buildTextTheme(AppColors.lightText, AppColors.lightTextSecondary),
+      textTheme: _buildTextTheme(
+        AppColors.lightText,
+        AppColors.lightTextSecondary,
+      ),
       visualDensity: VisualDensity.standard,
-      splashFactory: InkSparkle.splashFactory,
+      splashFactory: InkRipple.splashFactory,
     );
   }
 
-  static String? _fontFamily() => null; // System font by default
+  static String? _fontFamily() => null; // system font
 
   static TextTheme _buildTextTheme(Color primary, Color secondary) {
     return TextTheme(
@@ -332,25 +319,21 @@ class AppTheme {
         color: primary,
         fontSize: 57,
         fontWeight: FontWeight.w700,
-        letterSpacing: -1.5,
       ),
       displayMedium: TextStyle(
         color: primary,
         fontSize: 45,
         fontWeight: FontWeight.w700,
-        letterSpacing: -1.0,
       ),
       headlineLarge: TextStyle(
         color: primary,
         fontSize: 32,
-        fontWeight: FontWeight.w700,
-        letterSpacing: -0.5,
+        fontWeight: FontWeight.w600,
       ),
       headlineMedium: TextStyle(
         color: primary,
         fontSize: 28,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.3,
       ),
       headlineSmall: TextStyle(
         color: primary,
@@ -359,101 +342,81 @@ class AppTheme {
       ),
       titleLarge: TextStyle(
         color: primary,
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
       ),
       titleMedium: TextStyle(
         color: primary,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: FontWeight.w600,
       ),
       titleSmall: TextStyle(
         color: primary,
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.1,
       ),
       bodyLarge: TextStyle(
         color: primary,
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: FontWeight.w400,
       ),
       bodyMedium: TextStyle(
         color: secondary,
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w400,
       ),
       bodySmall: TextStyle(
         color: secondary,
         fontSize: 12,
         fontWeight: FontWeight.w400,
-        letterSpacing: 0.2,
       ),
       labelLarge: TextStyle(
         color: primary,
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.1,
       ),
       labelMedium: TextStyle(
         color: secondary,
         fontSize: 12,
         fontWeight: FontWeight.w500,
-        letterSpacing: 0.3,
       ),
       labelSmall: TextStyle(
         color: secondary,
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: FontWeight.w500,
-        letterSpacing: 0.5,
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared Decoration Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// Shared decoration helpers
 
 class AppDecorations {
   const AppDecorations._();
 
-  static BoxDecoration glassCard({
+  static BoxDecoration card({
     Color? color,
     double radius = AppRadius.lg,
     bool showBorder = true,
-  }) =>
-      BoxDecoration(
-        color: color ?? AppColors.bg1,
-        borderRadius: BorderRadius.circular(radius),
-        border: showBorder
-            ? Border.all(color: AppColors.border, width: 1)
-            : null,
-      );
+    bool isDark = true,
+  }) => BoxDecoration(
+    color: color ?? (isDark ? AppColors.bg1 : AppColors.lightCard),
+    borderRadius: BorderRadius.circular(radius),
+    border: showBorder
+        ? Border.all(
+            color: isDark ? AppColors.border : AppColors.lightBorder,
+            width: 1,
+          )
+        : null,
+  );
 
-  static BoxDecoration gradientCard({
-    List<Color>? colors,
-    double radius = AppRadius.lg,
-  }) =>
-      BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors ?? [AppColors.bg2, AppColors.bg1],
-        ),
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: AppColors.border, width: 1),
-      );
-
-  static BoxDecoration highlightCard({
+  static BoxDecoration statusHighlight({
     required Color color,
     double radius = AppRadius.lg,
-    double opacity = 0.08,
-  }) =>
-      BoxDecoration(
-        color: color.withValues(alpha: opacity),
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
-      );
+  }) => BoxDecoration(
+    color: color.withValues(alpha: 0.08),
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: color.withValues(alpha: 0.22), width: 1),
+  );
 }

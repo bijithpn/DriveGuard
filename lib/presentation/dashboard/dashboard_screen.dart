@@ -20,21 +20,21 @@ class DashboardScreen extends ConsumerWidget {
     final devices = ref.watch(devicesProvider);
     final settings = ref.watch(settingsProvider);
     final monitoringService = ref.watch(monitoringServiceProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
       body: Column(
         children: [
           _DashboardHeader(
             deviceCount: devices.length,
             monitoringEnabled: settings.monitoringEnabled,
-            onToggleMonitoring: () => ref.read(settingsProvider.notifier).updateWith(
-                (s) => s.copyWith(monitoringEnabled: !s.monitoringEnabled)),
+            onToggleMonitoring: () => ref
+                .read(settingsProvider.notifier)
+                .updateWith(
+                  (s) => s.copyWith(monitoringEnabled: !s.monitoringEnabled),
+                ),
             onRescan: monitoringService.rescan,
-            onOpenSettings: () => Navigator.of(context).push(
-              _slideRoute(const SettingsScreen()),
-            ),
+            onOpenSettings: () =>
+                Navigator.of(context).push(_slideRoute(const SettingsScreen())),
             compactView: settings.dashboardCompactView,
             onToggleCompactView: (value) => ref
                 .read(settingsProvider.notifier)
@@ -57,7 +57,9 @@ Route<void> _slideRoute(Widget page) {
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
         position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
-            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+            .animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
         child: child,
       );
     },
@@ -65,9 +67,7 @@ Route<void> _slideRoute(Widget page) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Header
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
@@ -97,8 +97,14 @@ class _DashboardHeader extends StatelessWidget {
     TemperatureSeverity worst = TemperatureSeverity.normal;
     for (final d in devices) {
       final thresholds = settings.thresholdsFor(d.id);
-      final presentation = DevicePresentation.of(d, thresholds, settings.temperatureUnit);
-      if (presentation.severity == TemperatureSeverity.critical) return TemperatureSeverity.critical;
+      final presentation = DevicePresentation.of(
+        d,
+        thresholds,
+        settings.temperatureUnit,
+      );
+      if (presentation.severity == TemperatureSeverity.critical) {
+        return TemperatureSeverity.critical;
+      }
       if (presentation.severity == TemperatureSeverity.warning) {
         worst = TemperatureSeverity.warning;
       }
@@ -114,9 +120,9 @@ class _DashboardHeader extends StatelessWidget {
         return 'Temperature warning';
       case TemperatureSeverity.normal:
       case TemperatureSeverity.warm:
-        return 'All systems normal';
+        return 'All drives normal';
       case TemperatureSeverity.unavailable:
-        return 'Scanning for devices…';
+        return 'Scanning for devices...';
     }
   }
 
@@ -128,17 +134,7 @@ class _DashboardHeader extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        gradient: isDark
-            ? const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF1A1640), AppColors.bg0],
-              )
-            : LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [const Color(0xFFF2F2F5), AppColors.lightBg],
-              ),
+        color: isDark ? AppColors.bg0 : AppColors.lightBg,
         border: Border(
           bottom: BorderSide(
             color: isDark ? AppColors.divider : AppColors.lightBorder,
@@ -149,14 +145,16 @@ class _DashboardHeader extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 2,
+          ),
           child: Row(
             children: [
-              // App icon / branding
+              // App icon
               _AppLogo(),
               const SizedBox(width: AppSpacing.md),
-              // Title block
+              // Title + status
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,35 +162,30 @@ class _DashboardHeader extends StatelessWidget {
                   children: [
                     Text(
                       'DriveGuard',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: isDark ? AppColors.textPrimary : AppColors.lightText,
-                            letterSpacing: -0.5,
-                          ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: isDark
+                            ? AppColors.textPrimary
+                            : AppColors.lightText,
+                      ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     Row(
                       children: [
-                        AnimatedContainer(
-                          duration: AppDurations.medium,
-                          width: 6,
-                          height: 6,
+                        Container(
+                          width: 5,
+                          height: 5,
                           decoration: BoxDecoration(
                             color: style.color,
                             shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                  color: style.color.withValues(alpha: 0.5),
-                                  blurRadius: 4,
-                                  spreadRadius: 1),
-                            ],
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
                         Text(
                           deviceCount == 0
                               ? 'No devices'
                               : '$deviceCount drive${deviceCount == 1 ? '' : 's'} · ${_statusText(severity)}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 color: isDark
                                     ? AppColors.textSecondary
                                     : AppColors.lightTextSecondary,
@@ -203,14 +196,16 @@ class _DashboardHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              // Action buttons
+              // Action strip
               _ViewToggle(compact: compactView, onChanged: onToggleCompactView),
               const SizedBox(width: AppSpacing.xs),
               _HeaderIconButton(
                 icon: monitoringEnabled
-                    ? Icons.pause_circle_outline_rounded
-                    : Icons.play_circle_outline_rounded,
-                tooltip: monitoringEnabled ? 'Pause monitoring' : 'Resume monitoring',
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                tooltip: monitoringEnabled
+                    ? 'Pause monitoring'
+                    : 'Resume monitoring',
                 onPressed: onToggleMonitoring,
                 isActive: !monitoringEnabled,
               ),
@@ -237,31 +232,27 @@ class _DashboardHeader extends StatelessWidget {
 class _AppLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      width: 40,
-      height: 40,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.purpleLight, AppColors.purpleDeep],
-        ),
+        color: AppColors.accent.withValues(alpha: isDark ? 0.15 : 0.1),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.purpleMid.withValues(alpha: 0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.3),
+          width: 1,
+        ),
       ),
-      child: const Icon(Icons.storage_rounded, color: Colors.white, size: 22),
+      child: const Icon(
+        Icons.storage_rounded,
+        color: AppColors.accent,
+        size: 18,
+      ),
     );
   }
 }
 
-/// Grid / list segmented toggle for how drives are laid out on the home
-/// page. Persisted via [AppSettings.dashboardCompactView].
 class _ViewToggle extends StatelessWidget {
   const _ViewToggle({required this.compact, required this.onChanged});
 
@@ -272,10 +263,10 @@ class _ViewToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      height: 36,
+      height: 32,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg2 : const Color(0xFFF2F2F5),
+        color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: isDark ? AppColors.border : AppColors.lightBorder,
@@ -321,31 +312,24 @@ class _ViewToggleButton extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppRadius.sm - 2),
-          child: AnimatedContainer(
-            duration: AppDurations.fast,
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: selected
-                  ? (isDark ? AppColors.bg3 : Colors.white)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppRadius.sm - 2),
-              boxShadow: selected && !isDark
-                  ? const [BoxShadow(color: AppColors.lightShadow, blurRadius: 4)]
-                  : null,
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: selected
-                  ? (isDark ? AppColors.textPrimary : AppColors.purpleMid)
-                  : (isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
-            ),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark ? AppColors.bg3 : Colors.white)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.sm - 2),
+          ),
+          child: Icon(
+            icon,
+            size: 15,
+            color: selected
+                ? (isDark ? AppColors.textPrimary : AppColors.lightText)
+                : (isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
           ),
         ),
       ),
@@ -373,28 +357,33 @@ class _HeaderIconButton extends StatelessWidget {
       message: tooltip,
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(AppRadius.sm),
           child: Container(
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: isActive
-                  ? AppColors.purpleMid.withValues(alpha: 0.2)
-                  : (isDark ? AppColors.bg2 : const Color(0xFFF2F2F5)),
+                  ? AppColors.accent.withValues(alpha: 0.15)
+                  : (isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted),
               borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(
-                color: isDark ? AppColors.border : AppColors.lightBorder,
+                color: isActive
+                    ? AppColors.accent.withValues(alpha: 0.35)
+                    : (isDark ? AppColors.border : AppColors.lightBorder),
                 width: 1,
               ),
             ),
             child: Icon(
               icon,
-              size: 18,
+              size: 16,
               color: isActive
-                  ? AppColors.purpleLight
-                  : (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary),
+                  ? AppColors.accent
+                  : (isDark
+                        ? AppColors.textSecondary
+                        : AppColors.lightTextSecondary),
             ),
           ),
         ),
@@ -403,9 +392,7 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Body
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _Body extends StatelessWidget {
   const _Body({required this.devices, required this.settings});
@@ -418,118 +405,117 @@ class _Body extends StatelessWidget {
       return const _EmptyState();
     }
 
-    return Consumer(builder: (context, ref, _) {
-      final settings = ref.watch(settingsProvider);
+    return Consumer(
+      builder: (context, ref, _) {
+        final settings = ref.watch(settingsProvider);
 
-      Widget entranceAnimated({required int index, required Widget child}) {
-        return TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: Duration(milliseconds: 300 + index * 60),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, child) => Opacity(
-            opacity: value,
-            child: Transform.translate(
-              offset: Offset(0, (1 - value) * 20),
-              child: child,
-            ),
-          ),
-          child: child,
-        );
-      }
-
-      if (settings.dashboardCompactView) {
-        return CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              sliver: SliverList.separated(
-                itemCount: devices.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (context, index) {
-                  final device = devices[index];
-                  return entranceAnimated(
-                    index: index,
-                    child: KeyedSubtree(
-                      key: ValueKey(device.id),
-                      child: _CompactDriveRow(
-                        device: device,
-                        thresholds: settings.thresholdsFor(device.id),
-                        unit: settings.temperatureUnit,
-                        onTap: () => Navigator.of(context).push(
-                          _slideRoute(DeviceDetailsScreen(deviceId: device.id)),
-                        ),
-                      ),
-                    ),
-                  );
-                },
+        Widget entranceAnimated({required int index, required Widget child}) {
+          return TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: Duration(milliseconds: 200 + index * 40),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, (1 - value) * 12),
+                child: child,
               ),
             ),
-          ],
-        );
-      }
-
-      return LayoutBuilder(builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        // Responsive card width drives the grid
-        double cardWidth;
-        if (width >= 1400) {
-          cardWidth = 320;
-        } else if (width >= 1000) {
-          cardWidth = 300;
-        } else if (width >= 650) {
-          cardWidth = 280;
-        } else {
-          cardWidth = width - AppSpacing.lg * 2;
+            child: child,
+          );
         }
 
-        return CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.lg),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: cardWidth,
-                  mainAxisExtent: 320,
-                  crossAxisSpacing: AppSpacing.md,
-                  mainAxisSpacing: AppSpacing.md,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
+        if (settings.dashboardCompactView) {
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                sliver: SliverList.separated(
+                  itemCount: devices.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: AppSpacing.xs),
+                  itemBuilder: (context, index) {
                     final device = devices[index];
                     return entranceAnimated(
                       index: index,
                       child: KeyedSubtree(
                         key: ValueKey(device.id),
-                        child: DriveCard(
+                        child: _CompactDriveRow(
                           device: device,
                           thresholds: settings.thresholdsFor(device.id),
                           unit: settings.temperatureUnit,
                           onTap: () => Navigator.of(context).push(
-                            _slideRoute(DeviceDetailsScreen(deviceId: device.id)),
+                            _slideRoute(
+                              DeviceDetailsScreen(deviceId: device.id),
+                            ),
                           ),
                         ),
                       ),
                     );
                   },
-                  childCount: devices.length,
                 ),
               ),
-            ),
-          ],
+            ],
+          );
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            double cardWidth;
+            if (width >= 1400) {
+              cardWidth = 300;
+            } else if (width >= 1000) {
+              cardWidth = 280;
+            } else if (width >= 650) {
+              cardWidth = 260;
+            } else {
+              cardWidth = width - AppSpacing.lg * 2;
+            }
+
+            return CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  sliver: SliverGrid(
+                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: cardWidth,
+                      mainAxisExtent: 288,
+                      crossAxisSpacing: AppSpacing.sm,
+                      mainAxisSpacing: AppSpacing.sm,
+                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final device = devices[index];
+                      return entranceAnimated(
+                        index: index,
+                        child: KeyedSubtree(
+                          key: ValueKey(device.id),
+                          child: DriveCard(
+                            device: device,
+                            thresholds: settings.thresholdsFor(device.id),
+                            unit: settings.temperatureUnit,
+                            onTap: () => Navigator.of(context).push(
+                              _slideRoute(
+                                DeviceDetailsScreen(deviceId: device.id),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }, childCount: devices.length),
+                  ),
+                ),
+              ],
+            );
+          },
         );
-      });
-    });
+      },
+    );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Compact list row (list view)
-// ─────────────────────────────────────────────────────────────────────────────
+// Compact list row
 
-/// One drive per row, CleanMyMac-style: icon, name/type, a small live
-/// temperature ring, and the status label — instead of the full card.
 class _CompactDriveRow extends StatefulWidget {
   const _CompactDriveRow({
     required this.device,
@@ -578,7 +564,11 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
 
   @override
   Widget build(BuildContext context) {
-    final presentation = DevicePresentation.of(widget.device, widget.thresholds, widget.unit);
+    final presentation = DevicePresentation.of(
+      widget.device,
+      widget.thresholds,
+      widget.unit,
+    );
     final style = SeverityStyle.of(presentation.severity, context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -596,39 +586,48 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
             borderRadius: BorderRadius.circular(AppRadius.lg),
             child: AnimatedContainer(
               duration: AppDurations.fast,
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm + 2,
+              ),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.bg1 : AppColors.lightCard,
+                color: isDark
+                    ? (_isHovered ? AppColors.bg2 : AppColors.bg1)
+                    : (_isHovered
+                          ? AppColors.lightSurfaceMuted
+                          : AppColors.lightCard),
                 borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(
                   color: _isHovered
-                      ? style.color.withValues(alpha: 0.35)
-                      : (isDark ? AppColors.border : AppColors.lightBorder),
+                      ? (isDark ? AppColors.border : AppColors.lightBorder)
+                      : (isDark ? AppColors.divider : AppColors.lightBorder),
                   width: 1,
                 ),
-                boxShadow: isDark
-                    ? const []
-                    : [
-                        BoxShadow(
-                          color: AppColors.lightShadow,
-                          blurRadius: _isHovered ? 14 : 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
               ),
               child: Row(
                 children: [
+                  // Type icon
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
-                      color: style.color.withValues(alpha: isDark ? 0.15 : 0.1),
+                      color: style.color.withValues(
+                        alpha: isDark ? 0.12 : 0.08,
+                      ),
                       borderRadius: BorderRadius.circular(AppRadius.sm),
-                      border: Border.all(color: style.color.withValues(alpha: 0.25)),
+                      border: Border.all(
+                        color: style.color.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
                     ),
-                    child: Icon(_typeIcon(widget.device.type), size: 20, color: style.color),
+                    child: Icon(
+                      _typeIcon(widget.device.type),
+                      size: 17,
+                      color: style.color,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.md),
+                  // Name + type
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -637,17 +636,20 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
                           widget.device.displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: isDark ? AppColors.textPrimary : AppColors.lightText,
-                                fontWeight: FontWeight.w700,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: isDark
+                                    ? AppColors.textPrimary
+                                    : AppColors.lightText,
                               ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                         Text(
                           '${_typeLabel(widget.device.type)} · ${style.label}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 color: isDark
                                     ? AppColors.textSecondary
                                     : AppColors.lightTextSecondary,
@@ -657,16 +659,22 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
+                  // Temperature gauge (small)
                   TemperatureGauge(
                     valueText: presentation.valueText,
                     fraction: presentation.fraction,
                     severity: presentation.severity,
-                    size: 48,
+                    size: 44,
                     showLabel: false,
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  Icon(Icons.chevron_right_rounded,
-                      size: 18, color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: isDark
+                        ? AppColors.textMuted
+                        : AppColors.lightTextSecondary,
+                  ),
                 ],
               ),
             ),
@@ -677,37 +685,10 @@ class _CompactDriveRowState extends State<_CompactDriveRow> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Empty State
-// ─────────────────────────────────────────────────────────────────────────────
+// Empty state
 
-class _EmptyState extends StatefulWidget {
+class _EmptyState extends StatelessWidget {
   const _EmptyState();
-
-  @override
-  State<_EmptyState> createState() => _EmptyStateState();
-}
-
-class _EmptyStateState extends State<_EmptyState> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-    _scale = Tween<double>(begin: 0.95, end: 1.05)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -718,52 +699,50 @@ class _EmptyStateState extends State<_EmptyState> with SingleTickerProviderState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ScaleTransition(
-              scale: _scale,
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.purpleMid, AppColors.purpleDeep],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.purpleMid.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 0,
-                    ),
-                  ],
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(
+                  color: isDark ? AppColors.border : AppColors.lightBorder,
+                  width: 1,
                 ),
-                child: const Icon(Icons.storage_rounded, size: 40, color: Colors.white),
+              ),
+              child: Icon(
+                Icons.storage_rounded,
+                size: 28,
+                color: isDark
+                    ? AppColors.textMuted
+                    : AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Scanning for storage devices',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: isDark ? AppColors.textPrimary : AppColors.lightText,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'DriveGuard detects NVMe, SATA, and USB drives automatically.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: isDark
+                    ? AppColors.textSecondary
+                    : AppColors.lightTextSecondary,
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Scanning for storage devices',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: isDark ? AppColors.textPrimary : AppColors.lightText,
-                  ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'DriveGuard automatically detects NVMe, SATA,\nand USB storage devices. This may take a moment.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
-                    height: 1.6,
-                  ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
             SizedBox(
-              width: 200,
+              width: 180,
               child: LinearProgressIndicator(
                 backgroundColor: isDark ? AppColors.bg3 : AppColors.lightBorder,
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(AppColors.purpleLight),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppColors.accent,
+                ),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),

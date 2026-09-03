@@ -23,10 +23,10 @@ void main() {
       ),
     );
 
-    expect(find.text('Storage Monitor'), findsOneWidget);
+    expect(find.text('DriveGuard'), findsOneWidget);
     // No devices are discovered yet because the monitoring service was
     // never started in this test - the empty state must render, not a
     // crash or a blank screen.
-    expect(find.textContaining('No supported storage devices detected'), findsOneWidget);
+    expect(find.textContaining('Scanning for storage devices'), findsOneWidget);
   });
 }

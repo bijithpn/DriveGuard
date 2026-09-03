@@ -7,8 +7,8 @@ import '../theme/app_theme.dart';
 import 'device_presentation.dart';
 import 'temperature_gauge.dart';
 
-/// Premium drive card with dark purple glass surface, gradient accent,
-/// animated temperature gauge, and rich status display.
+/// Flat drive card. No gradients, no glow, no pulsing.
+/// Hover shows a subtle border/background change only.
 class DriveCard extends StatefulWidget {
   const DriveCard({
     super.key,
@@ -27,24 +27,8 @@ class DriveCard extends StatefulWidget {
   State<DriveCard> createState() => _DriveCardState();
 }
 
-class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMixin {
-  late final AnimationController _hoverController;
+class _DriveCardState extends State<DriveCard> {
   bool _isHovered = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _hoverController = AnimationController(
-      vsync: this,
-      duration: AppDurations.fast,
-    );
-  }
-
-  @override
-  void dispose() {
-    _hoverController.dispose();
-    super.dispose();
-  }
 
   String _typeLabel() {
     switch (widget.device.type) {
@@ -74,7 +58,7 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
 
   String _capacityText() {
     final bytes = widget.device.capacityBytes;
-    if (bytes == null) return '—';
+    if (bytes == null) return '--';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     double size = bytes.toDouble();
     var unitIndex = 0;
@@ -96,7 +80,7 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
       case DeviceHealthStatus.unknown:
         return 'Unknown';
       case DeviceHealthStatus.unavailable:
-        return '—';
+        return '--';
     }
   }
 
@@ -126,75 +110,46 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    final presentation = DevicePresentation.of(widget.device, widget.thresholds, widget.unit);
+    final presentation = DevicePresentation.of(
+      widget.device,
+      widget.thresholds,
+      widget.unit,
+    );
     final style = SeverityStyle.of(presentation.severity, context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Semantics(
       button: true,
-      label: '${widget.device.displayName}, ${_typeLabel()}, ${style.label}, ${presentation.valueText}',
+      label:
+          '${widget.device.displayName}, ${_typeLabel()}, ${style.label}, ${presentation.valueText}',
       child: MouseRegion(
-        onEnter: (_) {
-          setState(() => _isHovered = true);
-          _hoverController.forward();
-        },
-        onExit: (_) {
-          setState(() => _isHovered = false);
-          _hoverController.reverse();
-        },
-        child: AnimatedBuilder(
-          animation: _hoverController,
-          builder: (context, child) {
-            return AnimatedContainer(
-              duration: AppDurations.fast,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? [
-                          AppColors.bg2.withValues(alpha: _isHovered ? 1.0 : 0.9),
-                          AppColors.bg1,
-                        ]
-                      : [Colors.white, const Color(0xFFFAFAFC)],
-                ),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(
-                  color: _isHovered
-                      ? style.color.withValues(alpha: 0.35)
-                      : (isDark ? AppColors.border : AppColors.lightBorder),
-                  width: 1,
-                ),
-                boxShadow: _isHovered
-                    ? [
-                        BoxShadow(
-                          color: style.color.withValues(alpha: 0.12),
-                          blurRadius: 20,
-                          spreadRadius: 0,
-                        ),
-                      ]
-                    : (isDark
-                        ? const []
-                        : const [
-                            BoxShadow(
-                              color: AppColors.lightShadow,
-                              blurRadius: 16,
-                              offset: Offset(0, 4),
-                            ),
-                          ]),
-              ),
-              child: child,
-            );
-          },
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: AnimatedContainer(
+          duration: AppDurations.fast,
+          decoration: BoxDecoration(
+            color: isDark
+                ? (_isHovered ? AppColors.bg2 : AppColors.bg1)
+                : (_isHovered
+                      ? AppColors.lightSurfaceMuted
+                      : AppColors.lightCard),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(
+              color: _isHovered
+                  ? (isDark ? AppColors.bg3 : AppColors.lightBorder)
+                  : (isDark ? AppColors.border : AppColors.lightBorder),
+              width: _isHovered ? 1.5 : 1,
+            ),
+          ),
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadius.lg),
             onTap: widget.onTap,
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header row
+                  // Header
                   Row(
                     children: [
                       _TypeBadge(icon: _typeIcon(), color: style.color),
@@ -205,17 +160,20 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
                           children: [
                             Text(
                               widget.device.displayName,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: isDark ? AppColors.textPrimary : AppColors.lightText,
-                                    fontWeight: FontWeight.w700,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: isDark
+                                        ? AppColors.textPrimary
+                                        : AppColors.lightText,
                                   ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 1),
                             Text(
                               _typeLabel(),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
                                     color: isDark
                                         ? AppColors.textSecondary
                                         : AppColors.lightTextSecondary,
@@ -224,36 +182,42 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
                           ],
                         ),
                       ),
-                      // Status dot
-                      _StatusDot(severity: presentation.severity, color: style.color),
+                      // Static status indicator (no pulse)
+                      _StatusIndicator(
+                        severity: presentation.severity,
+                        color: style.color,
+                      ),
                     ],
                   ),
 
                   const SizedBox(height: AppSpacing.md),
 
-                  // Temperature gauge — centered
+                  // Temperature gauge
                   Center(
                     child: TemperatureGauge(
                       valueText: presentation.valueText,
                       fraction: presentation.fraction,
                       severity: presentation.severity,
-                      size: 130,
+                      size: 120,
                       labelText: style.label,
                     ),
                   ),
 
                   const SizedBox(height: AppSpacing.md),
 
-                  // Stale indicator
+                  // Stale data
                   if (presentation.isStaleLike)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.warning_amber_rounded,
-                              size: 12, color: AppColors.warning.withValues(alpha: 0.8)),
-                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 11,
+                            color: AppColors.warning.withValues(alpha: 0.8),
+                          ),
+                          const SizedBox(width: 3),
                           Text(
                             'Stale data',
                             style: TextStyle(
@@ -267,17 +231,10 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
                     ),
 
                   // Divider
-                  Container(
+                  Divider(
                     height: 1,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          isDark ? AppColors.divider : AppColors.lightBorder,
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
+                    thickness: 1,
+                    color: isDark ? AppColors.divider : AppColors.lightBorder,
                   ),
 
                   const SizedBox(height: AppSpacing.sm),
@@ -290,14 +247,8 @@ class _DriveCardState extends State<DriveCard> with SingleTickerProviderStateMix
                         value: _healthLabel(),
                         valueColor: _healthColor(context),
                       ),
-                      _StatColumn(
-                        label: 'Capacity',
-                        value: _capacityText(),
-                      ),
-                      _StatColumn(
-                        label: 'Updated',
-                        value: _updatedText(),
-                      ),
+                      _StatColumn(label: 'Capacity', value: _capacityText()),
+                      _StatColumn(label: 'Updated', value: _updatedText()),
                     ],
                   ),
                 ],
@@ -319,76 +270,43 @@ class _TypeBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      width: 36,
-      height: 36,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.15 : 0.1),
+        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
-      child: Icon(icon, size: 18, color: color),
+      child: Icon(icon, size: 16, color: color),
     );
   }
 }
 
-class _StatusDot extends StatefulWidget {
-  const _StatusDot({required this.severity, required this.color});
+/// Static colored dot + icon indicating severity.
+/// No pulsing animation; warning/critical are clear through color and the
+/// icon label on the gauge itself.
+class _StatusIndicator extends StatelessWidget {
+  const _StatusIndicator({required this.severity, required this.color});
   final TemperatureSeverity severity;
   final Color color;
 
   @override
-  State<_StatusDot> createState() => _StatusDotState();
-}
-
-class _StatusDotState extends State<_StatusDot> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final shouldPulse = widget.severity == TemperatureSeverity.warning ||
-        widget.severity == TemperatureSeverity.critical;
-
-    if (!shouldPulse) {
-      return Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(
-          color: widget.color,
-          shape: BoxShape.circle,
-        ),
+    // For critical/warning show an icon in addition to the dot for clarity.
+    if (severity == TemperatureSeverity.critical ||
+        severity == TemperatureSeverity.warning) {
+      return Icon(
+        severity == TemperatureSeverity.critical
+            ? Icons.error_outline_rounded
+            : Icons.warning_amber_rounded,
+        size: 16,
+        color: color,
       );
     }
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) => Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(
-          color: widget.color,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: widget.color.withValues(alpha: 0.6 * _controller.value),
-              blurRadius: 6 + 4 * _controller.value,
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-      ),
+    return Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
@@ -415,11 +333,13 @@ class _StatColumn extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w500,
-              color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
-              letterSpacing: 0.5,
+              color: isDark
+                  ? AppColors.textMuted
+                  : AppColors.lightTextSecondary,
+              letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 2),
           Text(
             value,
             textAlign: TextAlign.center,
@@ -428,7 +348,9 @@ class _StatColumn extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: valueColor ?? (isDark ? AppColors.textPrimary : AppColors.lightText),
+              color:
+                  valueColor ??
+                  (isDark ? AppColors.textPrimary : AppColors.lightText),
             ),
           ),
         ],

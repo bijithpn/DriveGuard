@@ -29,7 +29,8 @@ class DeviceDetailsScreen extends ConsumerStatefulWidget {
   final String deviceId;
 
   @override
-  ConsumerState<DeviceDetailsScreen> createState() => _DeviceDetailsScreenState();
+  ConsumerState<DeviceDetailsScreen> createState() =>
+      _DeviceDetailsScreenState();
 }
 
 class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
@@ -53,23 +54,39 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
   Widget build(BuildContext context) {
     final devices = ref.watch(devicesProvider);
     final settings = ref.watch(settingsProvider);
-    final device =
-        devices.where((d) => d.id == widget.deviceId).cast<StorageDevice?>().firstOrNull;
+    final device = devices
+        .where((d) => d.id == widget.deviceId)
+        .cast<StorageDevice?>()
+        .firstOrNull;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (device == null) {
       return Scaffold(
         backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
-        appBar: _buildAppBar(context, 'Device', isDark),
+        appBar: AppBar(
+          backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: const Text('Device'),
+        ),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.device_unknown_rounded,
-                  size: 48, color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
+              Icon(
+                Icons.device_unknown_rounded,
+                size: 40,
+                color: isDark
+                    ? AppColors.textMuted
+                    : AppColors.lightTextSecondary,
+              ),
               const SizedBox(height: AppSpacing.md),
-              Text('This device is no longer available.',
-                  style: Theme.of(context).textTheme.bodyLarge),
+              Text(
+                'This device is no longer available.',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
             ],
           ),
         ),
@@ -77,26 +94,26 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
     }
 
     final thresholds = settings.thresholdsFor(device.id);
-    final presentation = DevicePresentation.of(device, thresholds, settings.temperatureUnit);
+    final presentation = DevicePresentation.of(
+      device,
+      thresholds,
+      settings.temperatureUnit,
+    );
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
       body: Column(
         children: [
-          // Hero header
-          _DeviceHero(
+          _DeviceHeader(
             device: device,
             presentation: presentation,
             isDark: isDark,
           ),
-          // Tab bar
-          _PremiumTabBar(controller: _tabController, isDark: isDark),
-          // Tab content
+          _NativeTabBar(controller: _tabController, isDark: isDark),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                // Temperature tab
                 _TemperatureTab(
                   device: device,
                   windowLabel: _windowLabel,
@@ -105,10 +122,12 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
                   unit: settings.temperatureUnit,
                   isDark: isDark,
                 ),
-                // Health tab
                 _HealthTab(device: device, isDark: isDark),
-                // Diagnostics tab
-                _DiagnosticsTab(device: device, settings: settings, isDark: isDark),
+                _DiagnosticsTab(
+                  device: device,
+                  settings: settings,
+                  isDark: isDark,
+                ),
               ],
             ),
           ),
@@ -116,26 +135,12 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
       ),
     );
   }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context, String title, bool isDark) {
-    return AppBar(
-      backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back_rounded,
-            color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      title: Text(title),
-    );
-  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Hero Section
-// ─────────────────────────────────────────────────────────────────────────────
+// Compact detail header
 
-class _DeviceHero extends StatelessWidget {
-  const _DeviceHero({
+class _DeviceHeader extends StatelessWidget {
+  const _DeviceHeader({
     required this.device,
     required this.presentation,
     required this.isDark,
@@ -190,23 +195,7 @@ class _DeviceHero extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        gradient: isDark
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.bg2,
-                  AppColors.bg0,
-                ],
-              )
-            : LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFFF2F2F5),
-                  AppColors.lightBg,
-                ],
-              ),
+        color: isDark ? AppColors.bg0 : AppColors.lightBg,
         border: Border(
           bottom: BorderSide(
             color: isDark ? AppColors.divider : AppColors.lightBorder,
@@ -217,26 +206,28 @@ class _DeviceHero extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 2,
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Back button
+              // Back
               _BackButton(isDark: isDark),
               const SizedBox(width: AppSpacing.md),
-              // Device icon
+              // Type icon
               Container(
-                width: 48,
-                height: 48,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: style.color.withValues(alpha: 0.12),
+                  color: style.color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppRadius.md),
-                  border: Border.all(color: style.color.withValues(alpha: 0.25)),
+                  border: Border.all(color: style.color.withValues(alpha: 0.2)),
                 ),
-                child: Icon(_typeIcon(), color: style.color, size: 24),
+                child: Icon(_typeIcon(), color: style.color, size: 20),
               ),
               const SizedBox(width: AppSpacing.md),
-              // Device info
+              // Name + meta
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,35 +235,43 @@ class _DeviceHero extends StatelessWidget {
                   children: [
                     Text(
                       device.displayName,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: isDark ? AppColors.textPrimary : AppColors.lightText,
-                            fontSize: 20,
-                          ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: isDark
+                            ? AppColors.textPrimary
+                            : AppColors.lightText,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
                         Text(
                           _typeLabel(),
                           style: TextStyle(
-                            color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
-                            fontSize: 13,
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.textSecondary
+                                : AppColors.lightTextSecondary,
                           ),
                         ),
                         if (device.capacityBytes != null) ...[
                           Text(
                             '  ·  ',
                             style: TextStyle(
-                              color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textMuted
+                                  : AppColors.lightTextSecondary,
                             ),
                           ),
                           Text(
                             _capacityText(),
                             style: TextStyle(
-                              color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
-                              fontSize: 13,
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textSecondary
+                                  : AppColors.lightTextSecondary,
                             ),
                           ),
                         ],
@@ -282,7 +281,7 @@ class _DeviceHero extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              // Temperature
+              // Temperature reading
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
@@ -291,21 +290,22 @@ class _DeviceHero extends StatelessWidget {
                     presentation.valueText,
                     style: TextStyle(
                       color: style.color,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
                     ),
                   ),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(style.icon, size: 12, color: style.color),
-                      const SizedBox(width: 4),
+                      Icon(style.icon, size: 11, color: style.color),
+                      const SizedBox(width: 3),
                       Text(
                         style.label,
                         style: TextStyle(
-                          color: style.color.withValues(alpha: 0.8),
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
+                          color: style.color,
                         ),
                       ),
                     ],
@@ -332,10 +332,10 @@ class _BackButton extends StatelessWidget {
         onTap: () => Navigator.of(context).pop(),
         borderRadius: BorderRadius.circular(AppRadius.sm),
         child: Container(
-          width: 36,
-          height: 36,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.bg2 : const Color(0xFFF2F2F5),
+            color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: isDark ? AppColors.border : AppColors.lightBorder,
@@ -343,8 +343,10 @@ class _BackButton extends StatelessWidget {
           ),
           child: Icon(
             Icons.arrow_back_rounded,
-            size: 18,
-            color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+            size: 16,
+            color: isDark
+                ? AppColors.textSecondary
+                : AppColors.lightTextSecondary,
           ),
         ),
       ),
@@ -352,12 +354,10 @@ class _BackButton extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab Bar
-// ─────────────────────────────────────────────────────────────────────────────
+// Native tab bar
 
-class _PremiumTabBar extends StatelessWidget {
-  const _PremiumTabBar({required this.controller, required this.isDark});
+class _NativeTabBar extends StatelessWidget {
+  const _NativeTabBar({required this.controller, required this.isDark});
   final TabController controller;
   final bool isDark;
 
@@ -365,21 +365,31 @@ class _PremiumTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: isDark ? AppColors.bg0 : AppColors.lightBg,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.xs,
+      ),
       child: TabBar(
         controller: controller,
         isScrollable: false,
         dividerColor: Colors.transparent,
         indicator: BoxDecoration(
-          color: isDark ? AppColors.bg2 : Colors.white,
+          color: isDark ? AppColors.bg2 : AppColors.lightCard,
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
+          border: Border.all(
+            color: isDark ? AppColors.border : AppColors.lightBorder,
+          ),
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: isDark ? AppColors.textPrimary : AppColors.lightText,
-        unselectedLabelColor: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+        unselectedLabelColor: isDark
+            ? AppColors.textMuted
+            : AppColors.lightTextSecondary,
         labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
         splashBorderRadius: BorderRadius.circular(AppRadius.sm),
         tabs: const [
           Tab(text: 'Temperature'),
@@ -391,9 +401,7 @@ class _PremiumTabBar extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Temperature Tab
-// ─────────────────────────────────────────────────────────────────────────────
+// Temperature tab
 
 class _TemperatureTab extends ConsumerWidget {
   const _TemperatureTab({
@@ -419,14 +427,17 @@ class _TemperatureTab extends ConsumerWidget {
     final samples = historyStore.pointsFor(device.id, window);
     final stats = historyStore.statsFor(device.id, window);
     final presentation = DevicePresentation.of(
-        device, ref.watch(settingsProvider).thresholdsFor(device.id), unit);
+      device,
+      ref.watch(settingsProvider).thresholdsFor(device.id),
+      unit,
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gauge + stats row
+          // Gauge + stats
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -434,7 +445,7 @@ class _TemperatureTab extends ConsumerWidget {
                 valueText: presentation.valueText,
                 fraction: presentation.fraction,
                 severity: presentation.severity,
-                size: 160,
+                size: 148,
               ),
               const SizedBox(width: AppSpacing.xl),
               Expanded(
@@ -443,13 +454,21 @@ class _TemperatureTab extends ConsumerWidget {
                     _StatCard(
                       label: 'Current',
                       value: device.primaryTemperature != null
-                          ? TemperatureUtils.format(device.primaryTemperature!.celsius, unit)
+                          ? TemperatureUtils.format(
+                              device.primaryTemperature!.celsius,
+                              unit,
+                            )
                           : 'Unavailable',
                       icon: Icons.thermostat_rounded,
                       isDark: isDark,
-                      color: presentation.severity == TemperatureSeverity.unavailable
+                      color:
+                          presentation.severity ==
+                              TemperatureSeverity.unavailable
                           ? AppColors.textMuted
-                          : SeverityStyle.of(presentation.severity, context).color,
+                          : SeverityStyle.of(
+                              presentation.severity,
+                              context,
+                            ).color,
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Row(
@@ -459,7 +478,7 @@ class _TemperatureTab extends ConsumerWidget {
                             label: 'Min',
                             value: stats.min != null
                                 ? TemperatureUtils.format(stats.min!, unit)
-                                : '—',
+                                : '--',
                             icon: Icons.arrow_downward_rounded,
                             isDark: isDark,
                             color: AppColors.normal,
@@ -472,7 +491,7 @@ class _TemperatureTab extends ConsumerWidget {
                             label: 'Max',
                             value: stats.max != null
                                 ? TemperatureUtils.format(stats.max!, unit)
-                                : '—',
+                                : '--',
                             icon: Icons.arrow_upward_rounded,
                             isDark: isDark,
                             color: AppColors.warning,
@@ -486,8 +505,8 @@ class _TemperatureTab extends ConsumerWidget {
                       label: 'Average',
                       value: stats.average != null
                           ? TemperatureUtils.format(stats.average!, unit)
-                          : '—',
-                      icon: Icons.analytics_outlined,
+                          : '--',
+                      icon: Icons.show_chart_rounded,
                       isDark: isDark,
                       compact: true,
                     ),
@@ -497,11 +516,11 @@ class _TemperatureTab extends ConsumerWidget {
             ],
           ),
 
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
 
-          // Source info
+          // Source row
           if (device.primaryTemperature != null)
-            _SourceChip(
+            _SourceRow(
               source: device.primaryTemperature!.source.toString(),
               timestamp: device.lastUpdated,
               isDark: isDark,
@@ -509,13 +528,12 @@ class _TemperatureTab extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Chart
-          _SectionTitle(title: 'Temperature History', isDark: isDark),
+          _SectionLabel(title: 'Temperature History', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
 
-          // Time window selector
+          // Window selector
           Wrap(
-            spacing: AppSpacing.sm,
+            spacing: AppSpacing.xs,
             children: _historyWindows.keys.map((label) {
               final selected = label == windowLabel;
               return GestureDetector(
@@ -523,15 +541,17 @@ class _TemperatureTab extends ConsumerWidget {
                 child: AnimatedContainer(
                   duration: AppDurations.fast,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                    horizontal: AppSpacing.sm + 2,
+                    vertical: AppSpacing.xs,
+                  ),
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.purpleMid
-                        : (isDark ? AppColors.bg2 : Colors.white),
+                        ? AppColors.accent
+                        : (isDark ? AppColors.bg2 : AppColors.lightCard),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(
                       color: selected
-                          ? AppColors.purpleMid
+                          ? AppColors.accent
                           : (isDark ? AppColors.border : AppColors.lightBorder),
                     ),
                   ),
@@ -539,10 +559,12 @@ class _TemperatureTab extends ConsumerWidget {
                     label,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                       color: selected
                           ? Colors.white
-                          : (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary),
+                          : (isDark
+                                ? AppColors.textSecondary
+                                : AppColors.lightTextSecondary),
                     ),
                   ),
                 ),
@@ -551,37 +573,48 @@ class _TemperatureTab extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.md),
 
-          // Chart container
+          // Chart
           Container(
-            height: 220,
+            height: 200,
             decoration: BoxDecoration(
-              color: isDark ? AppColors.bg1 : Colors.white,
+              color: isDark ? AppColors.bg1 : AppColors.lightCard,
               borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(
                 color: isDark ? AppColors.border : AppColors.lightBorder,
               ),
             ),
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
             child: samples.length < 2
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.show_chart_rounded,
-                            size: 36,
-                            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
-                        const SizedBox(height: AppSpacing.sm),
+                        Icon(
+                          Icons.show_chart_rounded,
+                          size: 32,
+                          color: isDark
+                              ? AppColors.textMuted
+                              : AppColors.lightTextSecondary,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           'Not enough history yet',
                           style: TextStyle(
-                            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
-                            fontSize: 13,
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.textMuted
+                                : AppColors.lightTextSecondary,
                           ),
                         ),
                       ],
                     ),
                   )
-                : _PremiumHistoryChart(
+                : _HistoryChart(
                     samples: samples,
                     thresholds: thresholds,
                     unit: unit,
@@ -591,8 +624,7 @@ class _TemperatureTab extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.lg),
 
-          // Sensors
-          _SectionTitle(title: 'Sensors', isDark: isDark),
+          _SectionLabel(title: 'Sensors', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
           _SensorsList(deviceId: device.id, unit: unit, isDark: isDark),
         ],
@@ -620,56 +652,77 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveColor = color ?? (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
+    final effectiveColor =
+        color ??
+        (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
     return Container(
       padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg2 : Colors.white,
+        color: isDark ? AppColors.bg2 : AppColors.lightCard,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
+        ),
       ),
       child: compact
           ? Row(
               children: [
-                Icon(icon, size: 14, color: effectiveColor),
-                const SizedBox(width: 6),
-                Text(label,
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary)),
+                Icon(icon, size: 13, color: effectiveColor),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.textMuted
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
                 const Spacer(),
-                Text(value,
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700, color: effectiveColor)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: effectiveColor,
+                  ),
+                ),
               ],
             )
           : Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 30,
+                  height: 30,
                   decoration: BoxDecoration(
-                    color: effectiveColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                    color: effectiveColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
-                  child: Icon(icon, size: 16, color: effectiveColor),
+                  child: Icon(icon, size: 15, color: effectiveColor),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(label,
-                          style: TextStyle(
-                              fontSize: 11,
-                              color:
-                                  isDark ? AppColors.textMuted : AppColors.lightTextSecondary)),
-                      Text(value,
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: effectiveColor,
-                              letterSpacing: -0.5)),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? AppColors.textMuted
+                              : AppColors.lightTextSecondary,
+                        ),
+                      ),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: effectiveColor,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -679,8 +732,12 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _SourceChip extends StatelessWidget {
-  const _SourceChip({required this.source, required this.timestamp, required this.isDark});
+class _SourceRow extends StatelessWidget {
+  const _SourceRow({
+    required this.source,
+    required this.timestamp,
+    required this.isDark,
+  });
   final String source;
   final DateTime? timestamp;
   final bool isDark;
@@ -696,32 +753,42 @@ class _SourceChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.purpleMid.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: AppColors.purpleMid.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.purpleLight),
-          const SizedBox(width: 6),
-          Text('Source: $source', style: const TextStyle(fontSize: 12, color: AppColors.purpleLight)),
-          const SizedBox(width: 12),
-          const Icon(Icons.schedule_rounded, size: 12, color: AppColors.textMuted),
-          const SizedBox(width: 4),
-          Text('Updated ${_ago()}',
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-        ],
-      ),
+    return Row(
+      children: [
+        Icon(
+          Icons.info_outline_rounded,
+          size: 13,
+          color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+        ),
+        const SizedBox(width: 5),
+        Text(
+          'Source: $source',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Icon(
+          Icons.schedule_rounded,
+          size: 12,
+          color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'Updated ${_ago()}',
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.isDark});
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.title, required this.isDark});
   final String title;
   final bool isDark;
 
@@ -730,17 +797,18 @@ class _SectionTitle extends StatelessWidget {
     return Text(
       title,
       style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
         color: isDark ? AppColors.textPrimary : AppColors.lightText,
-        letterSpacing: 0.2,
       ),
     );
   }
 }
 
-class _PremiumHistoryChart extends StatelessWidget {
-  const _PremiumHistoryChart({
+// Professional monitoring chart
+
+class _HistoryChart extends StatelessWidget {
+  const _HistoryChart({
     required this.samples,
     required this.thresholds,
     required this.unit,
@@ -756,18 +824,28 @@ class _PremiumHistoryChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final first = samples.first.timestamp as DateTime;
     final spots = samples
-        .map<FlSpot>((p) => FlSpot(
-              (p.timestamp as DateTime).difference(first).inSeconds.toDouble(),
-              TemperatureUtils.convert(p.celsius as double, unit),
-            ))
+        .map<FlSpot>(
+          (p) => FlSpot(
+            (p.timestamp as DateTime).difference(first).inSeconds.toDouble(),
+            TemperatureUtils.convert(p.celsius as double, unit),
+          ),
+        )
         .toList();
 
     final allTemps = spots.map((s) => s.y).toList();
-    final minTemp = allTemps.reduce(min) - 5;
-    final maxTemp = allTemps.reduce(max) + 5;
+    final minTemp = allTemps.reduce(min) - 4;
+    final maxTemp = allTemps.reduce(max) + 4;
 
-    final warn = TemperatureUtils.convert(thresholds.warningCelsius as double, unit);
-    final crit = TemperatureUtils.convert(thresholds.criticalCelsius as double, unit);
+    final warn = TemperatureUtils.convert(
+      thresholds.warningCelsius as double,
+      unit,
+    );
+    final crit = TemperatureUtils.convert(
+      thresholds.criticalCelsius as double,
+      unit,
+    );
+
+    final lineColor = isDark ? AppColors.accent : AppColors.accent;
 
     return LineChart(
       LineChartData(
@@ -776,65 +854,81 @@ class _PremiumHistoryChart extends StatelessWidget {
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          getDrawingHorizontalLine: (value) => FlLine(
+          getDrawingHorizontalLine: (_) => FlLine(
             color: isDark ? AppColors.divider : AppColors.lightBorder,
             strokeWidth: 1,
           ),
         ),
         titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 40,
+              reservedSize: 36,
               getTitlesWidget: (value, meta) => Text(
                 '${value.toInt()}${TemperatureUtils.unitSuffix(unit)}',
                 style: TextStyle(
                   fontSize: 10,
-                  color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                  color: isDark
+                      ? AppColors.textMuted
+                      : AppColors.lightTextSecondary,
                 ),
               ),
             ),
           ),
         ),
         borderData: FlBorderData(show: false),
-        extraLinesData: ExtraLinesData(horizontalLines: [
-          HorizontalLine(
-            y: warn,
-            color: AppColors.warning.withValues(alpha: 0.7),
-            strokeWidth: 1.5,
-            dashArray: [8, 5],
-            label: HorizontalLineLabel(
-              show: true,
-              alignment: Alignment.topRight,
-              style: const TextStyle(
-                  fontSize: 10, color: AppColors.warning, fontWeight: FontWeight.w600),
-              labelResolver: (_) => 'Warning',
+        extraLinesData: ExtraLinesData(
+          horizontalLines: [
+            HorizontalLine(
+              y: warn,
+              color: AppColors.warning.withValues(alpha: 0.6),
+              strokeWidth: 1,
+              dashArray: [6, 4],
+              label: HorizontalLineLabel(
+                show: true,
+                alignment: Alignment.topRight,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w500,
+                ),
+                labelResolver: (_) => 'Warn',
+              ),
             ),
-          ),
-          HorizontalLine(
-            y: crit,
-            color: AppColors.critical.withValues(alpha: 0.7),
-            strokeWidth: 1.5,
-            dashArray: [8, 5],
-            label: HorizontalLineLabel(
-              show: true,
-              alignment: Alignment.topRight,
-              style: const TextStyle(
-                  fontSize: 10, color: AppColors.critical, fontWeight: FontWeight.w600),
-              labelResolver: (_) => 'Critical',
+            HorizontalLine(
+              y: crit,
+              color: AppColors.critical.withValues(alpha: 0.6),
+              strokeWidth: 1,
+              dashArray: [6, 4],
+              label: HorizontalLineLabel(
+                show: true,
+                alignment: Alignment.topRight,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.critical,
+                  fontWeight: FontWeight.w500,
+                ),
+                labelResolver: (_) => 'Crit',
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
         lineBarsData: [
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            curveSmoothness: 0.35,
-            color: AppColors.purpleLight,
-            barWidth: 2,
+            curveSmoothness: 0.3,
+            color: lineColor,
+            barWidth: 1.5,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
@@ -842,8 +936,8 @@ class _PremiumHistoryChart extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppColors.purpleLight.withValues(alpha: 0.25),
-                  AppColors.purpleLight.withValues(alpha: 0.02),
+                  lineColor.withValues(alpha: 0.15),
+                  lineColor.withValues(alpha: 0.0),
                 ],
               ),
             ),
@@ -851,17 +945,20 @@ class _PremiumHistoryChart extends StatelessWidget {
         ],
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            getTooltipColor: (_) => isDark ? AppColors.bg3 : Colors.white,
+            getTooltipColor: (_) =>
+                isDark ? AppColors.bg3 : AppColors.lightCard,
             tooltipRoundedRadius: AppRadius.sm,
             getTooltipItems: (touchedSpots) => touchedSpots
-                .map((s) => LineTooltipItem(
-                      '${s.y.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)}',
-                      TextStyle(
-                        color: AppColors.purpleLight,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ))
+                .map(
+                  (s) => LineTooltipItem(
+                    '${s.y.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)}',
+                    TextStyle(
+                      color: lineColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -872,7 +969,11 @@ class _PremiumHistoryChart extends StatelessWidget {
 }
 
 class _SensorsList extends ConsumerStatefulWidget {
-  const _SensorsList({required this.deviceId, required this.unit, required this.isDark});
+  const _SensorsList({
+    required this.deviceId,
+    required this.unit,
+    required this.isDark,
+  });
   final String deviceId;
   final TemperatureUnit unit;
   final bool isDark;
@@ -920,22 +1021,29 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
           return Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: widget.isDark ? AppColors.bg1 : Colors.white,
+              color: widget.isDark ? AppColors.bg1 : AppColors.lightCard,
               borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(
-                  color: widget.isDark ? AppColors.border : AppColors.lightBorder),
+                color: widget.isDark ? AppColors.border : AppColors.lightBorder,
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.thermostat_outlined,
-                    size: 20,
-                    color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary),
+                Icon(
+                  Icons.thermostat_outlined,
+                  size: 18,
+                  color: widget.isDark
+                      ? AppColors.textMuted
+                      : AppColors.lightTextSecondary,
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 Text(
                   'No additional sensor detail available.',
                   style: TextStyle(
                     fontSize: 13,
-                    color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                    color: widget.isDark
+                        ? AppColors.textMuted
+                        : AppColors.lightTextSecondary,
                   ),
                 ),
               ],
@@ -944,10 +1052,11 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
         }
         return Container(
           decoration: BoxDecoration(
-            color: widget.isDark ? AppColors.bg1 : Colors.white,
+            color: widget.isDark ? AppColors.bg1 : AppColors.lightCard,
             borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
-                color: widget.isDark ? AppColors.border : AppColors.lightBorder),
+              color: widget.isDark ? AppColors.border : AppColors.lightBorder,
+            ),
           ),
           child: Column(
             children: sensors.asMap().entries.map((entry) {
@@ -956,22 +1065,26 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
               final isLast = index == sensors.length - 1;
               final tempText = s.reading != null
                   ? TemperatureUtils.format(s.reading!.celsius, widget.unit)
-                  : '—';
+                  : '--';
               return Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Row(
                       children: [
                         Icon(
-                          s.isPrimary ? Icons.star_rounded : Icons.thermostat_rounded,
-                          size: 16,
+                          s.isPrimary
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.thermostat_rounded,
+                          size: 15,
                           color: s.isPrimary
-                              ? AppColors.purpleLight
+                              ? AppColors.accent
                               : (widget.isDark
-                                  ? AppColors.textMuted
-                                  : AppColors.lightTextSecondary),
+                                    ? AppColors.textMuted
+                                    : AppColors.lightTextSecondary),
                         ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
@@ -988,23 +1101,36 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
                         if (s.isPrimary)
                           Container(
                             margin: const EdgeInsets.only(right: AppSpacing.sm),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.purpleMid.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
                             ),
-                            child: const Text('Primary',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: AppColors.purpleLight,
-                                    fontWeight: FontWeight.w600)),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.sm - 2,
+                              ),
+                              border: Border.all(
+                                color: AppColors.accent.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: const Text(
+                              'Primary',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         Text(
                           tempText,
                           style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: widget.isDark ? AppColors.textPrimary : AppColors.lightText,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: widget.isDark
+                                ? AppColors.textPrimary
+                                : AppColors.lightText,
                           ),
                         ),
                       ],
@@ -1013,7 +1139,9 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
                   if (!isLast)
                     Divider(
                       height: 1,
-                      color: widget.isDark ? AppColors.divider : AppColors.lightBorder,
+                      color: widget.isDark
+                          ? AppColors.divider
+                          : AppColors.lightBorder,
                     ),
                 ],
               );
@@ -1025,9 +1153,7 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Health Tab
-// ─────────────────────────────────────────────────────────────────────────────
+// Health tab
 
 class _HealthTab extends StatelessWidget {
   const _HealthTab({required this.device, required this.isDark});
@@ -1060,29 +1186,29 @@ class _HealthTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Overall health status card
+          // Status card
           Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.08),
+              color: statusColor.withValues(alpha: 0.07),
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+              border: Border.all(color: statusColor.withValues(alpha: 0.22)),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.15),
+                    color: statusColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                   ),
                   child: Icon(
                     device.health.status == DeviceHealthStatus.healthy
-                        ? Icons.verified_rounded
+                        ? Icons.check_circle_outline_rounded
                         : Icons.warning_amber_rounded,
                     color: statusColor,
-                    size: 24,
+                    size: 20,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.md),
@@ -1094,7 +1220,7 @@ class _HealthTab extends StatelessWidget {
                         device.health.status.name[0].toUpperCase() +
                             device.health.status.name.substring(1),
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 17,
                           fontWeight: FontWeight.w700,
                           color: statusColor,
                         ),
@@ -1102,8 +1228,10 @@ class _HealthTab extends StatelessWidget {
                       Text(
                         _healthDescription(device.health.status),
                         style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+                          fontSize: 12,
+                          color: isDark
+                              ? AppColors.textSecondary
+                              : AppColors.lightTextSecondary,
                         ),
                       ),
                     ],
@@ -1114,10 +1242,9 @@ class _HealthTab extends StatelessWidget {
           ),
 
           const SizedBox(height: AppSpacing.lg),
-          _SectionTitle(title: 'SMART & NVMe Data', isDark: isDark),
+          _SectionLabel(title: 'SMART & NVMe Data', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
 
-          // Health grid
           _HealthGrid(
             entries: [
               _HealthEntry(
@@ -1125,13 +1252,17 @@ class _HealthTab extends StatelessWidget {
                 value: health.smartPassed == null
                     ? 'Not available'
                     : (health.smartPassed! ? 'Passed' : 'Failed'),
-                icon: Icons.check_circle_outline_rounded,
-                statusColor: health.smartPassed == true ? AppColors.normal : AppColors.critical,
+                icon: Icons.verified_outlined,
+                statusColor: health.smartPassed == true
+                    ? AppColors.normal
+                    : AppColors.critical,
                 available: health.smartPassed != null,
               ),
               _HealthEntry(
                 label: 'Percentage Used',
-                value: health.percentageUsed != null ? '${health.percentageUsed}%' : '—',
+                value: health.percentageUsed != null
+                    ? '${health.percentageUsed}%'
+                    : '--',
                 icon: Icons.pie_chart_outline_rounded,
                 available: health.percentageUsed != null,
               ),
@@ -1139,14 +1270,14 @@ class _HealthTab extends StatelessWidget {
                 label: 'Available Spare',
                 value: health.availableSparePercent != null
                     ? '${health.availableSparePercent}%'
-                    : '—',
+                    : '--',
                 icon: Icons.disc_full_rounded,
                 available: health.availableSparePercent != null,
               ),
               _HealthEntry(
                 label: 'Critical Warnings',
                 value: _na(health.criticalWarning),
-                icon: Icons.warning_amber_rounded,
+                icon: Icons.warning_amber_outlined,
                 available: health.criticalWarning != null,
               ),
               _HealthEntry(
@@ -1163,7 +1294,9 @@ class _HealthTab extends StatelessWidget {
               ),
               _HealthEntry(
                 label: 'Power-on Hours',
-                value: health.powerOnHours != null ? '${health.powerOnHours} h' : '—',
+                value: health.powerOnHours != null
+                    ? '${health.powerOnHours} h'
+                    : '--',
                 icon: Icons.timer_outlined,
                 available: health.powerOnHours != null,
               ),
@@ -1224,7 +1357,10 @@ class _HealthGrid extends StatelessWidget {
       runSpacing: AppSpacing.sm,
       children: [
         for (var i = 0; i < entries.length; i++)
-          EntranceFade(index: i, child: _HealthTile(entry: entries[i], isDark: isDark)),
+          EntranceFade(
+            index: i,
+            child: _HealthTile(entry: entries[i], isDark: isDark),
+          ),
       ],
     );
   }
@@ -1238,41 +1374,51 @@ class _HealthTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = entry.available
-        ? (entry.statusColor ?? (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary))
+        ? (entry.statusColor ??
+              (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary))
         : AppColors.textMuted;
     return SizedBox(
-      width: 200,
+      width: 188,
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.bg1 : Colors.white,
+          color: isDark ? AppColors.bg1 : AppColors.lightCard,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
+          border: Border.all(
+            color: isDark ? AppColors.border : AppColors.lightBorder,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                IconBadge(icon: entry.icon, color: color, size: 26, iconSize: 13),
-                const SizedBox(width: AppSpacing.sm),
+                IconBadge(
+                  icon: entry.icon,
+                  color: color,
+                  size: 24,
+                  iconSize: 12,
+                ),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
                     entry.label,
                     style: TextStyle(
                       fontSize: 11,
-                      color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                      color: isDark
+                          ? AppColors.textMuted
+                          : AppColors.lightTextSecondary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               entry.value,
               style: TextStyle(
-                fontSize: 17,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: color,
               ),
@@ -1284,12 +1430,14 @@ class _HealthTile extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Diagnostics Tab
-// ─────────────────────────────────────────────────────────────────────────────
+// Diagnostics tab
 
 class _DiagnosticsTab extends StatelessWidget {
-  const _DiagnosticsTab({required this.device, required this.settings, required this.isDark});
+  const _DiagnosticsTab({
+    required this.device,
+    required this.settings,
+    required this.isDark,
+  });
   final StorageDevice device;
   final dynamic settings;
   final bool isDark;
@@ -1326,8 +1474,8 @@ class _DiagnosticsTab extends StatelessWidget {
         statusColor: device.sensorAvailability == SensorAvailability.available
             ? AppColors.normal
             : device.sensorAvailability == SensorAvailability.permissionDenied
-                ? AppColors.warning
-                : AppColors.textMuted,
+            ? AppColors.warning
+            : AppColors.textMuted,
       ),
       _DiagRow(
         label: 'Monitoring Status',
@@ -1337,8 +1485,8 @@ class _DiagnosticsTab extends StatelessWidget {
         statusColor: device.monitoringStatus == MonitoringStatus.active
             ? AppColors.normal
             : device.monitoringStatus == MonitoringStatus.error
-                ? AppColors.critical
-                : AppColors.warning,
+            ? AppColors.critical
+            : AppColors.warning,
       ),
       _DiagRow(
         label: 'Last Successful Reading',
@@ -1351,7 +1499,9 @@ class _DiagnosticsTab extends StatelessWidget {
         value: device.lastError ?? 'None',
         icon: Icons.error_outline_rounded,
         isDark: isDark,
-        statusColor: device.lastError != null ? AppColors.warning : AppColors.normal,
+        statusColor: device.lastError != null
+            ? AppColors.warning
+            : AppColors.normal,
       ),
       _DiagRow(
         label: 'Permission Status',
@@ -1360,26 +1510,38 @@ class _DiagnosticsTab extends StatelessWidget {
             : 'OK',
         icon: Icons.security_rounded,
         isDark: isDark,
-        statusColor: device.sensorAvailability == SensorAvailability.permissionDenied
+        statusColor:
+            device.sensorAvailability == SensorAvailability.permissionDenied
             ? AppColors.warning
             : AppColors.normal,
       ),
     ];
 
     final identifierRows = <_DiagRow>[
-      _DiagRow(label: 'Device ID', value: device.id, icon: Icons.fingerprint_rounded, isDark: isDark),
       _DiagRow(
-          label: 'Serial Number',
-          value: device.serialNumber ?? '—',
-          icon: Icons.numbers_rounded,
-          isDark: isDark),
+        label: 'Device ID',
+        value: device.id,
+        icon: Icons.fingerprint_rounded,
+        isDark: isDark,
+      ),
       _DiagRow(
-          label: 'Firmware', value: '—', icon: Icons.system_update_alt_rounded, isDark: isDark),
+        label: 'Serial Number',
+        value: device.serialNumber ?? '--',
+        icon: Icons.numbers_rounded,
+        isDark: isDark,
+      ),
       _DiagRow(
-          label: 'Interface',
-          value: device.interfaceType.name.toUpperCase(),
-          icon: Icons.cable_rounded,
-          isDark: isDark),
+        label: 'Firmware',
+        value: '--',
+        icon: Icons.system_update_alt_rounded,
+        isDark: isDark,
+      ),
+      _DiagRow(
+        label: 'Interface',
+        value: device.interfaceType.name.toUpperCase(),
+        icon: Icons.cable_rounded,
+        isDark: isDark,
+      ),
     ];
 
     return SingleChildScrollView(
@@ -1387,11 +1549,11 @@ class _DiagnosticsTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status overview
-          for (var i = 0; i < statusRows.length; i++) EntranceFade(index: i, child: statusRows[i]),
+          for (var i = 0; i < statusRows.length; i++)
+            EntranceFade(index: i, child: statusRows[i]),
 
           const SizedBox(height: AppSpacing.lg),
-          _SectionTitle(title: 'Capabilities', isDark: isDark),
+          _SectionLabel(title: 'Capabilities', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
           _CapabilitiesGrid(
             capabilities: DeviceCapabilities.derive(device),
@@ -1400,26 +1562,36 @@ class _DiagnosticsTab extends StatelessWidget {
           ),
 
           const SizedBox(height: AppSpacing.lg),
-          _SectionTitle(title: 'Device Identifiers', isDark: isDark),
+          _SectionLabel(title: 'Device Identifiers', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
 
           for (var i = 0; i < identifierRows.length; i++)
-            EntranceFade(index: statusRows.length + i, child: identifierRows[i]),
+            EntranceFade(
+              index: statusRows.length + i,
+              child: identifierRows[i],
+            ),
 
-          // Permission warning if needed
-          if (device.sensorAvailability == SensorAvailability.permissionDenied) ...[
+          // Permission warning
+          if (device.sensorAvailability ==
+              SensorAvailability.permissionDenied) ...[
             const SizedBox(height: AppSpacing.lg),
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.08),
+                color: AppColors.warning.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.22),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 18),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: AppColors.warning,
+                    size: 16,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
@@ -1428,13 +1600,19 @@ class _DiagnosticsTab extends StatelessWidget {
                         const Text(
                           'Temperature Unavailable',
                           style: TextStyle(
-                              color: AppColors.warning, fontWeight: FontWeight.w700, fontSize: 14),
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           device.lastError ??
                               'This device requires additional permissions to read temperature data. Check your system settings or run the application with elevated privileges.',
-                          style: const TextStyle(color: AppColors.warning, fontSize: 13),
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -1466,24 +1644,32 @@ class _DiagRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final badgeColor =
-        statusColor ?? (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
+        statusColor ??
+        (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg1 : Colors.white,
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: isDark ? AppColors.border : AppColors.lightBorder),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
+        ),
       ),
       child: Row(
         children: [
-          IconBadge(icon: icon, color: badgeColor, size: 28, iconSize: 14),
+          IconBadge(icon: icon, color: badgeColor, size: 26, iconSize: 13),
           const SizedBox(width: AppSpacing.sm),
           Text(
             label,
             style: TextStyle(
               fontSize: 13,
-              color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+              color: isDark
+                  ? AppColors.textSecondary
+                  : AppColors.lightTextSecondary,
             ),
           ),
           const Spacer(),
@@ -1492,7 +1678,9 @@ class _DiagRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: statusColor ?? (isDark ? AppColors.textPrimary : AppColors.lightText),
+              color:
+                  statusColor ??
+                  (isDark ? AppColors.textPrimary : AppColors.lightText),
             ),
           ),
         ],
@@ -1500,10 +1688,6 @@ class _DiagRow extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Per-device capabilities (spec section 10)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _CapabilitiesGrid extends StatelessWidget {
   const _CapabilitiesGrid({
@@ -1520,13 +1704,16 @@ class _CapabilitiesGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final entries = capabilities.entries;
     return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
       children: [
         for (var i = 0; i < entries.length; i++)
           EntranceFade(
             index: startIndex + i,
-            child: _CapabilityChip(label: entries[i].$1, available: entries[i].$2),
+            child: _CapabilityChip(
+              label: entries[i].$1,
+              available: entries[i].$2,
+            ),
           ),
       ],
     );
@@ -1544,31 +1731,42 @@ class _CapabilityChip extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = available ? AppColors.normal : AppColors.textMuted;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 5,
+      ),
       decoration: BoxDecoration(
         color: available
-            ? AppColors.normal.withValues(alpha: isDark ? 0.12 : 0.08)
-            : (isDark ? AppColors.bg1 : Colors.white),
+            ? AppColors.normal.withValues(alpha: isDark ? 0.1 : 0.07)
+            : (isDark ? AppColors.bg1 : AppColors.lightCard),
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
-          color: available ? AppColors.normal.withValues(alpha: 0.3) : AppColors.border,
+          color: available
+              ? AppColors.normal.withValues(alpha: 0.25)
+              : (isDark ? AppColors.border : AppColors.lightBorder),
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            available ? Icons.check_circle_rounded : Icons.remove_circle_outline_rounded,
-            size: 14,
+            available
+                ? Icons.check_circle_outline_rounded
+                : Icons.remove_circle_outline_rounded,
+            size: 13,
             color: color,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: available ? color : (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary),
+              fontWeight: FontWeight.w500,
+              color: available
+                  ? color
+                  : (isDark
+                        ? AppColors.textSecondary
+                        : AppColors.lightTextSecondary),
             ),
           ),
         ],
