@@ -1,0 +1,95 @@
+import '../enums/storage_enums.dart';
+import 'device_health.dart';
+import 'temperature_reading.dart';
+
+/// Unified, platform-independent representation of one physical storage
+/// device. Never carries raw platform-specific output - backends are
+/// responsible for translating diskutil/sysfs/WMI output into this shape.
+class StorageDevice {
+  const StorageDevice({
+    required this.id,
+    required this.type,
+    required this.interfaceType,
+    required this.sensorAvailability,
+    this.model,
+    this.manufacturer,
+    this.serialNumber,
+    this.capacityBytes,
+    this.isRemovable = false,
+    this.primaryTemperature,
+    this.sensors = const [],
+    this.health = DeviceHealth.unavailable,
+    this.monitoringStatus = MonitoringStatus.initializing,
+    this.lastUpdated,
+    this.lastError,
+  });
+
+  /// Stable identifier (backend-derived, e.g. a WMI PNPDeviceID, an IOKit
+  /// registry entry path, or a /dev/disk* + serial hash) - NEVER the
+  /// display name, so it survives renames and is safe to persist
+  /// per-device threshold overrides against.
+  final String id;
+
+  final StorageDeviceType type;
+  final StorageInterfaceType interfaceType;
+  final SensorAvailability sensorAvailability;
+
+  final String? model;
+  final String? manufacturer;
+  final String? serialNumber;
+  final int? capacityBytes;
+  final bool isRemovable;
+
+  /// The primary/composite sensor's latest reading, or null if temperature
+  /// is unavailable. The UI must render "Temperature unavailable" for
+  /// null - never 0 or a stale placeholder.
+  final TemperatureReading? primaryTemperature;
+  final List<StorageSensor> sensors;
+
+  final DeviceHealth health;
+  final MonitoringStatus monitoringStatus;
+  final DateTime? lastUpdated;
+  final String? lastError;
+
+  String get displayName => model?.trim().isNotEmpty == true
+      ? model!
+      : '${type.name.toUpperCase()} (${id.substring(0, id.length.clamp(0, 8))})';
+
+  StorageDevice copyWith({
+    StorageDeviceType? type,
+    StorageInterfaceType? interfaceType,
+    SensorAvailability? sensorAvailability,
+    String? model,
+    String? manufacturer,
+    String? serialNumber,
+    int? capacityBytes,
+    bool? isRemovable,
+    TemperatureReading? primaryTemperature,
+    bool clearTemperature = false,
+    List<StorageSensor>? sensors,
+    DeviceHealth? health,
+    MonitoringStatus? monitoringStatus,
+    DateTime? lastUpdated,
+    String? lastError,
+    bool clearLastError = false,
+  }) {
+    return StorageDevice(
+      id: id,
+      type: type ?? this.type,
+      interfaceType: interfaceType ?? this.interfaceType,
+      sensorAvailability: sensorAvailability ?? this.sensorAvailability,
+      model: model ?? this.model,
+      manufacturer: manufacturer ?? this.manufacturer,
+      serialNumber: serialNumber ?? this.serialNumber,
+      capacityBytes: capacityBytes ?? this.capacityBytes,
+      isRemovable: isRemovable ?? this.isRemovable,
+      primaryTemperature:
+          clearTemperature ? null : (primaryTemperature ?? this.primaryTemperature),
+      sensors: sensors ?? this.sensors,
+      health: health ?? this.health,
+      monitoringStatus: monitoringStatus ?? this.monitoringStatus,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+      lastError: clearLastError ? null : (lastError ?? this.lastError),
+    );
+  }
+}
