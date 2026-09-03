@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/utils/temperature_utils.dart';
 import '../../domain/entities/device_health.dart';
+import '../../domain/entities/storage_activity.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
 import '../../domain/entities/storage_device_event.dart';
@@ -156,6 +157,10 @@ class NativeStorageMonitor extends StorageMonitor {
         if (sensors.isNotEmpty) return sensors;
       }
     } on MissingPluginException {
+      AppLogger.instance.debug(
+        _tag,
+        'Native channel missing plugin Implmentaion',
+      );
     } catch (e) {
       AppLogger.instance.debug(
         _tag,
@@ -319,5 +324,34 @@ class NativeStorageMonitor extends StorageMonitor {
     };
     if (kind == null) return null;
     return StorageDeviceEvent(kind: kind, deviceId: deviceId);
+  }
+
+  @override
+  Stream<StorageActivity> watchActivity() {
+    return _channel
+        .activityEvents()
+        .map(_activityFromMap)
+        .where((e) => e != null)
+        .cast<StorageActivity>()
+        .handleError((Object e) {
+          if (e is! MissingPluginException) {
+            AppLogger.instance.debug(_tag, 'Activity stream error: $e');
+          }
+        });
+  }
+
+  StorageActivity? _activityFromMap(Map<String, dynamic> m) {
+    final deviceId = m['deviceId']?.toString();
+    if (deviceId == null || deviceId.isEmpty) return null;
+    return StorageActivity(
+      deviceId: deviceId,
+      timestamp: DateTime.now(),
+      availability: SensorAvailability.available,
+      readBytesPerSecond: (m['readBytesPerSecond'] as num?)?.toDouble(),
+      writeBytesPerSecond: (m['writeBytesPerSecond'] as num?)?.toDouble(),
+      readOperationsPerSecond: (m['readOpsPerSecond'] as num?)?.toDouble(),
+      writeOperationsPerSecond: (m['writeOpsPerSecond'] as num?)?.toDouble(),
+      utilizationPercent: (m['utilizationPercent'] as num?)?.toDouble(),
+    );
   }
 }

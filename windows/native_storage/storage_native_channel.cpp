@@ -17,6 +17,10 @@ constexpr GUID kGuidDevInterfaceDisk = {
 
 constexpr wchar_t kNotifyWindowClassName[] = L"DriveGuardStorageDeviceNotifyWindow";
 
+// Activity polling cadence (Phase 8, STORAGE_MONITORING.md "fast metrics").
+constexpr UINT_PTR kActivityTimerId = 1;
+constexpr UINT kActivityTimerIntervalMs = 1500;
+
 using flutter::EncodableList;
 using flutter::EncodableMap;
 using flutter::EncodableValue;
@@ -66,6 +70,7 @@ StorageNativeChannel::StorageNativeChannel(flutter::BinaryMessenger* messenger) 
       [](const auto& call, auto result) { StorageNativeChannel::HandleMethodCallStatic(call, std::move(result)); });
 
   SetupDeviceEvents(messenger);
+  SetupActivityStream(messenger);
 }
 
 StorageNativeChannel::~StorageNativeChannel() { TeardownDeviceEvents(); }
@@ -108,6 +113,9 @@ void StorageNativeChannel::SetupDeviceEvents(flutter::BinaryMessenger* messenger
 }
 
 void StorageNativeChannel::TeardownDeviceEvents() {
+  if (notify_window_ != nullptr) {
+    KillTimer(notify_window_, kActivityTimerId);
+  }
   if (device_notify_ != nullptr) {
     UnregisterDeviceNotification(device_notify_);
     device_notify_ = nullptr;
@@ -117,6 +125,33 @@ void StorageNativeChannel::TeardownDeviceEvents() {
     notify_window_ = nullptr;
   }
   event_sink_.reset();
+  activity_sink_.reset();
+}
+
+void StorageNativeChannel::SetupActivityStream(flutter::BinaryMessenger* messenger) {
+  activity_channel_ = std::make_unique<flutter::EventChannel<EncodableValue>>(
+      messenger, "driveguard/storage_activity", &flutter::StandardMethodCodec::GetInstance());
+  activity_channel_->SetStreamHandler(
+      std::make_unique<flutter::StreamHandlerFunctions<EncodableValue>>(
+          [this](const EncodableValue* arguments,
+                 std::unique_ptr<flutter::EventSink<EncodableValue>>&& events)
+              -> std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> {
+            activity_samples_.clear();
+            activity_sink_ = std::move(events);
+            if (notify_window_ != nullptr) {
+              SetTimer(notify_window_, kActivityTimerId, kActivityTimerIntervalMs, nullptr);
+            }
+            return nullptr;
+          },
+          [this](const EncodableValue* arguments)
+              -> std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> {
+            if (notify_window_ != nullptr) {
+              KillTimer(notify_window_, kActivityTimerId);
+            }
+            activity_sink_.reset();
+            activity_samples_.clear();
+            return nullptr;
+          }));
 }
 
 LRESULT CALLBACK StorageNativeChannel::WndProcStatic(HWND hwnd, UINT message, WPARAM wparam,
@@ -147,7 +182,70 @@ LRESULT StorageNativeChannel::HandleWindowMessage(HWND hwnd, UINT message, WPARA
     }
     return TRUE;
   }
+  if (message == WM_TIMER && wparam == kActivityTimerId) {
+    OnActivityTimerTick();
+    return 0;
+  }
   return DefWindowProcW(hwnd, message, wparam, lparam);
+}
+
+void StorageNativeChannel::OnActivityTimerTick() {
+  if (!activity_sink_) return;
+  auto& backend = StorageBackend::Instance();
+  auto now = std::chrono::steady_clock::now();
+
+  for (const auto& device : backend.EnumerateDevices()) {
+    auto r = backend.ReadActivityCounters(device.id);
+    if (r.status != NativeStorageStatus::kOk || !r.value.has_value()) continue;
+    const auto& counters = *r.value;
+
+    // Copy the previous sample out (not a reference) before overwriting the
+    // map entry below - a map iterator/reference points at the same node,
+    // so referencing through it after the assignment would see the new
+    // value, not the one to diff against.
+    auto it = activity_samples_.find(device.id);
+    std::optional<std::pair<NativeActivityCounters, std::chrono::steady_clock::time_point>> previousSample;
+    if (it != activity_samples_.end()) previousSample = it->second;
+    activity_samples_[device.id] = {counters, now};
+    if (!previousSample.has_value()) continue;  // no prior sample to diff against yet
+
+    const auto& previous = previousSample->first;
+    double elapsedSeconds = std::chrono::duration<double>(now - previousSample->second).count();
+    if (elapsedSeconds <= 0) continue;
+
+    // A counter reset (driver reload, device re-enumeration) can make the
+    // "current" sample smaller than the previous one - skip this tick
+    // rather than report a nonsensical negative rate.
+    if (counters.bytes_read < previous.bytes_read || counters.bytes_written < previous.bytes_written ||
+        counters.read_count < previous.read_count || counters.write_count < previous.write_count) {
+      continue;
+    }
+
+    EncodableMap event;
+    event[EncodableValue("deviceId")] = EncodableValue(device.id);
+    event[EncodableValue("readBytesPerSecond")] =
+        EncodableValue(static_cast<double>(counters.bytes_read - previous.bytes_read) / elapsedSeconds);
+    event[EncodableValue("writeBytesPerSecond")] = EncodableValue(
+        static_cast<double>(counters.bytes_written - previous.bytes_written) / elapsedSeconds);
+    event[EncodableValue("readOpsPerSecond")] =
+        EncodableValue(static_cast<double>(counters.read_count - previous.read_count) / elapsedSeconds);
+    event[EncodableValue("writeOpsPerSecond")] =
+        EncodableValue(static_cast<double>(counters.write_count - previous.write_count) / elapsedSeconds);
+
+    // Windows' own "% Disk Time" definition: fraction of the query window
+    // the disk was not idle. QueryTime can legitimately be 0 on some
+    // drivers (no time actually elapsed between IOCTL calls at the kernel
+    // level) - skip the field rather than divide by zero.
+    int64_t queryDelta = counters.query_time_100ns - previous.query_time_100ns;
+    if (queryDelta > 0) {
+      int64_t idleDelta = counters.idle_time_100ns - previous.idle_time_100ns;
+      double utilization = 100.0 * (1.0 - (static_cast<double>(idleDelta) / static_cast<double>(queryDelta)));
+      event[EncodableValue("utilizationPercent")] =
+          EncodableValue(std::max(0.0, std::min(100.0, utilization)));
+    }
+
+    activity_sink_->Success(EncodableValue(event));
+  }
 }
 
 // static-equivalent dispatcher kept as a free function bound via lambda

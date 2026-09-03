@@ -2,6 +2,11 @@
 
 #include <libudev.h>
 
+#include <algorithm>
+#include <chrono>
+#include <map>
+#include <utility>
+
 #include "storage_backend.h"
 
 namespace {
@@ -63,6 +68,97 @@ FlMethodErrorResponse* OnDeviceEventsListen(FlEventChannel* channel, FlValue* ar
   // g_io_add_watch's GSource holds its own reference to the channel; this
   // drops the caller's initial reference now that the watch owns one.
   g_io_channel_unref(io);
+  return nullptr;
+}
+
+// Real-time I/O activity (Phase 8, STORAGE_MONITORING.md): polls
+// /sys/block/*/stat on a GLib timeout integrated into the same main loop as
+// the udev watch above (no extra thread) and diffs against the previous
+// sample for a time-based rate - see StorageBackend::ReadActivityCounters.
+constexpr guint kActivityIntervalMs = 1500;
+
+FlEventChannel* g_activity_channel = nullptr;
+guint g_activity_timeout_id = 0;
+std::map<std::string, std::pair<driveguard::NativeActivityCounters, std::chrono::steady_clock::time_point>>
+    g_activity_samples;
+
+gboolean OnActivityTick(gpointer user_data) {
+  if (g_activity_channel == nullptr) return G_SOURCE_CONTINUE;
+  auto& backend = StorageBackend::Instance();
+  auto now = std::chrono::steady_clock::now();
+
+  for (const auto& device : backend.EnumerateDevices()) {
+    auto counters = backend.ReadActivityCounters(device.id);
+    if (!counters.has_value()) continue;
+
+    auto it = g_activity_samples.find(device.id);
+    std::optional<std::pair<driveguard::NativeActivityCounters, std::chrono::steady_clock::time_point>>
+        previousSample;
+    if (it != g_activity_samples.end()) previousSample = it->second;
+    g_activity_samples[device.id] = {*counters, now};
+    if (!previousSample.has_value()) continue;  // no prior sample to diff against yet
+
+    const auto& previous = previousSample->first;
+    double elapsedSeconds = std::chrono::duration<double>(now - previousSample->second).count();
+    if (elapsedSeconds <= 0) continue;
+
+    // Counter reset guard - see the Windows/macOS equivalents' identical
+    // rationale.
+    if (counters->reads_completed < previous.reads_completed ||
+        counters->sectors_read < previous.sectors_read ||
+        counters->writes_completed < previous.writes_completed ||
+        counters->sectors_written < previous.sectors_written) {
+      continue;
+    }
+
+    constexpr int64_t kBytesPerSector = 512;
+    double readBytesPerSec =
+        static_cast<double>((counters->sectors_read - previous.sectors_read) * kBytesPerSector) /
+        elapsedSeconds;
+    double writeBytesPerSec =
+        static_cast<double>((counters->sectors_written - previous.sectors_written) * kBytesPerSector) /
+        elapsedSeconds;
+    double readOpsPerSec =
+        static_cast<double>(counters->reads_completed - previous.reads_completed) / elapsedSeconds;
+    double writeOpsPerSec =
+        static_cast<double>(counters->writes_completed - previous.writes_completed) / elapsedSeconds;
+
+    FlValue* m = fl_value_new_map();
+    fl_value_set_string_take(m, "deviceId", fl_value_new_string(device.id.c_str()));
+    fl_value_set_string_take(m, "readBytesPerSecond", fl_value_new_float(readBytesPerSec));
+    fl_value_set_string_take(m, "writeBytesPerSecond", fl_value_new_float(writeBytesPerSec));
+    fl_value_set_string_take(m, "readOpsPerSecond", fl_value_new_float(readOpsPerSec));
+    fl_value_set_string_take(m, "writeOpsPerSecond", fl_value_new_float(writeOpsPerSec));
+
+    if (counters->io_ms >= previous.io_ms) {
+      double ioMsDelta = static_cast<double>(counters->io_ms - previous.io_ms);
+      double elapsedMs = elapsedSeconds * 1000.0;
+      double utilization = std::min(100.0, std::max(0.0, 100.0 * ioMsDelta / elapsedMs));
+      fl_value_set_string_take(m, "utilizationPercent", fl_value_new_float(utilization));
+    }
+
+    g_autoptr(GError) error = nullptr;
+    if (!fl_event_channel_send(g_activity_channel, m, nullptr, &error)) {
+      g_warning("Failed to send storage activity event: %s", error->message);
+    }
+  }
+  return G_SOURCE_CONTINUE;
+}
+
+FlMethodErrorResponse* OnActivityListen(FlEventChannel* channel, FlValue* args, gpointer user_data) {
+  g_activity_samples.clear();
+  if (g_activity_timeout_id == 0) {
+    g_activity_timeout_id = g_timeout_add(kActivityIntervalMs, OnActivityTick, nullptr);
+  }
+  return nullptr;
+}
+
+FlMethodErrorResponse* OnActivityCancel(FlEventChannel* channel, FlValue* args, gpointer user_data) {
+  if (g_activity_timeout_id != 0) {
+    g_source_remove(g_activity_timeout_id);
+    g_activity_timeout_id = 0;
+  }
+  g_activity_samples.clear();
   return nullptr;
 }
 
@@ -287,4 +383,9 @@ void storage_native_channel_register(FlBinaryMessenger* messenger) {
       fl_event_channel_new(messenger, "driveguard/storage_device_events", FL_METHOD_CODEC(codec));
   fl_event_channel_set_stream_handlers(g_device_events_channel, OnDeviceEventsListen,
                                         OnDeviceEventsCancel, nullptr, nullptr);
+
+  g_activity_channel =
+      fl_event_channel_new(messenger, "driveguard/storage_activity", FL_METHOD_CODEC(codec));
+  fl_event_channel_set_stream_handlers(g_activity_channel, OnActivityListen, OnActivityCancel, nullptr,
+                                        nullptr);
 }

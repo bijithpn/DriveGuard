@@ -4,6 +4,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/errors/storage_exceptions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/utils/temperature_utils.dart';
+import '../../domain/entities/storage_activity.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
 import '../../domain/entities/storage_device_event.dart';
@@ -39,9 +40,21 @@ class MonitoringService {
   List<StorageDevice> get currentDevices =>
       _devices.values.toList(growable: false);
 
+  final Map<String, StorageActivity> _latestActivity = {};
+  final _activityController = StreamController<StorageActivity>.broadcast();
+
+  /// Real-time per-device I/O activity (STORAGE_MONITORING.md Phase 8) - one
+  /// event per sample, pushed by the native layer, not polled. An empty
+  /// stream on any backend/platform without native activity support; the UI
+  /// must treat "no events yet" as unavailable, never as zero throughput.
+  Stream<StorageActivity> get activityStream => _activityController.stream;
+  StorageActivity? latestActivityFor(String deviceId) =>
+      _latestActivity[deviceId];
+
   Timer? _pollTimer;
   Timer? _discoveryTimer;
   StreamSubscription<StorageDeviceEvent>? _deviceEventsSub;
+  StreamSubscription<StorageActivity>? _activitySub;
   AppSettings _settings = const AppSettings();
   bool _paused = false;
   bool _started = false;
@@ -54,8 +67,26 @@ class MonitoringService {
     await _discoverDevices();
     _rescheduleTimers();
     _listenForHotplugEvents();
+    _listenForActivity();
     _started = true;
     AppLogger.instance.info(_tag, 'Monitoring started');
+  }
+
+  /// Subscribes to native real-time I/O activity (Phase 8) once, for the
+  /// life of the service - each event just updates [_latestActivity] and
+  /// re-broadcasts, no polling/timer involved on the Dart side.
+  void _listenForActivity() {
+    _activitySub = _backend.watchActivity().listen(
+      (activity) {
+        _latestActivity[activity.deviceId] = activity;
+        if (!_activityController.isClosed) {
+          _activityController.add(activity);
+        }
+      },
+      onError: (Object e) {
+        AppLogger.instance.debug(_tag, 'Activity stream error: $e');
+      },
+    );
   }
 
   /// Native hot-plug push notifications (see STORAGE_MONITORING.md Phase 7)
@@ -152,6 +183,7 @@ class MonitoringService {
         _devices.remove(id);
         _alertStates.remove(id);
         _historyStore.clearDevice(id);
+        _latestActivity.remove(id);
         _disconnectedOnce.remove(id);
         AppLogger.instance.info(_tag, 'Device removed after disconnect: $id');
       } else {
@@ -190,9 +222,17 @@ class MonitoringService {
           ]);
           final current = _devices[id];
           if (current == null) return;
-          _devices[id] = current.copyWith(
-            capacity: results[0] as StorageCapacity,
-            volumes: results[1] as List<StorageVolume>,
+          final capacity = results[0] as StorageCapacity;
+          final volumes = results[1] as List<StorageVolume>;
+          _devices[id] = current.copyWith(capacity: capacity, volumes: volumes);
+          // Diagnostics (spec section 19): which metrics were actually
+          // retrieved vs. unavailable for this device, on this poll. Never
+          // logs the serial number or any other identifying field.
+          AppLogger.instance.debug(
+            _tag,
+            'Capacity for $id: ${capacity.availability.name}'
+            '${capacity.isValid ? ' (${capacity.usagePercent?.toStringAsFixed(0) ?? '?'}% used)' : ''}, '
+            'volumes: ${volumes.length}',
           );
         } catch (e) {
           AppLogger.instance.debug(
@@ -350,6 +390,8 @@ class MonitoringService {
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
     await _deviceEventsSub?.cancel();
+    await _activitySub?.cancel();
     await _devicesController.close();
+    await _activityController.close();
   }
 }

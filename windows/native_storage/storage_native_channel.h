@@ -9,7 +9,12 @@
 #include <flutter/method_channel.h>
 #include <flutter/standard_method_codec.h>
 
+#include <chrono>
+#include <map>
 #include <memory>
+#include <string>
+
+#include "storage_backend.h"
 
 namespace driveguard {
 
@@ -40,15 +45,25 @@ class StorageNativeChannel {
 
   void SetupDeviceEvents(flutter::BinaryMessenger* messenger);
   void TeardownDeviceEvents();
+  void SetupActivityStream(flutter::BinaryMessenger* messenger);
 
   static LRESULT CALLBACK WndProcStatic(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
   LRESULT HandleWindowMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
+  void OnActivityTimerTick();
 
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
   std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>> event_channel_;
   std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> event_sink_;
+  std::unique_ptr<flutter::EventChannel<flutter::EncodableValue>> activity_channel_;
+  std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> activity_sink_;
   HWND notify_window_ = nullptr;
   HDEVNOTIFY device_notify_ = nullptr;
+
+  // Previous IOCTL_DISK_PERFORMANCE sample per device id, for the
+  // time-based-delta rate calculation - see storage_backend.cpp's
+  // ReadActivityCounters header comment.
+  std::map<std::string, std::pair<NativeActivityCounters, std::chrono::steady_clock::time_point>>
+      activity_samples_;
 };
 
 }  // namespace driveguard

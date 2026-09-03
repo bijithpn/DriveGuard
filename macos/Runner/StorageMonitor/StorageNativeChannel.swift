@@ -15,6 +15,7 @@ enum StorageNativeChannel {
   // Retained for the process lifetime - FlutterEventChannel does not keep a
   // strong reference to the handler passed to setStreamHandler.
   private static let deviceEventHandler = DeviceEventStreamHandler()
+  private static let activityHandler = ActivityStreamHandler()
 
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
@@ -30,6 +31,12 @@ enum StorageNativeChannel {
       binaryMessenger: registrar.messenger
     )
     eventChannel.setStreamHandler(deviceEventHandler)
+
+    let activityChannel = FlutterEventChannel(
+      name: "driveguard/storage_activity",
+      binaryMessenger: registrar.messenger
+    )
+    activityChannel.setStreamHandler(activityHandler)
   }
 
   private static func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -177,5 +184,81 @@ private final class DeviceEventStreamHandler: NSObject, FlutterStreamHandler {
     DispatchQueue.main.async { [weak self] in
       self?.eventSink?(["kind": kind, "deviceId": "macos-\(bsdName)"])
     }
+  }
+}
+
+/// Pushes per-device real-time I/O activity (Phase 8, STORAGE_MONITORING.md)
+/// by polling `IOKitStorageBackend.activityCounters` on a short interval and
+/// diffing against the previous sample - "currentTotalBytes -
+/// previousTotalBytes / elapsedTime", never derived from capacity or any
+/// static value. The first sample after `onListen` (or after a device first
+/// appears) has no prior counters to diff against, so it is skipped rather
+/// than reported as a fabricated zero/instant rate.
+private final class ActivityStreamHandler: NSObject, FlutterStreamHandler {
+  private static let pollInterval: TimeInterval = 1.5
+
+  private var timer: Timer?
+  private var eventSink: FlutterEventSink?
+  private var lastSample: [String: (counters: IOKitStorageBackend.ActivityCounters, at: Date)] = [:]
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    eventSink = events
+    lastSample.removeAll()
+    let t = Timer.scheduledTimer(withTimeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
+      self?.tick()
+    }
+    RunLoop.main.add(t, forMode: .common)
+    timer = t
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    timer?.invalidate()
+    timer = nil
+    eventSink = nil
+    lastSample.removeAll()
+    return nil
+  }
+
+  private func tick() {
+    guard let eventSink else { return }
+    let now = Date()
+    for device in IOKitStorageBackend.shared.enumerateDevices() {
+      guard let bsdName = bsdName(fromDeviceId: device.id),
+        let counters = IOKitStorageBackend.shared.activityCounters(forWholeBsdName: bsdName)
+      else { continue }
+
+      defer { lastSample[device.id] = (counters, now) }
+      guard let previous = lastSample[device.id] else { continue }
+
+      let elapsed = now.timeIntervalSince(previous.at)
+      guard elapsed > 0 else { continue }
+      // A driver reload or counter reset can make the "current" value
+      // smaller than the previous sample - report unavailable for this
+      // tick rather than a nonsensical negative rate.
+      guard counters.bytesRead >= previous.counters.bytesRead,
+        counters.bytesWritten >= previous.counters.bytesWritten,
+        counters.operationsRead >= previous.counters.operationsRead,
+        counters.operationsWritten >= previous.counters.operationsWritten
+      else { continue }
+
+      let event: [String: Any] = [
+        "deviceId": device.id,
+        "readBytesPerSecond": Double(counters.bytesRead - previous.counters.bytesRead) / elapsed,
+        "writeBytesPerSecond": Double(counters.bytesWritten - previous.counters.bytesWritten) / elapsed,
+        "readOpsPerSecond": Double(counters.operationsRead - previous.counters.operationsRead) / elapsed,
+        "writeOpsPerSecond": Double(counters.operationsWritten - previous.counters.operationsWritten) / elapsed,
+        // IOBlockStorageDriver's Statistics dictionary has no direct
+        // "percent busy" field - utilization is left unreported rather than
+        // approximated from latency/time fields that don't reliably sum to
+        // a wall-clock busy fraction.
+      ]
+      eventSink(event)
+    }
+  }
+
+  private func bsdName(fromDeviceId id: String) -> String? {
+    guard id.hasPrefix("macos-") else { return nil }
+    return String(id.dropFirst("macos-".count))
   }
 }

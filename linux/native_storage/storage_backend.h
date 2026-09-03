@@ -43,6 +43,18 @@ struct NativeCapacityInfo {
   std::optional<int64_t> free_bytes;
 };
 
+// Cumulative counters read from /sys/block/<name>/stat (kernel block layer
+// I/O accounting, see Documentation/admin-guide/iostats.rst) - fields 1, 3,
+// 5, 7, 10 in that doc's numbering. Callers diff two samples over elapsed
+// wall-clock time to get a rate.
+struct NativeActivityCounters {
+  int64_t reads_completed = 0;
+  int64_t sectors_read = 0;      // 512-byte units regardless of actual sector size.
+  int64_t writes_completed = 0;
+  int64_t sectors_written = 0;
+  int64_t io_ms = 0;  // time spent doing I/Os, milliseconds - basis for %util.
+};
+
 struct NativeHealthInfo {
   std::string status;
   std::optional<int> percentage_used;
@@ -122,6 +134,11 @@ class StorageBackend {
   // /sys/block/<name>/size (authoritative), used/free summed across
   // EnumerateVolumes().
   NativeCapacityInfo GetCapacity(const std::string& device_id);
+
+  // Raw /sys/block/<name>/stat snapshot - std::nullopt when the file is
+  // missing/unreadable (e.g. device just disconnected), never a fabricated
+  // zero.
+  std::optional<NativeActivityCounters> ReadActivityCounters(const std::string& device_id);
 
  private:
   StorageBackend() = default;

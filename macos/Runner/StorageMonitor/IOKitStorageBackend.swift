@@ -66,6 +66,18 @@ final class IOKitStorageBackend {
     let freeBytes: Int64?
   }
 
+  /// Cumulative (since driver load, not since boot) I/O counters read from
+  /// the `IOBlockStorageDriver`'s public "Statistics" property - the same
+  /// counters `iostat`/Activity Monitor's disk view read. Callers compute
+  /// rates by diffing two samples over the elapsed wall-clock time; this
+  /// struct only ever reports what IOKit actually returned, never a rate.
+  struct ActivityCounters {
+    let bytesRead: Int64
+    let bytesWritten: Int64
+    let operationsRead: Int64
+    let operationsWritten: Int64
+  }
+
   func enumerateDevices() -> [Device] {
     var result: [Device] = []
     var iterator: io_iterator_t = 0
@@ -215,6 +227,42 @@ final class IOKitStorageBackend {
       totalBytes: total,
       usedBytes: haveAny ? usedSum : nil,
       freeBytes: haveAny ? freeSum : nil
+    )
+  }
+
+  /// Reads the whole disk's `IOBlockStorageDriver` "Statistics" dictionary -
+  /// the provider chain is nub -> IOBlockStorageDriver -> IOMedia, so this
+  /// is the parent of the whole `IOMedia` node found by BSD name. `nil`
+  /// when the property is absent (some virtual/synthetic media don't
+  /// publish it) rather than fabricating zero counters.
+  func activityCounters(forWholeBsdName wholeBsdName: String) -> ActivityCounters? {
+    guard let matchDict = IOBSDNameMatching(kIOMasterPortDefault, 0, wholeBsdName) else { return nil }
+    let media = IOServiceGetMatchingService(kIOMasterPortDefault, matchDict)
+    guard media != 0 else { return nil }
+    defer { IOObjectRelease(media) }
+
+    var parent: io_registry_entry_t = 0
+    guard IORegistryEntryGetParentEntry(media, kIOServicePlane, &parent) == KERN_SUCCESS else {
+      return nil
+    }
+    defer { IOObjectRelease(parent) }
+
+    guard let stats = ioProperty(parent, "Statistics") as? [String: Any] else { return nil }
+    // Key names per <IOKit/storage/IOBlockStorageDriver.h>
+    // (kIOBlockStorageDriverStatisticsBytesReadKey = "Bytes (Read)",
+    // kIOBlockStorageDriverStatisticsBytesWrittenKey = "Bytes (Write)",
+    // kIOBlockStorageDriverStatisticsReadsKey = "Operations (Read)",
+    // kIOBlockStorageDriverStatisticsWritesKey = "Operations (Write)") -
+    // IOKit vends them as plain string keys in the dictionary, not exported
+    // Swift constants.
+    func intValue(_ key: String) -> Int64 {
+      (stats[key] as? NSNumber)?.int64Value ?? 0
+    }
+    return ActivityCounters(
+      bytesRead: intValue("Bytes (Read)"),
+      bytesWritten: intValue("Bytes (Write)"),
+      operationsRead: intValue("Operations (Read)"),
+      operationsWritten: intValue("Operations (Write)")
     )
   }
 

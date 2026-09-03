@@ -13,7 +13,23 @@ class StorageNativeChannel {
   static const EventChannel _deviceEventsChannel = EventChannel(
     'driveguard/storage_device_events',
   );
+  static const EventChannel _activityChannel = EventChannel(
+    'driveguard/storage_activity',
+  );
   static const _tag = 'StorageNativeChannel';
+
+  /// Real-time per-device I/O activity, one map per sample
+  /// (`{"deviceId", "readBytesPerSecond", "writeBytesPerSecond",
+  /// "readOpsPerSecond", "writeOpsPerSecond", "utilizationPercent"}`, any
+  /// numeric field may be absent when the platform doesn't expose it). Same
+  /// "no stream handler registered -> MissingPluginException on first
+  /// listen" caveat as [deviceEvents].
+  Stream<Map<String, dynamic>> activityEvents() {
+    return _activityChannel.receiveBroadcastStream().map((raw) {
+      final map = _asMap(raw);
+      return map ?? const <String, dynamic>{};
+    });
+  }
 
   /// Native hot-plug push notifications, one map per event
   /// (`{"kind": "added"|"removed", "deviceId": "..."}`). Native backends

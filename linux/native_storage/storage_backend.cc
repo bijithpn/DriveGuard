@@ -557,4 +557,28 @@ NativeCapacityInfo StorageBackend::GetCapacity(const std::string& device_id) {
   return capacity;
 }
 
+std::optional<NativeActivityCounters> StorageBackend::ReadActivityCounters(const std::string& device_id) {
+  auto sysName = ParseSysName(device_id);
+  if (!sysName.has_value()) return std::nullopt;
+
+  auto line = ReadSysfsString("/sys/block/" + *sysName + "/stat");
+  if (!line.has_value()) return std::nullopt;
+
+  // Whitespace-separated fields per Documentation/admin-guide/iostats.rst;
+  // only 1, 3, 5, 7, 10 are needed here (1-indexed in that doc).
+  std::istringstream iss(*line);
+  std::vector<int64_t> fields;
+  int64_t v;
+  while (iss >> v) fields.push_back(v);
+  if (fields.size() < 10) return std::nullopt;
+
+  NativeActivityCounters counters;
+  counters.reads_completed = fields[0];
+  counters.sectors_read = fields[2];
+  counters.writes_completed = fields[4];
+  counters.sectors_written = fields[6];
+  counters.io_ms = fields[9];
+  return counters;
+}
+
 }  // namespace driveguard

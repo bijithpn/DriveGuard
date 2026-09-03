@@ -48,6 +48,22 @@ struct NativeCapacityInfo {
   std::optional<int64_t> free_bytes;
 };
 
+// Cumulative (since driver load) I/O counters from IOCTL_DISK_PERFORMANCE.
+// Callers diff two samples over elapsed wall-clock time to get a rate -
+// never report these fields directly as a rate.
+struct NativeActivityCounters {
+  int64_t bytes_read = 0;
+  int64_t bytes_written = 0;
+  int64_t read_count = 0;
+  int64_t write_count = 0;
+  // 100ns units, per DISK_PERFORMANCE - QueryTime is wall-clock time
+  // covered by this sample, IdleTime is how much of it the disk was idle;
+  // (QueryTime - IdleTime) / QueryTime is Windows' own definition of
+  // "% Disk Time" (Perfmon's PhysicalDisk counter).
+  int64_t query_time_100ns = 0;
+  int64_t idle_time_100ns = 0;
+};
+
 struct NativeHealthInfo {
   std::string status;  // "healthy" | "warning" | "critical" | "unknown"
   std::optional<int> percentage_used;
@@ -117,6 +133,11 @@ class StorageBackend {
   // EnumerateVolumes() - not necessarily reconciling to the physical total
   // when unallocated space exists between partitions.
   NativeCapacityInfo GetCapacity(const std::string& device_id);
+
+  // Raw IOCTL_DISK_PERFORMANCE snapshot for one physical drive - unsupported
+  // status (not an error) when the IOCTL itself fails, which some USB
+  // bridges and virtual disks do.
+  NativeResult<NativeActivityCounters> ReadActivityCounters(const std::string& device_id);
 
  private:
   StorageBackend() = default;

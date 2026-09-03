@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/entities/storage_activity.dart';
 import '../domain/entities/storage_device.dart';
 import '../domain/repositories/storage_monitor.dart';
 import '../infrastructure/persistence/settings_repository.dart';
@@ -76,3 +77,26 @@ class DevicesNotifier extends Notifier<List<StorageDevice>> {
 final devicesProvider = NotifierProvider<DevicesNotifier, List<StorageDevice>>(
   DevicesNotifier.new,
 );
+
+/// Real-time per-device I/O activity (Phase 8), keyed by device id. Only
+/// devices with at least one native activity sample appear here - the UI
+/// must treat a missing entry as "activity unavailable", never as zero
+/// throughput.
+class ActivityNotifier extends Notifier<Map<String, StorageActivity>> {
+  StreamSubscription<StorageActivity>? _subscription;
+
+  @override
+  Map<String, StorageActivity> build() {
+    final service = ref.watch(monitoringServiceProvider);
+    _subscription = service.activityStream.listen((activity) {
+      state = {...state, activity.deviceId: activity};
+    });
+    ref.onDispose(() => _subscription?.cancel());
+    return const {};
+  }
+}
+
+final activityProvider =
+    NotifierProvider<ActivityNotifier, Map<String, StorageActivity>>(
+      ActivityNotifier.new,
+    );

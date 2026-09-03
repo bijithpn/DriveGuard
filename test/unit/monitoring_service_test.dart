@@ -3,7 +3,9 @@ import 'package:driveguard/application/monitoring/temperature_history_store.dart
 import 'package:driveguard/application/settings/app_settings.dart';
 import 'package:driveguard/core/errors/storage_exceptions.dart';
 import 'package:driveguard/domain/entities/device_health.dart';
+import 'package:driveguard/domain/entities/storage_capacity.dart';
 import 'package:driveguard/domain/entities/storage_device.dart';
+import 'package:driveguard/domain/entities/storage_volume.dart';
 import 'package:driveguard/domain/entities/temperature_reading.dart';
 import 'package:driveguard/domain/enums/storage_enums.dart';
 import 'package:driveguard/domain/repositories/storage_monitor.dart';
@@ -17,6 +19,8 @@ import '../mocks/fake_notification_service.dart';
 class _ScriptedMonitor extends StorageMonitor {
   List<StorageDevice> devices;
   final Map<String, Object> nextReadingOrError = {};
+  final Map<String, StorageCapacity> nextCapacity = {};
+  final Map<String, List<StorageVolume>> nextVolumes = {};
 
   _ScriptedMonitor(this.devices);
 
@@ -58,6 +62,14 @@ class _ScriptedMonitor extends StorageMonitor {
   @override
   Future<DeviceHealth?> getHealth(String deviceId) async =>
       DeviceHealth.unavailable;
+
+  @override
+  Future<StorageCapacity> getCapacity(String deviceId) async =>
+      nextCapacity[deviceId] ?? StorageCapacity.unavailable;
+
+  @override
+  Future<List<StorageVolume>> getVolumes(String deviceId) async =>
+      nextVolumes[deviceId] ?? const [];
 }
 
 StorageDevice _device(String id) => StorageDevice(
@@ -185,4 +197,65 @@ void main() {
 
     await service.dispose();
   });
+
+  test('capacity and volumes are refreshed alongside discovery', () async {
+    final device = _device('with-capacity');
+    final backend = _ScriptedMonitor([device]);
+    backend.nextReadingOrError['with-capacity'] = 30.0;
+    backend.nextCapacity['with-capacity'] = const StorageCapacity(
+      availability: SensorAvailability.available,
+      totalBytes: 1000,
+      usedBytes: 400,
+    );
+    backend.nextVolumes['with-capacity'] = const [
+      StorageVolume(
+        id: 'vol-1',
+        mountPoint: '/',
+        totalBytes: 1000,
+        usedBytes: 400,
+      ),
+    ];
+
+    final service = MonitoringService(
+      backend: backend,
+      notifications: FakeNotificationService(),
+      historyStore: TemperatureHistoryStore(),
+    );
+
+    await service.start(const AppSettings());
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    final result = service.currentDevices.single;
+    expect(result.capacity.isValid, isTrue);
+    expect(result.capacity.usagePercent, 40.0);
+    expect(result.volumes, hasLength(1));
+    expect(result.volumes.single.mountPoint, '/');
+
+    await service.dispose();
+  });
+
+  test(
+    'a device with no capacity support keeps reporting unavailable, never zero',
+    () async {
+      final backend = _ScriptedMonitor([_device('no-capacity')]);
+      backend.nextReadingOrError['no-capacity'] = 30.0;
+      // nextCapacity/nextVolumes left empty - base StorageMonitor defaults apply.
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+
+      await service.start(const AppSettings());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final result = service.currentDevices.single;
+      expect(result.capacity.isValid, isFalse);
+      expect(result.capacity.availability, SensorAvailability.unavailable);
+      expect(result.volumes, isEmpty);
+
+      await service.dispose();
+    },
+  );
 }

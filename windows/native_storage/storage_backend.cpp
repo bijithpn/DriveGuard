@@ -709,4 +709,40 @@ NativeCapacityInfo StorageBackend::GetCapacity(const std::string& device_id) {
   return capacity;
 }
 
+NativeResult<NativeActivityCounters> StorageBackend::ReadActivityCounters(const std::string& device_id) {
+  NativeResult<NativeActivityCounters> result;
+  int index = ParseDriveIndex(device_id);
+  if (index < 0) {
+    result.status = NativeStorageStatus::kDeviceNotFound;
+    return result;
+  }
+
+  HANDLE h = OpenDrive(index, 0);
+  if (h == INVALID_HANDLE_VALUE) {
+    result.status = (GetLastError() == ERROR_ACCESS_DENIED) ? NativeStorageStatus::kPermissionDenied
+                                                              : NativeStorageStatus::kUnsupported;
+    return result;
+  }
+
+  DISK_PERFORMANCE perf = {};
+  DWORD bytesReturned = 0;
+  BOOL ok = DeviceIoControl(h, IOCTL_DISK_PERFORMANCE, nullptr, 0, &perf, sizeof(perf), &bytesReturned,
+                             nullptr);
+  CloseHandle(h);
+  if (!ok) {
+    result.status = NativeStorageStatus::kUnsupported;
+    return result;
+  }
+
+  NativeActivityCounters counters;
+  counters.bytes_read = perf.BytesRead.QuadPart;
+  counters.bytes_written = perf.BytesWritten.QuadPart;
+  counters.read_count = static_cast<int64_t>(perf.ReadCount);
+  counters.write_count = static_cast<int64_t>(perf.WriteCount);
+  counters.query_time_100ns = perf.QueryTime.QuadPart;
+  counters.idle_time_100ns = perf.IdleTime.QuadPart;
+  result.value = counters;
+  return result;
+}
+
 }  // namespace driveguard

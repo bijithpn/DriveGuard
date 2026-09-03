@@ -1,5 +1,6 @@
 import '../../core/logging/app_logger.dart';
 import '../../domain/entities/device_health.dart';
+import '../../domain/entities/storage_activity.dart';
 import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
 import '../../domain/entities/storage_device_event.dart';
@@ -123,4 +124,9 @@ class FallbackStorageMonitor extends StorageMonitor {
   /// support.
   @override
   Stream<StorageDeviceEvent> watchDeviceEvents() => native.watchDeviceEvents();
+
+  /// Same rationale as [watchDeviceEvents] - only native can push activity
+  /// samples; legacy CLI backends have nothing to fall back to.
+  @override
+  Stream<StorageActivity> watchActivity() => native.watchActivity();
 }
