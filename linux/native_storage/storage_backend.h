@@ -26,15 +26,49 @@ struct NativeTemperatureInfo {
   bool is_primary = true;
 };
 
+struct NativeVolumeInfo {
+  std::string id;  // the partition's block device path, e.g. "/dev/nvme0n1p1".
+  std::optional<std::string> mount_point;
+  std::optional<std::string> filesystem;
+  bool is_read_only = false;
+  bool is_boot_volume = false;
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
+struct NativeCapacityInfo {
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
+// Cumulative counters read from /sys/block/<name>/stat (kernel block layer
+// I/O accounting, see Documentation/admin-guide/iostats.rst) - fields 1, 3,
+// 5, 7, 10 in that doc's numbering. Callers diff two samples over elapsed
+// wall-clock time to get a rate.
+struct NativeActivityCounters {
+  int64_t reads_completed = 0;
+  int64_t sectors_read = 0;      // 512-byte units regardless of actual sector size.
+  int64_t writes_completed = 0;
+  int64_t sectors_written = 0;
+  int64_t io_ms = 0;  // time spent doing I/Os, milliseconds - basis for %util.
+};
+
 struct NativeHealthInfo {
   std::string status;
   std::optional<int> percentage_used;
   std::optional<int> available_spare_percent;
+  std::optional<int> available_spare_threshold;
   std::optional<std::string> critical_warning;
   std::optional<int64_t> media_errors;
   std::optional<int64_t> power_cycles;
   std::optional<int64_t> power_on_hours;
   std::optional<int64_t> unsafe_shutdowns;
+  // Raw NVMe "Data Units Read/Written" counters (1 unit = 512,000 bytes,
+  // NVMe base spec 5.14.1.3).
+  std::optional<int64_t> data_units_read;
+  std::optional<int64_t> data_units_written;
   std::optional<bool> smart_passed;
 };
 
@@ -92,6 +126,24 @@ class StorageBackend {
   // device only has the single composite/hwmon reading already covered by
   // [ReadTemperature].
   NativeResult<std::vector<NativeTemperatureInfo>> ReadSensors(const std::string& device_id);
+
+  // Partitions of this block device (/sys/block/<name>/<name>N or
+  // <name>pN for NVMe), matched against /proc/mounts for mount
+  // point/filesystem/read-only, and statvfs() on the mount point for
+  // capacity - the PhysicalDisk -> Partition -> Volume split the Dart
+  // model expects. A partition that exists but isn't mounted is still
+  // returned, with capacity fields unset.
+  std::vector<NativeVolumeInfo> EnumerateVolumes(const std::string& device_id);
+
+  // Aggregate capacity for the whole block device: total from
+  // /sys/block/<name>/size (authoritative), used/free summed across
+  // EnumerateVolumes().
+  NativeCapacityInfo GetCapacity(const std::string& device_id);
+
+  // Raw /sys/block/<name>/stat snapshot - std::nullopt when the file is
+  // missing/unreadable (e.g. device just disconnected), never a fabricated
+  // zero.
+  std::optional<NativeActivityCounters> ReadActivityCounters(const std::string& device_id);
 
  private:
   StorageBackend() = default;

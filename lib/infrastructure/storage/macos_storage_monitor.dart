@@ -10,7 +10,7 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class MacOSStorageMonitor implements StorageMonitor {
+class MacOSStorageMonitor extends StorageMonitor {
   static const _tag = 'MacOSStorageMonitor';
   static const _smartctl = 'smartctl';
 
@@ -308,11 +308,15 @@ class MacOSStorageMonitor implements StorageMonitor {
             : DeviceHealthStatus.healthy,
         percentageUsed: (nvmeLog['percentage_used'] as num?)?.toInt(),
         availableSparePercent: (nvmeLog['available_spare'] as num?)?.toInt(),
+        availableSpareThreshold: (nvmeLog['available_spare_threshold'] as num?)
+            ?.toInt(),
         criticalWarning: nvmeLog['critical_warning']?.toString(),
         mediaErrors: (nvmeLog['media_errors'] as num?)?.toInt(),
         powerCycles: (nvmeLog['power_cycles'] as num?)?.toInt(),
         powerOnHours: (nvmeLog['power_on_hours'] as num?)?.toInt(),
         unsafeShutdowns: (nvmeLog['unsafe_shutdowns'] as num?)?.toInt(),
+        dataUnitsRead: (nvmeLog['data_units_read'] as num?)?.toInt(),
+        dataUnitsWritten: (nvmeLog['data_units_written'] as num?)?.toInt(),
         smartPassed: passed,
       );
     }

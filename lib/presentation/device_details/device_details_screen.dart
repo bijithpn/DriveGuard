@@ -8,13 +8,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/providers.dart';
 import '../../core/utils/temperature_utils.dart';
 import '../../domain/entities/device_capabilities.dart';
+import '../../domain/entities/storage_activity.dart';
+import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
+import '../../domain/entities/storage_volume.dart';
 import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../components/animated_entrance.dart';
 import '../components/device_presentation.dart';
 import '../components/temperature_gauge.dart';
 import '../theme/app_theme.dart';
+
+String _formatBytes(int bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  double size = bytes.toDouble();
+  var unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  return '${size.toStringAsFixed(1)} ${units[unitIndex]}';
+}
+
+String _formatBytesPerSecond(double bytesPerSecond) =>
+    '${_formatBytes(bytesPerSecond.round())}/s';
 
 const _historyWindows = <String, Duration>{
   '5 min': Duration(minutes: 5),
@@ -41,7 +58,7 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -132,6 +149,7 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
                         isDark: isDark,
                       ),
                       _HealthTab(device: device, isDark: isDark),
+                      _StorageTab(device: device, isDark: isDark),
                       _DiagnosticsTab(
                         device: device,
                         settings: settings,
@@ -449,6 +467,7 @@ class _NativeTabBar extends StatelessWidget {
         tabs: const [
           Tab(text: 'Temperature'),
           Tab(text: 'Health'),
+          Tab(text: 'Storage'),
           Tab(text: 'Diagnostics'),
         ],
       ),
@@ -1201,7 +1220,7 @@ class _HealthTab extends StatelessWidget {
   final StorageDevice device;
   final bool isDark;
 
-  String _na(Object? v) => v?.toString() ?? 'Not available';
+  String _na(Object? v) => v?.toString() ?? 'N/A';
 
   Color _statusColor() {
     switch (device.health.status) {
@@ -1305,7 +1324,7 @@ class _HealthTab extends StatelessWidget {
               _HealthEntry(
                 label: 'SMART Status',
                 value: health.smartPassed == null
-                    ? 'Not available'
+                    ? 'N/A'
                     : (health.smartPassed! ? 'Passed' : 'Failed'),
                 icon: Icons.verified_outlined,
                 statusColor: health.smartPassed == true
@@ -1328,6 +1347,14 @@ class _HealthTab extends StatelessWidget {
                     : '--',
                 icon: Icons.disc_full_rounded,
                 available: health.availableSparePercent != null,
+              ),
+              _HealthEntry(
+                label: 'Spare Threshold',
+                value: health.availableSpareThreshold != null
+                    ? '${health.availableSpareThreshold}%'
+                    : '--',
+                icon: Icons.rule_rounded,
+                available: health.availableSpareThreshold != null,
               ),
               _HealthEntry(
                 label: 'Critical Warnings',
@@ -1360,6 +1387,22 @@ class _HealthTab extends StatelessWidget {
                 value: _na(health.unsafeShutdowns),
                 icon: Icons.power_off_rounded,
                 available: health.unsafeShutdowns != null,
+              ),
+              _HealthEntry(
+                label: 'Total Read',
+                value: health.totalBytesRead != null
+                    ? _formatBytes(health.totalBytesRead!)
+                    : '--',
+                icon: Icons.arrow_downward_rounded,
+                available: health.totalBytesRead != null,
+              ),
+              _HealthEntry(
+                label: 'Total Written',
+                value: health.totalBytesWritten != null
+                    ? _formatBytes(health.totalBytesWritten!)
+                    : '--',
+                icon: Icons.arrow_upward_rounded,
+                available: health.totalBytesWritten != null,
               ),
             ],
             isDark: isDark,
@@ -1473,6 +1516,338 @@ class _HealthTile extends StatelessWidget {
   }
 }
 
+class _StorageTab extends ConsumerWidget {
+  const _StorageTab({required this.device, required this.isDark});
+
+  final StorageDevice device;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final capacity = device.capacity;
+    final StorageActivity? activity = ref.watch(activityProvider)[device.id];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionLabel(title: 'Capacity', isDark: isDark),
+          const SizedBox(height: AppSpacing.sm),
+          if (capacity.isValid)
+            _CapacityBar(capacity: capacity, isDark: isDark)
+          else
+            _UnavailableNote(
+              text:
+                  'Capacity information is not available for this device yet.',
+              isDark: isDark,
+            ),
+
+          const SizedBox(height: AppSpacing.lg),
+          _SectionLabel(title: 'Activity', isDark: isDark),
+          const SizedBox(height: AppSpacing.sm),
+          if (activity != null)
+            _HealthGrid(
+              entries: [
+                _HealthEntry(
+                  label: 'Read Speed',
+                  value: activity.readBytesPerSecond != null
+                      ? _formatBytesPerSecond(activity.readBytesPerSecond!)
+                      : '--',
+                  icon: Icons.arrow_downward_rounded,
+                  available: activity.readBytesPerSecond != null,
+                ),
+                _HealthEntry(
+                  label: 'Write Speed',
+                  value: activity.writeBytesPerSecond != null
+                      ? _formatBytesPerSecond(activity.writeBytesPerSecond!)
+                      : '--',
+                  icon: Icons.arrow_upward_rounded,
+                  available: activity.writeBytesPerSecond != null,
+                ),
+                _HealthEntry(
+                  label: 'Read IOPS',
+                  value: activity.readOperationsPerSecond != null
+                      ? activity.readOperationsPerSecond!.toStringAsFixed(0)
+                      : '--',
+                  icon: Icons.speed_rounded,
+                  available: activity.readOperationsPerSecond != null,
+                ),
+                _HealthEntry(
+                  label: 'Write IOPS',
+                  value: activity.writeOperationsPerSecond != null
+                      ? activity.writeOperationsPerSecond!.toStringAsFixed(0)
+                      : '--',
+                  icon: Icons.speed_rounded,
+                  available: activity.writeOperationsPerSecond != null,
+                ),
+                _HealthEntry(
+                  label: 'Utilization',
+                  value: activity.utilizationPercent != null
+                      ? '${activity.utilizationPercent!.toStringAsFixed(0)}%'
+                      : '--',
+                  icon: Icons.donut_large_rounded,
+                  available: activity.utilizationPercent != null,
+                ),
+              ],
+              isDark: isDark,
+            )
+          else
+            _UnavailableNote(
+              text:
+                  'No activity samples yet. Real-time read/write activity '
+                  'requires native platform support and appears once the '
+                  'device has been active.',
+              isDark: isDark,
+            ),
+
+          const SizedBox(height: AppSpacing.lg),
+          _SectionLabel(title: 'Volumes', isDark: isDark),
+          const SizedBox(height: AppSpacing.sm),
+          if (device.volumes.isEmpty)
+            _UnavailableNote(
+              text:
+                  'No mounted volumes were detected on this device, or '
+                  'volume enumeration is not supported on this platform.',
+              isDark: isDark,
+            )
+          else
+            Column(
+              children: [
+                for (final volume in device.volumes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: _VolumeRow(volume: volume, isDark: isDark),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CapacityBar extends StatelessWidget {
+  const _CapacityBar({required this.capacity, required this.isDark});
+
+  final StorageCapacity capacity;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final usagePercent = capacity.usagePercent;
+    final total = capacity.totalBytes;
+    final used = capacity.usedBytes;
+    final free = capacity.freeBytes;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                used != null && total != null
+                    ? '${_formatBytes(used)} / ${_formatBytes(total)}'
+                    : (total != null ? _formatBytes(total) : 'Unknown'),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.textPrimary : AppColors.lightText,
+                ),
+              ),
+              if (capacity.usagePercent != null)
+                Text(
+                  '${capacity.usagePercent!.toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (usagePercent != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: LinearProgressIndicator(
+                value: (usagePercent / 100).clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: isDark
+                    ? AppColors.bg2
+                    : AppColors.lightSurfaceMuted,
+                valueColor: AlwaysStoppedAnimation(AppColors.accent),
+              ),
+            )
+          else
+            Text(
+              'Usage percentage unavailable',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark
+                    ? AppColors.textMuted
+                    : AppColors.lightTextSecondary,
+              ),
+            ),
+          if (free != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${_formatBytes(free)} free',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark
+                    ? AppColors.textMuted
+                    : AppColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VolumeRow extends StatelessWidget {
+  const _VolumeRow({required this.volume, required this.isDark});
+
+  final StorageVolume volume;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = volume.volumeName?.trim().isNotEmpty == true
+        ? volume.volumeName!
+        : (volume.mountPoint ?? volume.id);
+    final subtitleParts = <String>[
+      if (volume.filesystem != null) volume.filesystem!,
+      if (volume.mountPoint != null) volume.mountPoint!,
+      if (volume.totalBytes != null) _formatBytes(volume.totalBytes!),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
+        ),
+      ),
+      child: Row(
+        children: [
+          IconBadge(
+            icon: volume.isBootVolume
+                ? Icons.laptop_mac_rounded
+                : Icons.storage_rounded,
+            color: isDark ? AppColors.textSecondary : AppColors.lightText,
+            size: 32,
+            iconSize: 16,
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.textPrimary : AppColors.lightText,
+                  ),
+                ),
+                if (subtitleParts.isNotEmpty)
+                  Text(
+                    subtitleParts.join(' · '),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.textMuted
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (volume.isBootVolume) _VolumeBadge(text: 'Boot', isDark: isDark),
+          if (volume.isReadOnly) ...[
+            const SizedBox(width: AppSpacing.xs),
+            _VolumeBadge(text: 'Read-only', isDark: isDark),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VolumeBadge extends StatelessWidget {
+  const _VolumeBadge({required this.text, required this.isDark});
+
+  final String text;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: isDark
+              ? AppColors.textSecondary
+              : AppColors.lightTextSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _UnavailableNote extends StatelessWidget {
+  const _UnavailableNote({required this.text, required this.isDark});
+
+  final String text;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg1 : AppColors.lightCard,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
+        ),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+        ),
+      ),
+    );
+  }
+}
+
 class _DiagnosticsTab extends StatelessWidget {
   const _DiagnosticsTab({
     required this.device,
@@ -1504,7 +1879,7 @@ class _DiagnosticsTab extends StatelessWidget {
       ),
       _DiagRow(
         label: 'Sensor Source',
-        value: device.primaryTemperature?.source.toString() ?? 'Not available',
+        value: device.primaryTemperature?.source.toString() ?? 'N/A',
         icon: Icons.sensors_rounded,
         isDark: isDark,
       ),

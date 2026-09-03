@@ -1,10 +1,14 @@
 import '../../core/logging/app_logger.dart';
 import '../../domain/entities/device_health.dart';
+import '../../domain/entities/storage_activity.dart';
+import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
+import '../../domain/entities/storage_device_event.dart';
+import '../../domain/entities/storage_volume.dart';
 import '../../domain/entities/temperature_reading.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class FallbackStorageMonitor implements StorageMonitor {
+class FallbackStorageMonitor extends StorageMonitor {
   FallbackStorageMonitor({required this.native, required this.legacy});
 
   final StorageMonitor native;
@@ -95,4 +99,28 @@ class FallbackStorageMonitor implements StorageMonitor {
     }
     return legacy.getHealth(deviceId);
   }
+
+  @override
+  Future<StorageCapacity> getCapacity(String deviceId) async {
+    if (await _isNativeAvailable()) {
+      final capacity = await native.getCapacity(deviceId);
+      if (capacity.isValid) return capacity;
+    }
+    return legacy.getCapacity(deviceId);
+  }
+
+  @override
+  Future<List<StorageVolume>> getVolumes(String deviceId) async {
+    if (await _isNativeAvailable()) {
+      final volumes = await native.getVolumes(deviceId);
+      if (volumes.isNotEmpty) return volumes;
+    }
+    return legacy.getVolumes(deviceId);
+  }
+
+  @override
+  Stream<StorageDeviceEvent> watchDeviceEvents() => native.watchDeviceEvents();
+
+  @override
+  Stream<StorageActivity> watchActivity() => native.watchActivity();
 }

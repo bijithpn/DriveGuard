@@ -31,4 +31,22 @@ class AppConstants {
 
   static const Duration rawHistoryRetention = Duration(hours: 1);
   static const Duration maxHistoryRetention = Duration(hours: 24);
+
+  static const double defaultRapidRiseDeltaCelsius = 10.0;
+  static const Duration defaultRapidRiseWindow = Duration(minutes: 3);
+  static const List<Duration> allowedRapidRiseWindows = [
+    Duration(minutes: 1),
+    Duration(minutes: 3),
+    Duration(minutes: 5),
+    Duration(minutes: 10),
+  ];
+
+  static const Duration defaultHealthPollingInterval = Duration(seconds: 60);
+  static const List<Duration> allowedHealthPollingIntervals = [
+    Duration(seconds: 30),
+    Duration(seconds: 60),
+    Duration(minutes: 5),
+  ];
+
+  static const int defaultWearJumpAlertPercent = 3;
 }

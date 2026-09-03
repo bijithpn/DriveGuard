@@ -10,7 +10,7 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class WindowsStorageMonitor implements StorageMonitor {
+class WindowsStorageMonitor extends StorageMonitor {
   static const _tag = 'WindowsStorageMonitor';
 
   static const _enumerateScript = r'''

@@ -56,9 +56,7 @@ class _DriveCardState extends State<DriveCard> {
     }
   }
 
-  String _capacityText() {
-    final bytes = widget.device.capacityBytes;
-    if (bytes == null) return '--';
+  String _formatBytes(int bytes) {
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     double size = bytes.toDouble();
     var unitIndex = 0;
@@ -67,6 +65,16 @@ class _DriveCardState extends State<DriveCard> {
       unitIndex++;
     }
     return '${size.toStringAsFixed(1)} ${units[unitIndex]}';
+  }
+
+  String _capacityText() {
+    final capacity = widget.device.capacity;
+    if (capacity.isValid && capacity.freeBytes != null) {
+      return '${_formatBytes(capacity.freeBytes!)} free';
+    }
+    final bytes = widget.device.capacityBytes;
+    if (bytes == null) return '--';
+    return _formatBytes(bytes);
   }
 
   String _healthLabel() {
@@ -147,6 +155,11 @@ class _DriveCardState extends State<DriveCard> {
                 typeIcon: _typeIcon(),
                 healthLabel: _healthLabel(),
                 healthColor: _healthColor(context),
+                capacityLabel:
+                    widget.device.capacity.isValid &&
+                        widget.device.capacity.freeBytes != null
+                    ? 'Free'
+                    : 'Capacity',
                 capacityText: _capacityText(),
                 updatedText: _updatedText(),
                 onTap: widget.onTap,
@@ -294,6 +307,7 @@ class _GridCard extends StatelessWidget {
     required this.typeIcon,
     required this.healthLabel,
     required this.healthColor,
+    required this.capacityLabel,
     required this.capacityText,
     required this.updatedText,
     required this.onTap,
@@ -308,6 +322,7 @@ class _GridCard extends StatelessWidget {
   final IconData typeIcon;
   final String healthLabel;
   final Color healthColor;
+  final String capacityLabel;
   final String capacityText;
   final String updatedText;
   final VoidCallback onTap;
@@ -424,7 +439,7 @@ class _GridCard extends StatelessWidget {
                           value: healthLabel,
                           valueColor: healthColor,
                         ),
-                        _StatColumn(label: 'Capacity', value: capacityText),
+                        _StatColumn(label: capacityLabel, value: capacityText),
                         _StatColumn(label: 'Updated', value: updatedText),
                       ],
                     ),

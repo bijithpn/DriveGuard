@@ -1,5 +1,7 @@
 import '../enums/storage_enums.dart';
 import 'device_health.dart';
+import 'storage_capacity.dart';
+import 'storage_volume.dart';
 import 'temperature_reading.dart';
 
 class StorageDevice {
@@ -11,11 +13,14 @@ class StorageDevice {
     this.model,
     this.manufacturer,
     this.serialNumber,
+    this.firmwareVersion,
     this.capacityBytes,
     this.isRemovable = false,
     this.primaryTemperature,
     this.sensors = const [],
     this.health = DeviceHealth.unavailable,
+    this.capacity = StorageCapacity.unavailable,
+    this.volumes = const [],
     this.monitoringStatus = MonitoringStatus.initializing,
     this.lastUpdated,
     this.lastError,
@@ -30,6 +35,8 @@ class StorageDevice {
   final String? model;
   final String? manufacturer;
   final String? serialNumber;
+  final String? firmwareVersion;
+
   final int? capacityBytes;
   final bool isRemovable;
 
@@ -37,6 +44,11 @@ class StorageDevice {
   final List<StorageSensor> sensors;
 
   final DeviceHealth health;
+
+  final StorageCapacity capacity;
+
+  final List<StorageVolume> volumes;
+
   final MonitoringStatus monitoringStatus;
   final DateTime? lastUpdated;
   final String? lastError;
@@ -52,12 +64,15 @@ class StorageDevice {
     String? model,
     String? manufacturer,
     String? serialNumber,
+    String? firmwareVersion,
     int? capacityBytes,
     bool? isRemovable,
     TemperatureReading? primaryTemperature,
     bool clearTemperature = false,
     List<StorageSensor>? sensors,
     DeviceHealth? health,
+    StorageCapacity? capacity,
+    List<StorageVolume>? volumes,
     MonitoringStatus? monitoringStatus,
     DateTime? lastUpdated,
     String? lastError,
@@ -71,6 +86,7 @@ class StorageDevice {
       model: model ?? this.model,
       manufacturer: manufacturer ?? this.manufacturer,
       serialNumber: serialNumber ?? this.serialNumber,
+      firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       capacityBytes: capacityBytes ?? this.capacityBytes,
       isRemovable: isRemovable ?? this.isRemovable,
       primaryTemperature: clearTemperature
@@ -78,6 +94,8 @@ class StorageDevice {
           : (primaryTemperature ?? this.primaryTemperature),
       sensors: sensors ?? this.sensors,
       health: health ?? this.health,
+      capacity: capacity ?? this.capacity,
+      volumes: volumes ?? this.volumes,
       monitoringStatus: monitoringStatus ?? this.monitoringStatus,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       lastError: clearLastError ? null : (lastError ?? this.lastError),

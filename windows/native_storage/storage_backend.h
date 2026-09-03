@@ -30,15 +30,55 @@ struct NativeTemperatureInfo {
   bool is_primary = true;
 };
 
+struct NativeVolumeInfo {
+  std::string id;  // volume GUID path, e.g. "\\?\Volume{...}\" - stable across reboots.
+  std::optional<std::string> mount_point;
+  std::optional<std::string> volume_name;
+  std::optional<std::string> filesystem;
+  bool is_read_only = false;
+  bool is_boot_volume = false;
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
+struct NativeCapacityInfo {
+  std::optional<int64_t> total_bytes;
+  std::optional<int64_t> used_bytes;
+  std::optional<int64_t> free_bytes;
+};
+
+// Cumulative (since driver load) I/O counters from IOCTL_DISK_PERFORMANCE.
+// Callers diff two samples over elapsed wall-clock time to get a rate -
+// never report these fields directly as a rate.
+struct NativeActivityCounters {
+  int64_t bytes_read = 0;
+  int64_t bytes_written = 0;
+  int64_t read_count = 0;
+  int64_t write_count = 0;
+  // 100ns units, per DISK_PERFORMANCE - QueryTime is wall-clock time
+  // covered by this sample, IdleTime is how much of it the disk was idle;
+  // (QueryTime - IdleTime) / QueryTime is Windows' own definition of
+  // "% Disk Time" (Perfmon's PhysicalDisk counter).
+  int64_t query_time_100ns = 0;
+  int64_t idle_time_100ns = 0;
+};
+
 struct NativeHealthInfo {
   std::string status;  // "healthy" | "warning" | "critical" | "unknown"
   std::optional<int> percentage_used;
   std::optional<int> available_spare_percent;
+  std::optional<int> available_spare_threshold;
   std::optional<std::string> critical_warning;
   std::optional<int64_t> media_errors;
   std::optional<int64_t> power_cycles;
   std::optional<int64_t> power_on_hours;
   std::optional<int64_t> unsafe_shutdowns;
+  // Raw NVMe "Data Units Read/Written" counters (1 unit = 512,000 bytes,
+  // NVMe base spec 5.14.1.3) - not pre-multiplied, so the Dart layer can
+  // show both the raw and derived value.
+  std::optional<int64_t> data_units_read;
+  std::optional<int64_t> data_units_written;
   std::optional<bool> smart_passed;
 };
 
@@ -86,6 +126,24 @@ class StorageBackend {
   // (not an error) when the device exposes only the single composite/194
   // reading already covered by [ReadTemperature].
   NativeResult<std::vector<NativeTemperatureInfo>> ReadSensors(const std::string& device_id);
+
+  // Every mounted volume whose disk extent (IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS)
+  // reports this physical drive index - the PhysicalDisk -> Partition ->
+  // Volume split the Dart model expects. A raw/unformatted partition with
+  // no volume GUID is not returned (Windows doesn't expose it as a volume
+  // at all without a filesystem).
+  std::vector<NativeVolumeInfo> EnumerateVolumes(const std::string& device_id);
+
+  // Aggregate capacity for the physical disk: total from
+  // IOCTL_DISK_GET_LENGTH_INFO (authoritative), used/free summed across
+  // EnumerateVolumes() - not necessarily reconciling to the physical total
+  // when unallocated space exists between partitions.
+  NativeCapacityInfo GetCapacity(const std::string& device_id);
+
+  // Raw IOCTL_DISK_PERFORMANCE snapshot for one physical drive - unsupported
+  // status (not an error) when the IOCTL itself fails, which some USB
+  // bridges and virtual disks do.
+  NativeResult<NativeActivityCounters> ReadActivityCounters(const std::string& device_id);
 
  private:
   StorageBackend() = default;

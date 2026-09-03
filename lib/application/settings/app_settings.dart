@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 
@@ -87,6 +88,15 @@ class AppSettings {
     this.recoveryNotificationsEnabled = true,
     this.globalThresholds = TemperatureThresholds.defaults,
     this.perDeviceThresholds = const {},
+    this.storageThresholds = StorageThresholds.defaults,
+    this.storageAlertsEnabled = true,
+    this.perDeviceStorageThresholds = const {},
+    this.rapidRiseAlertsEnabled = true,
+    this.rapidRiseDeltaCelsius = AppConstants.defaultRapidRiseDeltaCelsius,
+    this.rapidRiseWindow = AppConstants.defaultRapidRiseWindow,
+    this.perDeviceRapidRiseDelta = const {},
+    this.healthPollingInterval = AppConstants.defaultHealthPollingInterval,
+    this.healthAlertsEnabled = true,
     this.themeMode = ThemeMode.system,
     this.uiDensity = 1.0,
     this.startWithOS = false,
@@ -111,6 +121,18 @@ class AppSettings {
   final TemperatureThresholds globalThresholds;
   final Map<String, TemperatureThresholds> perDeviceThresholds;
 
+  final StorageThresholds storageThresholds;
+  final bool storageAlertsEnabled;
+  final Map<String, StorageThresholds> perDeviceStorageThresholds;
+
+  final bool rapidRiseAlertsEnabled;
+  final double rapidRiseDeltaCelsius;
+  final Duration rapidRiseWindow;
+  final Map<String, double> perDeviceRapidRiseDelta;
+
+  final Duration healthPollingInterval;
+  final bool healthAlertsEnabled;
+
   final ThemeMode themeMode;
   final double uiDensity;
 
@@ -129,6 +151,12 @@ class AppSettings {
   TemperatureThresholds thresholdsFor(String deviceId) =>
       perDeviceThresholds[deviceId] ?? globalThresholds;
 
+  StorageThresholds storageThresholdsFor(String deviceId) =>
+      perDeviceStorageThresholds[deviceId] ?? storageThresholds;
+
+  double rapidRiseDeltaFor(String deviceId) =>
+      perDeviceRapidRiseDelta[deviceId] ?? rapidRiseDeltaCelsius;
+
   AppSettings copyWith({
     Duration? pollingInterval,
     Duration? deviceDiscoveryInterval,
@@ -139,6 +167,15 @@ class AppSettings {
     bool? recoveryNotificationsEnabled,
     TemperatureThresholds? globalThresholds,
     Map<String, TemperatureThresholds>? perDeviceThresholds,
+    StorageThresholds? storageThresholds,
+    bool? storageAlertsEnabled,
+    Map<String, StorageThresholds>? perDeviceStorageThresholds,
+    bool? rapidRiseAlertsEnabled,
+    double? rapidRiseDeltaCelsius,
+    Duration? rapidRiseWindow,
+    Map<String, double>? perDeviceRapidRiseDelta,
+    Duration? healthPollingInterval,
+    bool? healthAlertsEnabled,
     ThemeMode? themeMode,
     double? uiDensity,
     bool? startWithOS,
@@ -162,6 +199,20 @@ class AppSettings {
           recoveryNotificationsEnabled ?? this.recoveryNotificationsEnabled,
       globalThresholds: globalThresholds ?? this.globalThresholds,
       perDeviceThresholds: perDeviceThresholds ?? this.perDeviceThresholds,
+      storageThresholds: storageThresholds ?? this.storageThresholds,
+      storageAlertsEnabled: storageAlertsEnabled ?? this.storageAlertsEnabled,
+      perDeviceStorageThresholds:
+          perDeviceStorageThresholds ?? this.perDeviceStorageThresholds,
+      rapidRiseAlertsEnabled:
+          rapidRiseAlertsEnabled ?? this.rapidRiseAlertsEnabled,
+      rapidRiseDeltaCelsius:
+          rapidRiseDeltaCelsius ?? this.rapidRiseDeltaCelsius,
+      rapidRiseWindow: rapidRiseWindow ?? this.rapidRiseWindow,
+      perDeviceRapidRiseDelta:
+          perDeviceRapidRiseDelta ?? this.perDeviceRapidRiseDelta,
+      healthPollingInterval:
+          healthPollingInterval ?? this.healthPollingInterval,
+      healthAlertsEnabled: healthAlertsEnabled ?? this.healthAlertsEnabled,
       themeMode: themeMode ?? this.themeMode,
       uiDensity: uiDensity ?? this.uiDensity,
       startWithOS: startWithOS ?? this.startWithOS,
@@ -188,6 +239,17 @@ class AppSettings {
     'perDeviceThresholds': perDeviceThresholds.map(
       (k, v) => MapEntry(k, v.toJson()),
     ),
+    'storageThresholds': storageThresholds.toJson(),
+    'storageAlertsEnabled': storageAlertsEnabled,
+    'perDeviceStorageThresholds': perDeviceStorageThresholds.map(
+      (k, v) => MapEntry(k, v.toJson()),
+    ),
+    'rapidRiseAlertsEnabled': rapidRiseAlertsEnabled,
+    'rapidRiseDeltaCelsius': rapidRiseDeltaCelsius,
+    'rapidRiseWindowMs': rapidRiseWindow.inMilliseconds,
+    'perDeviceRapidRiseDelta': perDeviceRapidRiseDelta,
+    'healthPollingIntervalMs': healthPollingInterval.inMilliseconds,
+    'healthAlertsEnabled': healthAlertsEnabled,
     'themeMode': themeMode.name,
     'uiDensity': uiDensity,
     'startWithOS': startWithOS,
@@ -208,6 +270,25 @@ class AppSettings {
         perDevice[entry.key] = TemperatureThresholds.fromJson(
           entry.value as Map<String, dynamic>,
         );
+      }
+    }
+    final perDeviceStorage = <String, StorageThresholds>{};
+    final rawPerDeviceStorage =
+        json['perDeviceStorageThresholds'] as Map<String, dynamic>?;
+    if (rawPerDeviceStorage != null) {
+      for (final entry in rawPerDeviceStorage.entries) {
+        perDeviceStorage[entry.key] = StorageThresholds.fromJson(
+          entry.value as Map<String, dynamic>,
+        );
+      }
+    }
+    final perDeviceRapidRise = <String, double>{};
+    final rawPerDeviceRapidRise =
+        json['perDeviceRapidRiseDelta'] as Map<String, dynamic>?;
+    if (rawPerDeviceRapidRise != null) {
+      for (final entry in rawPerDeviceRapidRise.entries) {
+        final v = (entry.value as num?)?.toDouble();
+        if (v != null) perDeviceRapidRise[entry.key] = v;
       }
     }
     return AppSettings(
@@ -240,6 +321,29 @@ class AppSettings {
             )
           : TemperatureThresholds.defaults,
       perDeviceThresholds: perDevice,
+      storageThresholds: json['storageThresholds'] != null
+          ? StorageThresholds.fromJson(
+              json['storageThresholds'] as Map<String, dynamic>,
+            )
+          : StorageThresholds.defaults,
+      storageAlertsEnabled: json['storageAlertsEnabled'] as bool? ?? true,
+      perDeviceStorageThresholds: perDeviceStorage,
+      rapidRiseAlertsEnabled: json['rapidRiseAlertsEnabled'] as bool? ?? true,
+      rapidRiseDeltaCelsius:
+          (json['rapidRiseDeltaCelsius'] as num?)?.toDouble() ??
+          AppConstants.defaultRapidRiseDeltaCelsius,
+      rapidRiseWindow: Duration(
+        milliseconds:
+            json['rapidRiseWindowMs'] as int? ??
+            AppConstants.defaultRapidRiseWindow.inMilliseconds,
+      ),
+      perDeviceRapidRiseDelta: perDeviceRapidRise,
+      healthPollingInterval: Duration(
+        milliseconds:
+            json['healthPollingIntervalMs'] as int? ??
+            AppConstants.defaultHealthPollingInterval.inMilliseconds,
+      ),
+      healthAlertsEnabled: json['healthAlertsEnabled'] as bool? ?? true,
       themeMode: ThemeMode.values.firstWhere(
         (m) => m.name == json['themeMode'],
         orElse: () => ThemeMode.system,

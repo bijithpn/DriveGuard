@@ -6,6 +6,7 @@
 #include <regex.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -296,7 +297,10 @@ NativeResult<NativeHealthInfo> StorageBackend::ReadHealth(const std::string& dev
     const uint8_t* l = log->data();
     uint8_t criticalWarning = l[0];
     uint8_t availableSpare = l[3];
+    uint8_t availableSpareThreshold = l[4];
     uint8_t percentageUsed = l[5];
+    uint64_t dataUnitsRead = ReadU64LE(l + 32);
+    uint64_t dataUnitsWritten = ReadU64LE(l + 48);
     uint64_t powerCycles = ReadU64LE(l + 112);
     uint64_t powerOnHours = ReadU64LE(l + 128);
     uint64_t unsafeShutdowns = ReadU64LE(l + 144);
@@ -306,6 +310,9 @@ NativeResult<NativeHealthInfo> StorageBackend::ReadHealth(const std::string& dev
     health.status = criticalWarning != 0 ? "warning" : "healthy";
     health.percentage_used = percentageUsed;
     health.available_spare_percent = availableSpare;
+    health.available_spare_threshold = availableSpareThreshold;
+    health.data_units_read = static_cast<int64_t>(dataUnitsRead);
+    health.data_units_written = static_cast<int64_t>(dataUnitsWritten);
     if (criticalWarning != 0) {
       std::ostringstream oss;
       oss << "0x" << std::hex << static_cast<int>(criticalWarning);
@@ -411,6 +418,173 @@ NativeResult<std::vector<NativeTemperatureInfo>> StorageBackend::ReadSensors(
     result.status = NativeStorageStatus::kUnsupported;
   }
   return result;
+}
+
+namespace {
+
+struct MountEntry {
+  std::string device;
+  std::string mountPoint;
+  std::string filesystem;
+  bool readOnly = false;
+};
+
+// Parses /proc/mounts (kernel-native, always present, no permission
+// needed) into device -> mount point/filesystem/options. Octal escapes
+// (\040 for space, etc.) used by the kernel for paths containing spaces
+// are unescaped since mount points legitimately can contain them.
+std::string UnescapeOctal(const std::string& s) {
+  std::string out;
+  out.reserve(s.size());
+  for (size_t i = 0; i < s.size(); i++) {
+    if (s[i] == '\\' && i + 3 < s.size() && isdigit(static_cast<unsigned char>(s[i + 1]))) {
+      int value = (s[i + 1] - '0') * 64 + (s[i + 2] - '0') * 8 + (s[i + 3] - '0');
+      out.push_back(static_cast<char>(value));
+      i += 3;
+    } else {
+      out.push_back(s[i]);
+    }
+  }
+  return out;
+}
+
+std::vector<MountEntry> ReadProcMounts() {
+  std::vector<MountEntry> mounts;
+  std::ifstream f("/proc/mounts");
+  if (!f.is_open()) return mounts;
+  std::string line;
+  while (std::getline(f, line)) {
+    std::istringstream iss(line);
+    std::string device, mountPoint, fstype, options;
+    if (!(iss >> device >> mountPoint >> fstype >> options)) continue;
+    MountEntry entry;
+    entry.device = UnescapeOctal(device);
+    entry.mountPoint = UnescapeOctal(mountPoint);
+    entry.filesystem = fstype;
+    entry.readOnly = options.substr(0, 2) == "ro";
+    mounts.push_back(std::move(entry));
+  }
+  return mounts;
+}
+
+// Partition child names of a whole-disk sysfs name: entries directly under
+// /sys/block/<name>/ that are themselves registered block devices (have a
+// "partition" file) - the kernel's own definition of "this is a
+// partition", not a guessed naming pattern.
+std::vector<std::string> PartitionNames(const std::string& wholeName) {
+  std::vector<std::string> names;
+  std::string root = "/sys/block/" + wholeName;
+  DIR* dir = opendir(root.c_str());
+  if (dir == nullptr) return names;
+  struct dirent* entry;
+  while ((entry = readdir(dir)) != nullptr) {
+    std::string name = entry->d_name;
+    if (name == "." || name == "..") continue;
+    struct stat st;
+    std::string partitionMarker = root + "/" + name + "/partition";
+    if (stat(partitionMarker.c_str(), &st) == 0) {
+      names.push_back(name);
+    }
+  }
+  closedir(dir);
+  return names;
+}
+
+}  // namespace
+
+std::vector<NativeVolumeInfo> StorageBackend::EnumerateVolumes(const std::string& device_id) {
+  std::vector<NativeVolumeInfo> result;
+  auto sysName = ParseSysName(device_id);
+  if (!sysName.has_value()) return result;
+
+  auto mounts = ReadProcMounts();
+  for (const auto& partitionName : PartitionNames(*sysName)) {
+    NativeVolumeInfo info;
+    info.id = "/dev/" + partitionName;
+
+    const MountEntry* matched = nullptr;
+    for (const auto& m : mounts) {
+      if (m.device == info.id) {
+        matched = &m;
+        break;
+      }
+    }
+
+    if (matched != nullptr) {
+      info.mount_point = matched->mountPoint;
+      info.filesystem = matched->filesystem;
+      info.is_read_only = matched->readOnly;
+      info.is_boot_volume = (matched->mountPoint == "/");
+
+      struct statvfs vfs;
+      if (statvfs(matched->mountPoint.c_str(), &vfs) == 0) {
+        uint64_t total = static_cast<uint64_t>(vfs.f_blocks) * vfs.f_frsize;
+        uint64_t free = static_cast<uint64_t>(vfs.f_bfree) * vfs.f_frsize;
+        info.total_bytes = static_cast<int64_t>(total);
+        info.free_bytes = static_cast<int64_t>(free);
+        info.used_bytes = static_cast<int64_t>(total - free);
+      }
+    }
+
+    result.push_back(std::move(info));
+  }
+  return result;
+}
+
+NativeCapacityInfo StorageBackend::GetCapacity(const std::string& device_id) {
+  NativeCapacityInfo capacity;
+  auto sysName = ParseSysName(device_id);
+  if (!sysName.has_value()) return capacity;
+
+  auto sizeSectors = ReadSysfsString("/sys/block/" + *sysName + "/size");
+  if (sizeSectors.has_value()) {
+    try {
+      capacity.total_bytes = std::stoll(*sizeSectors) * 512;
+    } catch (...) {
+    }
+  }
+
+  int64_t usedSum = 0, freeSum = 0;
+  bool haveAny = false;
+  for (const auto& v : EnumerateVolumes(device_id)) {
+    if (v.used_bytes.has_value()) {
+      usedSum += *v.used_bytes;
+      haveAny = true;
+    }
+    if (v.free_bytes.has_value()) {
+      freeSum += *v.free_bytes;
+      haveAny = true;
+    }
+  }
+  if (haveAny) {
+    capacity.used_bytes = usedSum;
+    capacity.free_bytes = freeSum;
+  }
+  return capacity;
+}
+
+std::optional<NativeActivityCounters> StorageBackend::ReadActivityCounters(const std::string& device_id) {
+  auto sysName = ParseSysName(device_id);
+  if (!sysName.has_value()) return std::nullopt;
+
+  auto line = ReadSysfsString("/sys/block/" + *sysName + "/stat");
+  if (!line.has_value()) return std::nullopt;
+
+  // Whitespace-separated fields per Documentation/admin-guide/iostats.rst;
+  // only 1, 3, 5, 7, 10 are needed here (1-indexed in that doc).
+  std::istringstream iss(*line);
+  std::vector<int64_t> fields;
+  int64_t v;
+  while (iss >> v) fields.push_back(v);
+  if (fields.size() < 10) return std::nullopt;
+
+  NativeActivityCounters counters;
+  counters.reads_completed = fields[0];
+  counters.sectors_read = fields[2];
+  counters.writes_completed = fields[4];
+  counters.sectors_written = fields[6];
+  counters.io_ms = fields[9];
+  return counters;
 }
 
 }  // namespace driveguard

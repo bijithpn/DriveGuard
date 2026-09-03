@@ -1,3 +1,4 @@
+import DiskArbitration
 import Foundation
 import IOKit
 import IOKit.storage
@@ -44,6 +45,37 @@ final class IOKitStorageBackend {
     let interfaceType: String
     let capacityBytes: Int64?
     let removable: Bool
+  }
+
+  struct Volume {
+    let id: String
+    let mountPoint: String?
+    let volumeName: String?
+    let filesystem: String?
+    let volumeUuid: String?
+    let isReadOnly: Bool
+    let isBootVolume: Bool
+    let totalBytes: Int64?
+    let usedBytes: Int64?
+    let freeBytes: Int64?
+  }
+
+  struct Capacity {
+    let totalBytes: Int64?
+    let usedBytes: Int64?
+    let freeBytes: Int64?
+  }
+
+  /// Cumulative (since driver load, not since boot) I/O counters read from
+  /// the `IOBlockStorageDriver`'s public "Statistics" property - the same
+  /// counters `iostat`/Activity Monitor's disk view read. Callers compute
+  /// rates by diffing two samples over the elapsed wall-clock time; this
+  /// struct only ever reports what IOKit actually returned, never a rate.
+  struct ActivityCounters {
+    let bytesRead: Int64
+    let bytesWritten: Int64
+    let operationsRead: Int64
+    let operationsWritten: Int64
   }
 
   func enumerateDevices() -> [Device] {
@@ -143,6 +175,200 @@ final class IOKitStorageBackend {
       interfaceType: interfaceType,
       capacityBytes: sizeNumber?.int64Value,
       removable: removable
+    )
+  }
+
+  /// Mounted filesystem volumes living on the partitions of the whole disk
+  /// identified by [wholeBsdName] (e.g. "disk0"). Re-looks-up the whole
+  /// `IOMedia` node by BSD name (rather than reusing a handle from
+  /// [enumerateDevices], which releases its handles) and walks its
+  /// IOService-plane children for partition `IOMedia` nodes - the
+  /// `PhysicalDisk -> Partition -> Volume` split the Dart model expects.
+  /// Mount point / volume name / filesystem / UUID come from
+  /// DiskArbitration (`DADiskCopyDescription`), the same public API Disk
+  /// Utility uses; capacity comes from `URLResourceValues` on the mount
+  /// point. A partition that exists but isn't mounted (no mount point) is
+  /// still returned with capacity fields `nil` - that's a real, non-fabricated
+  /// "we don't know" state, not an error.
+  func volumes(forWholeBsdName wholeBsdName: String) -> [Volume] {
+    guard let session = DASessionCreate(kCFAllocatorDefault) else { return [] }
+    var result: [Volume] = []
+    for bsdName in partitionBsdNames(ofWhole: wholeBsdName) {
+      if let volume = describeVolume(bsdName: bsdName, session: session) {
+        result.append(volume)
+      }
+    }
+    return result
+  }
+
+  /// Aggregate capacity for the whole disk: total from the IOKit `Size`
+  /// property (authoritative, physical), used/free summed across its
+  /// mounted volumes (an APFS container may not fully reconcile to the
+  /// physical total due to container overhead/snapshots - documented
+  /// limitation, not a bug). Returns `nil` fields when nothing could be
+  /// determined rather than fabricating zero.
+  func capacity(forWholeBsdName wholeBsdName: String) -> Capacity {
+    let vols = volumes(forWholeBsdName: wholeBsdName)
+    var usedSum: Int64 = 0
+    var freeSum: Int64 = 0
+    var haveAny = false
+    for v in vols {
+      if let used = v.usedBytes {
+        usedSum += used
+        haveAny = true
+      }
+      if let free = v.freeBytes {
+        freeSum += free
+        haveAny = true
+      }
+    }
+    let total = totalSize(ofWholeBsdName: wholeBsdName)
+    return Capacity(
+      totalBytes: total,
+      usedBytes: haveAny ? usedSum : nil,
+      freeBytes: haveAny ? freeSum : nil
+    )
+  }
+
+  /// Reads the whole disk's `IOBlockStorageDriver` "Statistics" dictionary -
+  /// the provider chain is nub -> IOBlockStorageDriver -> IOMedia, so this
+  /// is the parent of the whole `IOMedia` node found by BSD name. `nil`
+  /// when the property is absent (some virtual/synthetic media don't
+  /// publish it) rather than fabricating zero counters.
+  func activityCounters(forWholeBsdName wholeBsdName: String) -> ActivityCounters? {
+    guard let matchDict = IOBSDNameMatching(kIOMasterPortDefault, 0, wholeBsdName) else { return nil }
+    let media = IOServiceGetMatchingService(kIOMasterPortDefault, matchDict)
+    guard media != 0 else { return nil }
+    defer { IOObjectRelease(media) }
+
+    var parent: io_registry_entry_t = 0
+    guard IORegistryEntryGetParentEntry(media, kIOServicePlane, &parent) == KERN_SUCCESS else {
+      return nil
+    }
+    defer { IOObjectRelease(parent) }
+
+    guard let stats = ioProperty(parent, "Statistics") as? [String: Any] else { return nil }
+    // Key names per <IOKit/storage/IOBlockStorageDriver.h>
+    // (kIOBlockStorageDriverStatisticsBytesReadKey = "Bytes (Read)",
+    // kIOBlockStorageDriverStatisticsBytesWrittenKey = "Bytes (Write)",
+    // kIOBlockStorageDriverStatisticsReadsKey = "Operations (Read)",
+    // kIOBlockStorageDriverStatisticsWritesKey = "Operations (Write)") -
+    // IOKit vends them as plain string keys in the dictionary, not exported
+    // Swift constants. A missing key means the driver doesn't publish that
+    // counter - the whole read is nil in that case, never a 0 standing in
+    // for "not reported" (a 0 here would read as a real, sustained zero
+    // rate once diffed against a later sample).
+    func intValue(_ key: String) -> Int64? {
+      (stats[key] as? NSNumber)?.int64Value
+    }
+    guard let bytesRead = intValue("Bytes (Read)"),
+      let bytesWritten = intValue("Bytes (Write)"),
+      let operationsRead = intValue("Operations (Read)"),
+      let operationsWritten = intValue("Operations (Write)")
+    else { return nil }
+    return ActivityCounters(
+      bytesRead: bytesRead,
+      bytesWritten: bytesWritten,
+      operationsRead: operationsRead,
+      operationsWritten: operationsWritten
+    )
+  }
+
+  private func totalSize(ofWholeBsdName wholeBsdName: String) -> Int64? {
+    guard let matchDict = IOBSDNameMatching(kIOMasterPortDefault, 0, wholeBsdName) else { return nil }
+    let service = IOServiceGetMatchingService(kIOMasterPortDefault, matchDict)
+    guard service != 0 else { return nil }
+    defer { IOObjectRelease(service) }
+    return (ioProperty(service, "Size") as? NSNumber)?.int64Value
+  }
+
+  /// BSD names of the non-whole `IOMedia` children directly below the whole
+  /// disk's own `IOMedia` node - i.e. its partitions.
+  private func partitionBsdNames(ofWhole wholeBsdName: String) -> [String] {
+    guard let matchDict = IOBSDNameMatching(kIOMasterPortDefault, 0, wholeBsdName) else { return [] }
+    let service = IOServiceGetMatchingService(kIOMasterPortDefault, matchDict)
+    guard service != 0 else { return [] }
+    defer { IOObjectRelease(service) }
+
+    var names: [String] = []
+    var iterator: io_iterator_t = 0
+    guard IORegistryEntryGetChildIterator(service, kIOServicePlane, &iterator) == KERN_SUCCESS else {
+      return []
+    }
+    defer { IOObjectRelease(iterator) }
+
+    var child = IOIteratorNext(iterator)
+    while child != 0 {
+      let isWhole = (ioProperty(child, "Whole") as? NSNumber)?.boolValue ?? false
+      if !isWhole, let bsd = ioProperty(child, "BSD Name") as? String {
+        names.append(bsd)
+      }
+      IOObjectRelease(child)
+      child = IOIteratorNext(iterator)
+    }
+    return names
+  }
+
+  private func describeVolume(bsdName: String, session: DASession) -> Volume? {
+    guard let disk = DADiskCreateFromBSDName(kCFAllocatorDefault, session, bsdName) else { return nil }
+    guard let descCF = DADiskCopyDescription(disk) else {
+      // Unformatted/raw partition (e.g. an EFI or recovery slice DA can't
+      // describe) - still a real partition, just not a mountable volume.
+      return Volume(
+        id: "macos-\(bsdName)", mountPoint: nil, volumeName: nil, filesystem: nil,
+        volumeUuid: nil, isReadOnly: false, isBootVolume: false,
+        totalBytes: nil, usedBytes: nil, freeBytes: nil
+      )
+    }
+    let desc = descCF as NSDictionary
+
+    let mountURL = desc[kDADiskDescriptionVolumePathKey as String] as? URL
+    let volumeName = desc[kDADiskDescriptionVolumeNameKey as String] as? String
+    let filesystem = desc[kDADiskDescriptionVolumeKindKey as String] as? String
+    var volumeUuid: String?
+    if let uuidRef = desc[kDADiskDescriptionVolumeUUIDKey as String] {
+      let cfUuid = uuidRef as CFTypeRef
+      if CFGetTypeID(cfUuid) == CFUUIDGetTypeID() {
+        // swiftlint:disable:next force_cast
+        volumeUuid = CFUUIDCreateString(kCFAllocatorDefault, (cfUuid as! CFUUID)) as String
+      }
+    }
+
+    var totalBytes: Int64?
+    var usedBytes: Int64?
+    var freeBytes: Int64?
+    var isReadOnly = false
+    var isBoot = false
+    if let mountURL {
+      isBoot = mountURL.path == "/"
+      do {
+        let values = try mountURL.resourceValues(forKeys: [
+          .volumeTotalCapacityKey, .volumeAvailableCapacityKey, .volumeIsReadOnlyKey,
+        ])
+        if let total = values.volumeTotalCapacity { totalBytes = Int64(total) }
+        if let available = values.volumeAvailableCapacity {
+          freeBytes = Int64(available)
+          if let totalBytes { usedBytes = max(0, totalBytes - freeBytes!) }
+        }
+        isReadOnly = values.volumeIsReadOnly ?? false
+      } catch {
+        // Volume mounted but statfs-equivalent failed (e.g. transient
+        // unmount race) - report the volume without capacity rather than
+        // dropping it or fabricating numbers.
+      }
+    }
+
+    return Volume(
+      id: "macos-\(bsdName)",
+      mountPoint: mountURL?.path,
+      volumeName: volumeName,
+      filesystem: filesystem,
+      volumeUuid: volumeUuid,
+      isReadOnly: isReadOnly,
+      isBootVolume: isBoot,
+      totalBytes: totalBytes,
+      usedBytes: usedBytes,
+      freeBytes: freeBytes
     )
   }
 

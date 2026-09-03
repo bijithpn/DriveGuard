@@ -10,7 +10,27 @@ class StorageNativeChannel {
   static const MethodChannel _channel = MethodChannel(
     'driveguard/storage_native',
   );
+  static const EventChannel _deviceEventsChannel = EventChannel(
+    'driveguard/storage_device_events',
+  );
+  static const EventChannel _activityChannel = EventChannel(
+    'driveguard/storage_activity',
+  );
   static const _tag = 'StorageNativeChannel';
+
+  Stream<Map<String, dynamic>> activityEvents() {
+    return _activityChannel.receiveBroadcastStream().map((raw) {
+      final map = _asMap(raw);
+      return map ?? const <String, dynamic>{};
+    });
+  }
+
+  Stream<Map<String, dynamic>> deviceEvents() {
+    return _deviceEventsChannel.receiveBroadcastStream().map((raw) {
+      final map = _asMap(raw);
+      return map ?? const <String, dynamic>{};
+    });
+  }
 
   Future<Map<String, dynamic>> getCapabilities() async {
     final raw = await _invoke('getCapabilities', null);
@@ -39,6 +59,21 @@ class StorageNativeChannel {
 
   Future<List<Map<String, dynamic>>> getSensors(String deviceId) async {
     final raw = await _invoke('getSensors', {'deviceId': deviceId});
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Object>()
+        .map(_asMap)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+  }
+
+  Future<Map<String, dynamic>?> getCapacity(String deviceId) async {
+    final raw = await _invoke('getCapacity', {'deviceId': deviceId});
+    return _asMap(raw);
+  }
+
+  Future<List<Map<String, dynamic>>> getVolumes(String deviceId) async {
+    final raw = await _invoke('getVolumes', {'deviceId': deviceId});
     if (raw is! List) return const [];
     return raw
         .whereType<Object>()

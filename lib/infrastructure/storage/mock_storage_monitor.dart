@@ -8,7 +8,7 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class MockStorageMonitor implements StorageMonitor {
+class MockStorageMonitor extends StorageMonitor {
   MockStorageMonitor({Random? random}) : _random = random ?? Random(7);
 
   final Random _random;
@@ -156,11 +156,14 @@ class MockStorageMonitor implements StorageMonitor {
       status: DeviceHealthStatus.healthy,
       percentageUsed: 4,
       availableSparePercent: 100,
+      availableSpareThreshold: 10,
       criticalWarning: '0x00',
       mediaErrors: 0,
       powerCycles: 128,
       powerOnHours: 940,
       unsafeShutdowns: 2,
+      dataUnitsRead: 45000000,
+      dataUnitsWritten: 30000000,
       smartPassed: true,
     );
   }

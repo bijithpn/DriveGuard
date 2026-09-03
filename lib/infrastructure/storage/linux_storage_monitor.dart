@@ -11,7 +11,7 @@ import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 
-class LinuxStorageMonitor implements StorageMonitor {
+class LinuxStorageMonitor extends StorageMonitor {
   static const _tag = 'LinuxStorageMonitor';
 
   @override
@@ -61,9 +61,11 @@ class LinuxStorageMonitor implements StorageMonitor {
           );
       final serial = _readSysfsString('/sys/block/$name/device/serial');
       final sizeSectors = _readSysfsString('/sys/block/$name/size');
-      final capacityBytes = sizeSectors != null
-          ? (int.tryParse(sizeSectors) ?? 0) * 512
+
+      final parsedSectors = sizeSectors != null
+          ? int.tryParse(sizeSectors)
           : null;
+      final capacityBytes = parsedSectors != null ? parsedSectors * 512 : null;
       final rotational = _readSysfsString('/sys/block/$name/queue/rotational');
 
       StorageDeviceType type;
@@ -303,11 +305,17 @@ class LinuxStorageMonitor implements StorageMonitor {
               : DeviceHealthStatus.warning,
           percentageUsed: (json['percentage_used'] as num?)?.toInt(),
           availableSparePercent: (json['avail_spare'] as num?)?.toInt(),
+
+          availableSpareThreshold:
+              (json['spare_thresh'] as num?)?.toInt() ??
+              (json['avail_spare_threshold'] as num?)?.toInt(),
           criticalWarning: json['critical_warning']?.toString(),
           mediaErrors: (json['media_errors'] as num?)?.toInt(),
           powerCycles: (json['power_cycles'] as num?)?.toInt(),
           powerOnHours: (json['power_on_hours'] as num?)?.toInt(),
           unsafeShutdowns: (json['unsafe_shutdowns'] as num?)?.toInt(),
+          dataUnitsRead: (json['data_units_read'] as num?)?.toInt(),
+          dataUnitsWritten: (json['data_units_written'] as num?)?.toInt(),
         );
       } catch (e) {
         AppLogger.instance.debug(_tag, 'nvme health read failed: $e');
