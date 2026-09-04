@@ -11,6 +11,7 @@ import '../../application/widget/mini_widget_snapshot.dart';
 import '../../core/logging/app_logger.dart';
 import '../../infrastructure/tray/desktop_window_controller.dart'
     show kWidgetChannel, kWidgetMinimumSize;
+import '../theme/app_theme.dart';
 import 'mini_monitor_view.dart';
 
 class MiniWidgetApp extends StatefulWidget {
@@ -100,7 +101,7 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
       if (!Platform.isLinux) {
         await windowManager.setBackgroundColor(Colors.transparent);
       } else {
-        await windowManager.setBackgroundColor(const Color(0xFF1C1C1E));
+        await windowManager.setBackgroundColor(AppColors.bg1);
       }
       await windowManager.setAlwaysOnTop(alwaysOnTop);
       if (!Platform.isLinux) {
@@ -188,9 +189,9 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
+      theme: AppTheme.dark(),
       home: Scaffold(
-        backgroundColor: const Color(0xFF1C1C1E),
+        backgroundColor: AppColors.bg1,
         body: MiniMonitorView(
           snapshot: _snapshot,
           onExpand: _onExpand,

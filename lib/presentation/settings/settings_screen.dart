@@ -444,6 +444,13 @@ class _SectionGroup extends StatelessWidget {
         border: Border.all(
           color: isDark ? AppColors.border : AppColors.lightBorder,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? AppColors.shadowDark : AppColors.lightShadow,
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

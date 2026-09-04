@@ -376,6 +376,13 @@ class _GridCard extends StatelessWidget {
         color: isDark ? AppColors.bg1 : AppColors.lightCard,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? AppColors.shadowDark : AppColors.lightShadow,
+            blurRadius: isHovered ? 22 : 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.lg),

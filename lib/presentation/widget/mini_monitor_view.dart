@@ -138,7 +138,7 @@ class _SingleDeviceCard extends StatelessWidget {
                     ? Icons.storage_rounded
                     : Icons.album_rounded,
                 size: 13,
-                color: const Color(0xFF98989D),
+                color: AppColors.textSecondary,
               ),
               const SizedBox(width: 5),
               Flexible(
@@ -147,7 +147,7 @@ class _SingleDeviceCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFFEEEEF0),
+                    color: AppColors.textPrimary,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -166,7 +166,7 @@ class _SingleDeviceCard extends StatelessWidget {
                   painter: _MiniGaugePainter(
                     fraction: device.fraction,
                     color: style.color,
-                    trackColor: const Color(0xFF2C2C2E),
+                    trackColor: AppColors.bg2,
                   ),
                   child: Center(
                     child: Column(
@@ -176,7 +176,7 @@ class _SingleDeviceCard extends StatelessWidget {
                           device.valueText,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: const Color(0xFFEEEEF0),
+                            color: AppColors.textPrimary,
                             fontSize: compact ? 18 : 22,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
@@ -222,7 +222,7 @@ class _SingleDeviceCard extends StatelessWidget {
                 icon: device.tbwText != null
                     ? Icons.save_as_rounded
                     : Icons.power_rounded,
-                color: const Color(0xFF64D2FF),
+                color: AppColors.accent,
               ),
               const SizedBox(width: 5),
               _MiniStatChip(
@@ -259,9 +259,9 @@ class _MiniStatChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF242426),
+          color: AppColors.bg2,
           borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: const Color(0xFF38383A)),
+          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -277,7 +277,7 @@ class _MiniStatChip extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Color(0xFF8E8E93),
+                      color: AppColors.textMuted,
                       fontSize: 8.5,
                       fontWeight: FontWeight.w500,
                     ),
@@ -292,7 +292,7 @@ class _MiniStatChip extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: const Color(0xFFF2F2F7),
+                color: AppColors.textPrimary,
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -372,12 +372,12 @@ class _WidgetShell extends StatelessWidget {
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
+        color: AppColors.bg1,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: const Color(0xFF3A3A3C), width: 1),
+        border: Border.all(color: AppColors.bg3, width: 1),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x50000000),
+            color: AppColors.shadowDark,
             blurRadius: 24,
             spreadRadius: 0,
             offset: Offset(0, 6),
@@ -449,7 +449,7 @@ class _Header extends StatelessWidget {
           Text(
             'Drives',
             style: TextStyle(
-              color: const Color(0xFF98989D),
+              color: AppColors.textSecondary,
               fontSize: compact ? 10 : 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.1,
@@ -460,13 +460,13 @@ class _Header extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: const Color(0xFF3A3A3C),
+                color: AppColors.bg3,
                 borderRadius: BorderRadius.circular(3),
               ),
               child: Text(
                 '$deviceCount',
                 style: TextStyle(
-                  color: const Color(0xFF636366),
+                  color: AppColors.textMuted,
                   fontSize: compact ? 9 : 10,
                   fontWeight: FontWeight.w600,
                 ),
@@ -485,7 +485,7 @@ class _Header extends StatelessWidget {
               child: Text(
                 '${currentIndex + 1}/$deviceCount',
                 style: TextStyle(
-                  color: const Color(0xFF8E8E93),
+                  color: AppColors.textMuted,
                   fontSize: compact ? 9 : 10,
                   fontWeight: FontWeight.w600,
                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -544,7 +544,7 @@ class _NavArrowButtonState extends State<_NavArrowButton> {
           height: widget.compact ? 22 : 24,
           decoration: BoxDecoration(
             color: enabled && _hovered
-                ? const Color(0xFF48484A)
+                ? AppColors.border
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(5),
           ),
@@ -552,8 +552,8 @@ class _NavArrowButtonState extends State<_NavArrowButton> {
             widget.icon,
             size: widget.compact ? 16 : 18,
             color: enabled
-                ? (_hovered ? const Color(0xFFEEEEF0) : const Color(0xFFB0B0B5))
-                : const Color(0xFF38383A),
+                ? (_hovered ? AppColors.textPrimary : AppColors.textSecondary)
+                : AppColors.border,
           ),
         ),
       ),
@@ -588,13 +588,13 @@ class _CloseWidgetButtonState extends State<_CloseWidgetButton> {
             height: widget.compact ? 22 : 24,
             decoration: BoxDecoration(
               color: _hovered
-                  ? const Color(0xFF5A2A2A)
-                  : const Color(0xFF3A3A3C),
+                  ? AppColors.criticalDim
+                  : AppColors.bg3,
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
                 color: _hovered
-                    ? const Color(0xFFFF453A)
-                    : const Color(0xFF48484A),
+                    ? AppColors.critical
+                    : AppColors.border,
                 width: 1,
               ),
             ),
@@ -602,8 +602,8 @@ class _CloseWidgetButtonState extends State<_CloseWidgetButton> {
               Icons.close_rounded,
               size: widget.compact ? 13 : 15,
               color: _hovered
-                  ? const Color(0xFFFF6961)
-                  : const Color(0xFFA0A0A5),
+                  ? AppColors.critical
+                  : AppColors.textSecondary,
             ),
           ),
         ),
@@ -639,17 +639,17 @@ class _ExpandButtonState extends State<_ExpandButton> {
             height: widget.compact ? 22 : 24,
             decoration: BoxDecoration(
               color: _hovered
-                  ? const Color(0xFF48484A)
-                  : const Color(0xFF3A3A3C),
+                  ? AppColors.border
+                  : AppColors.bg3,
               borderRadius: BorderRadius.circular(5),
-              border: Border.all(color: const Color(0xFF48484A), width: 1),
+              border: Border.all(color: AppColors.border, width: 1),
             ),
             child: Icon(
               Icons.open_in_full_rounded,
               size: widget.compact ? 12 : 14,
               color: _hovered
-                  ? const Color(0xFFEEEEF0)
-                  : const Color(0xFFA0A0A5),
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
             ),
           ),
         ),
@@ -675,13 +675,13 @@ class _EmptyBody extends StatelessWidget {
           const Icon(
             Icons.hourglass_empty_rounded,
             size: 11,
-            color: Color(0xFF636366),
+            color: AppColors.textMuted,
           ),
           const SizedBox(width: 5),
           Text(
             'Scanning...',
             style: TextStyle(
-              color: const Color(0xFF636366),
+              color: AppColors.textMuted,
               fontSize: compact ? 10 : 11,
             ),
           ),

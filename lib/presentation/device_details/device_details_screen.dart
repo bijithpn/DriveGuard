@@ -197,6 +197,19 @@ class _DeviceInfoPanel extends StatelessWidget {
     }
   }
 
+  IconData _typeIcon() {
+    switch (device.type) {
+      case StorageDeviceType.nvme:
+        return Icons.memory_rounded;
+      case StorageDeviceType.ssd:
+        return Icons.storage_rounded;
+      case StorageDeviceType.hdd:
+        return Icons.album_rounded;
+      case StorageDeviceType.unknown:
+        return Icons.device_unknown_rounded;
+    }
+  }
+
   String _capacityText() {
     final bytes = device.capacityBytes;
     if (bytes == null) return 'Unknown capacity';
@@ -387,138 +400,146 @@ class _DeviceInfoPanel extends StatelessWidget {
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  presentation.valueText,
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w800,
-                    color: style.color,
-                    letterSpacing: -1.5,
-                    height: 1.0,
-                  ),
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topCenter,
+                  radius: 1.2,
+                  colors: [
+                    style.color.withValues(alpha: isDark ? 0.16 : 0.10),
+                    style.color.withValues(alpha: 0.0),
+                  ],
                 ),
-                const SizedBox(height: 6),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: style.color.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    border: Border.all(
-                      color: style.color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(color: style.color.withValues(alpha: 0.18)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    presentation.valueText,
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w800,
+                      color: style.color,
+                      letterSpacing: -1.5,
+                      height: 1.0,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(style.icon, size: 11, color: style.color),
-                      const SizedBox(width: 5),
-                      Text(
-                        style.label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: style.color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 6),
 
-                Center(
-                  child: TemperatureGauge(
-                    valueText: presentation.valueText,
-                    fraction: presentation.fraction,
-                    severity: presentation.severity,
-                    size: 148,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: style.color.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      border: Border.all(
+                        color: style.color.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(style.icon, size: 11, color: style.color),
+                        const SizedBox(width: 5),
+                        Text(
+                          style.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: style.color,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                  const SizedBox(height: 16),
+
+                  Center(
+                    child: TemperatureGauge(
+                      valueText: presentation.valueText,
+                      fraction: presentation.fraction,
+                      severity: presentation.severity,
+                      size: 148,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: isDark ? AppColors.divider : AppColors.lightBorder,
-          ),
-
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _InfoRow(label: 'Type', value: _typeLabel(), isDark: isDark),
-                const SizedBox(height: 10),
-                _InfoRow(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: _HealthGrid(
+              entries: [
+                _HealthEntry(
+                  label: 'Type',
+                  value: _typeLabel(),
+                  icon: _typeIcon(),
+                ),
+                _HealthEntry(
                   label: 'Capacity',
                   value: _capacityText(),
-                  isDark: isDark,
+                  icon: Icons.pie_chart_outline_rounded,
                 ),
-                const SizedBox(height: 10),
-                _InfoRow(
+                _HealthEntry(
                   label: 'Health',
                   value: _healthLabel(),
-                  isDark: isDark,
+                  icon: Icons.favorite_rounded,
+                  statusColor:
+                      device.health.status == DeviceHealthStatus.healthy
+                      ? AppColors.normal
+                      : device.health.status == DeviceHealthStatus.warning
+                      ? AppColors.warning
+                      : device.health.status == DeviceHealthStatus.critical
+                      ? AppColors.critical
+                      : null,
                 ),
-                const SizedBox(height: 10),
-                _InfoRow(
+                _HealthEntry(
                   label: 'Last Updated',
                   value: _lastUpdatedText(),
-                  isDark: isDark,
+                  icon: Icons.schedule_rounded,
+                ),
+                _HealthEntry(
+                  label: 'Interface',
+                  value: device.interfaceType.name.toUpperCase(),
+                  icon: Icons.cable_rounded,
+                ),
+                _HealthEntry(
+                  label: 'Monitoring',
+                  value:
+                      device.monitoringStatus.name[0].toUpperCase() +
+                      device.monitoringStatus.name.substring(1),
+                  icon: Icons.monitor_heart_outlined,
+                  statusColor: device.monitoringStatus == MonitoringStatus.active
+                      ? AppColors.normal
+                      : device.monitoringStatus == MonitoringStatus.error
+                      ? AppColors.critical
+                      : null,
+                ),
+                _HealthEntry(
+                  label: 'Sensor Source',
+                  value: device.primaryTemperature?.source.toString() ?? 'N/A',
+                  icon: Icons.sensors_rounded,
+                ),
+                _HealthEntry(
+                  label: 'Serial Number',
+                  value: device.serialNumber ?? '--',
+                  icon: Icons.numbers_rounded,
                 ),
               ],
+              isDark: isDark,
+              minTileWidth: 110,
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.label,
-    required this.value,
-    required this.isDark,
-  });
-
-  final String label;
-  final String value;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: isDark ? AppColors.textPrimary : AppColors.lightText,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -532,37 +553,58 @@ class _NativeTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: isDark ? AppColors.bg0 : AppColors.lightBg,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.xs,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.divider : AppColors.lightBorder,
+          ),
+        ),
       ),
       child: TabBar(
         controller: controller,
-        isScrollable: false,
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
         dividerColor: Colors.transparent,
-        indicator: BoxDecoration(
-          color: isDark ? AppColors.bg2 : AppColors.lightCard,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(
-            color: isDark ? AppColors.border : AppColors.lightBorder,
-          ),
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: isDark ? AppColors.textPrimary : AppColors.lightText,
+        indicatorSize: TabBarIndicatorSize.label,
+        indicatorColor: AppColors.accent,
+        indicatorWeight: 2.5,
+        labelColor: AppColors.accent,
         unselectedLabelColor: isDark
-            ? AppColors.textMuted
+            ? AppColors.textSecondary
             : AppColors.lightTextSecondary,
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         unselectedLabelStyle: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
-        splashBorderRadius: BorderRadius.circular(AppRadius.sm),
+        overlayColor: WidgetStateProperty.all(Colors.transparent),
         tabs: const [
-          Tab(text: 'Temperature'),
-          Tab(text: 'Health'),
-          Tab(text: 'Storage'),
-          Tab(text: 'Diagnostics'),
+          Tab(
+            height: 44,
+            icon: Icon(Icons.thermostat_rounded, size: 16),
+            iconMargin: EdgeInsets.only(bottom: 2),
+            text: 'Temperature',
+          ),
+          Tab(
+            height: 44,
+            icon: Icon(Icons.favorite_rounded, size: 16),
+            iconMargin: EdgeInsets.only(bottom: 2),
+            text: 'Health',
+          ),
+          Tab(
+            height: 44,
+            icon: Icon(Icons.storage_rounded, size: 16),
+            iconMargin: EdgeInsets.only(bottom: 2),
+            text: 'Storage',
+          ),
+          Tab(
+            height: 44,
+            icon: Icon(Icons.build_rounded, size: 16),
+            iconMargin: EdgeInsets.only(bottom: 2),
+            text: 'Diagnostics',
+          ),
         ],
       ),
     );
@@ -826,12 +868,9 @@ class _TemperatureTab extends ConsumerWidget {
           const SizedBox(height: AppSpacing.md),
 
           Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.bg1 : AppColors.lightCard,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: isDark ? AppColors.border : AppColors.lightBorder,
-              ),
+            decoration: AppDecorations.card(
+              isDark: isDark,
+              radius: AppRadius.lg,
             ),
             padding: const EdgeInsets.all(AppSpacing.md),
             child: samples.length < 2
@@ -934,12 +973,10 @@ class _StatCard extends StatelessWidget {
         (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
     return Container(
       padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
-      decoration: BoxDecoration(
+      decoration: AppDecorations.card(
+        isDark: isDark,
+        radius: AppRadius.md,
         color: isDark ? AppColors.bg2 : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: isDark ? AppColors.border : AppColors.lightBorder,
-        ),
       ),
       child: compact
           ? Row(
@@ -1838,10 +1875,6 @@ class _SensorsList extends ConsumerStatefulWidget {
   final TemperatureUnit unit;
   final bool isDark;
 
-  
-  
-  
-  
   final bool isSpinDownRisk;
 
   @override
@@ -1856,12 +1889,7 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
   void initState() {
     super.initState();
     _load();
-    
-    
-    
-    
-    
-    
+
     if (!widget.isSpinDownRisk) {
       _refreshTimer = Timer.periodic(
         const Duration(seconds: 30),
@@ -1897,12 +1925,9 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
         if (sensors.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: widget.isDark ? AppColors.bg1 : AppColors.lightCard,
-              borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(
-                color: widget.isDark ? AppColors.border : AppColors.lightBorder,
-              ),
+            decoration: AppDecorations.card(
+              isDark: widget.isDark,
+              radius: AppRadius.md,
             ),
             child: Row(
               children: [
@@ -1928,12 +1953,9 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
           );
         }
         return Container(
-          decoration: BoxDecoration(
-            color: widget.isDark ? AppColors.bg1 : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(
-              color: widget.isDark ? AppColors.border : AppColors.lightBorder,
-            ),
+          decoration: AppDecorations.card(
+            isDark: widget.isDark,
+            radius: AppRadius.md,
           ),
           child: Column(
             children: sensors.asMap().entries.map((entry) {
@@ -2245,12 +2267,9 @@ class _HealthTab extends StatelessWidget {
 
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.bg1 : AppColors.lightCard,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: isDark ? AppColors.border : AppColors.lightBorder,
-              ),
+            decoration: AppDecorations.card(
+              isDark: isDark,
+              radius: AppRadius.lg,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2351,23 +2370,40 @@ class _HealthEntry {
 }
 
 class _HealthGrid extends StatelessWidget {
-  const _HealthGrid({required this.entries, required this.isDark});
+  const _HealthGrid({
+    required this.entries,
+    required this.isDark,
+    this.minTileWidth = 170,
+  });
 
   final List<_HealthEntry> entries;
   final bool isDark;
+  final double minTileWidth;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: [
-        for (var i = 0; i < entries.length; i++)
-          EntranceFade(
-            index: i,
-            child: _HealthTile(entry: entries[i], isDark: isDark),
-          ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final rawCols = (width / (minTileWidth + AppSpacing.sm)).floor();
+        final cols = rawCols.clamp(1, entries.length).toInt();
+        final tileWidth = (width - AppSpacing.sm * (cols - 1)) / cols;
+
+        return Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            for (var i = 0; i < entries.length; i++)
+              EntranceFade(
+                index: i,
+                child: SizedBox(
+                  width: tileWidth,
+                  child: _HealthTile(entry: entries[i], isDark: isDark),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -2384,54 +2420,40 @@ class _HealthTile extends StatelessWidget {
         ? (entry.statusColor ??
               (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary))
         : AppColors.textMuted;
-    return SizedBox(
-      width: 188,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.bg1 : AppColors.lightCard,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isDark ? AppColors.border : AppColors.lightBorder,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                IconBadge(
-                  icon: entry.icon,
-                  color: color,
-                  size: 24,
-                  iconSize: 12,
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    entry.label,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? AppColors.textMuted
-                          : AppColors.lightTextSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: AppDecorations.card(isDark: isDark, radius: AppRadius.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconBadge(icon: entry.icon, color: color, size: 24, iconSize: 12),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  entry.label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.textMuted
+                        : AppColors.lightTextSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              entry.value,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: color,
               ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            entry.value,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -2563,13 +2585,7 @@ class _CapacityBar extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.bg1 : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: isDark ? AppColors.border : AppColors.lightBorder,
-        ),
-      ),
+      decoration: AppDecorations.card(isDark: isDark, radius: AppRadius.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2659,13 +2675,7 @@ class _VolumeRow extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.bg1 : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: isDark ? AppColors.border : AppColors.lightBorder,
-        ),
-      ),
+      decoration: AppDecorations.card(isDark: isDark, radius: AppRadius.md),
       child: Row(
         children: [
           IconBadge(
@@ -2751,13 +2761,7 @@ class _UnavailableNote extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.bg1 : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: isDark ? AppColors.border : AppColors.lightBorder,
-        ),
-      ),
+      decoration: AppDecorations.card(isDark: isDark, radius: AppRadius.md),
       child: Text(
         text,
         style: TextStyle(
@@ -2993,13 +2997,7 @@ class _DiagRow extends StatelessWidget {
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
       ),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.bg1 : AppColors.lightCard,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: isDark ? AppColors.border : AppColors.lightBorder,
-        ),
-      ),
+      decoration: AppDecorations.card(isDark: isDark, radius: AppRadius.md),
       child: Row(
         children: [
           IconBadge(icon: icon, color: badgeColor, size: 26, iconSize: 13),

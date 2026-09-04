@@ -27,10 +27,10 @@ class AppSpacing {
 class AppRadius {
   const AppRadius._();
 
-  static const double sm = 6;
-  static const double md = 8;
-  static const double lg = 10;
-  static const double xl = 14;
+  static const double sm = 8;
+  static const double md = 10;
+  static const double lg = 14;
+  static const double xl = 18;
 
   static const Radius mdRadius = Radius.circular(md);
   static const Radius lgRadius = Radius.circular(lg);
@@ -45,39 +45,46 @@ class AppDurations {
   static const Duration verySlow = Duration(milliseconds: 800);
 }
 
+/// Cross-platform, OS-agnostic design tokens. Deliberately avoids native
+/// platform chrome (no vibrancy/glass, no per-OS branch) so the app reads
+/// the same on Windows, Linux and macOS — a cool neutral slate scale with a
+/// single confident accent, and status hues reserved for severity only.
 class AppColors {
   const AppColors._();
 
-  static const Color bg0 = Color(0xFF1C1C1E);
-  static const Color bg1 = Color(0xFF2C2C2E);
-  static const Color bg2 = Color(0xFF3A3A3C);
-  static const Color bg3 = Color(0xFF48484A);
+  // Dark surface ramp — deep slate, not pure black.
+  static const Color bg0 = Color(0xFF0D1117);
+  static const Color bg1 = Color(0xFF161B22);
+  static const Color bg2 = Color(0xFF1F2630);
+  static const Color bg3 = Color(0xFF2B3440);
 
-  static const Color accent = Color(0xFF3E7BFA);
-  static const Color accentDim = Color(0xFF2B5ED6);
+  static const Color accent = Color(0xFF4F8CFF);
+  static const Color accentDim = Color(0xFF3568C4);
 
-  static const Color normal = Color(0xFF30D158);
-  static const Color normalDim = Color(0xFF248A3D);
-  static const Color warm = Color(0xFF7ED321);
-  static const Color warning = Color(0xFFFF9F0A);
-  static const Color warningDim = Color(0xFFB97000);
-  static const Color critical = Color(0xFFFF453A);
-  static const Color criticalDim = Color(0xFFBF3228);
+  static const Color normal = Color(0xFF35D68C);
+  static const Color normalDim = Color(0xFF22996A);
+  static const Color warm = Color(0xFF8BD450);
+  static const Color warning = Color(0xFFF5A623);
+  static const Color warningDim = Color(0xFFC6821A);
+  static const Color critical = Color(0xFFFF5C5C);
+  static const Color criticalDim = Color(0xFFD93B3B);
 
-  static const Color textPrimary = Color(0xFFEEEEF0);
-  static const Color textSecondary = Color(0xFF98989D);
-  static const Color textMuted = Color(0xFF636366);
+  static const Color textPrimary = Color(0xFFF3F5F8);
+  static const Color textSecondary = Color(0xFF99A3B0);
+  static const Color textMuted = Color(0xFF5C6773);
 
-  static const Color divider = Color(0xFF38383A);
-  static const Color border = Color(0xFF3A3A3C);
+  static const Color divider = Color(0xFF232B36);
+  static const Color border = Color(0xFF262E3A);
+  static const Color shadowDark = Color(0x40000000);
 
-  static const Color lightBg = Color(0xFFF2F2F7);
+  // Light surface ramp — matching cool slate hue, inverted.
+  static const Color lightBg = Color(0xFFF5F7FA);
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightSurfaceMuted = Color(0xFFEFEFF4);
-  static const Color lightBorder = Color(0xFFD1D1D6);
-  static const Color lightText = Color(0xFF1C1C1E);
-  static const Color lightTextSecondary = Color(0xFF6C6C70);
-  static const Color lightShadow = Color(0x0C000000);
+  static const Color lightSurfaceMuted = Color(0xFFECF0F5);
+  static const Color lightBorder = Color(0xFFDCE2E9);
+  static const Color lightText = Color(0xFF12161C);
+  static const Color lightTextSecondary = Color(0xFF5C6773);
+  static const Color lightShadow = Color(0x14101820);
 }
 
 class SeverityStyle {
@@ -171,6 +178,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: AppColors.bg1,
+        shadowColor: AppColors.shadowDark,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           side: const BorderSide(color: AppColors.border, width: 1),
@@ -313,7 +321,7 @@ class AppTheme {
     );
   }
 
-  static String? _fontFamily() => null;
+  static String? _fontFamily() => 'Manrope';
 
   static TextTheme _buildTextTheme(Color primary, Color secondary) {
     return TextTheme(
@@ -398,6 +406,7 @@ class AppDecorations {
     double radius = AppRadius.lg,
     bool showBorder = true,
     bool isDark = true,
+    bool elevated = true,
   }) => BoxDecoration(
     color: color ?? (isDark ? AppColors.bg1 : AppColors.lightCard),
     borderRadius: BorderRadius.circular(radius),
@@ -406,6 +415,15 @@ class AppDecorations {
             color: isDark ? AppColors.border : AppColors.lightBorder,
             width: 1,
           )
+        : null,
+    boxShadow: elevated
+        ? [
+            BoxShadow(
+              color: isDark ? AppColors.shadowDark : AppColors.lightShadow,
+              blurRadius: isDark ? 16 : 12,
+              offset: const Offset(0, 4),
+            ),
+          ]
         : null,
   );
 
@@ -423,17 +441,14 @@ class AppDecorations {
     required bool isDark,
   }) {
     if (selected) {
-      return BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border(
-          left: const BorderSide(color: AppColors.accent, width: 2),
-          top: BorderSide.none,
-          right: BorderSide.none,
-          bottom: BorderSide.none,
-        ),
+      return const BoxDecoration(
+        color: Colors.transparent,
+        border: Border(left: BorderSide(color: AppColors.accent, width: 2.5)),
       );
     }
-    return const BoxDecoration(color: Colors.transparent);
+    return const BoxDecoration(
+      color: Colors.transparent,
+      border: Border(left: BorderSide(color: Colors.transparent, width: 2.5)),
+    );
   }
 }
