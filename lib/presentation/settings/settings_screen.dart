@@ -486,12 +486,25 @@ class _GeneralSection extends ConsumerWidget {
         ),
       ),
       _SettingRow(
+        label: 'System tray icon',
+        subtitle:
+            'Show temperature and quick menu in the system tray / menu bar',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.showTrayIcon,
+          onChanged: (v) =>
+              notifier.updateWith((s) => s.copyWith(showTrayIcon: v)),
+        ),
+      ),
+      _SettingRow(
         label: 'Minimize to tray',
         isDark: isDark,
         trailing: Switch(
-          value: settings.minimizeToTray,
-          onChanged: (v) =>
-              notifier.updateWith((s) => s.copyWith(minimizeToTray: v)),
+          value: settings.minimizeToTray && settings.showTrayIcon,
+          onChanged: settings.showTrayIcon
+              ? (v) =>
+                  notifier.updateWith((s) => s.copyWith(minimizeToTray: v))
+              : null,
         ),
       ),
       _SettingRow(
@@ -500,9 +513,11 @@ class _GeneralSection extends ConsumerWidget {
         isDark: isDark,
         isLast: true,
         trailing: Switch(
-          value: settings.closeToTray,
-          onChanged: (v) =>
-              notifier.updateWith((s) => s.copyWith(closeToTray: v)),
+          value: settings.closeToTray && settings.showTrayIcon,
+          onChanged: settings.showTrayIcon
+              ? (v) =>
+                  notifier.updateWith((s) => s.copyWith(closeToTray: v))
+              : null,
         ),
       ),
     ];

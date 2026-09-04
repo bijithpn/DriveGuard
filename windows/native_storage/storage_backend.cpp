@@ -51,6 +51,28 @@ HANDLE OpenDrive(int index, DWORD desired_access) {
                       OPEN_EXISTING, 0, nullptr);
 }
 
+// Attempts opening the physical drive with read/write access (needed for
+// IOCTL_ATA_PASS_THROUGH). If that fails with ERROR_ACCESS_DENIED (because
+// the process is not elevated), falls back to opening with 0 desired access,
+// which is sufficient for IOCTL_STORAGE_QUERY_PROPERTY (NVMe health log).
+HANDLE OpenDriveWithFallback(int index, bool* has_write_access) {
+  HANDLE h = OpenDrive(index, GENERIC_READ | GENERIC_WRITE);
+  if (h != INVALID_HANDLE_VALUE) {
+    if (has_write_access) *has_write_access = true;
+    return h;
+  }
+  DWORD err = GetLastError();
+  if (err == ERROR_ACCESS_DENIED) {
+    h = OpenDrive(index, 0);
+    if (h != INVALID_HANDLE_VALUE) {
+      if (has_write_access) *has_write_access = false;
+      return h;
+    }
+  }
+  if (has_write_access) *has_write_access = false;
+  return INVALID_HANDLE_VALUE;
+}
+
 uint16_t ReadU16LE(const BYTE* p) { return static_cast<uint16_t>(p[0] | (p[1] << 8)); }
 
 // Reads a little-endian counter up to 8 bytes wide out of a wider
@@ -241,7 +263,8 @@ NativeResult<NativeTemperatureInfo> StorageBackend::ReadTemperature(const std::s
     return result;
   }
 
-  HANDLE h = OpenDrive(index, GENERIC_READ | GENERIC_WRITE);
+  bool hasWriteAccess = true;
+  HANDLE h = OpenDriveWithFallback(index, &hasWriteAccess);
   if (h == INVALID_HANDLE_VALUE) {
     result.status = (GetLastError() == ERROR_ACCESS_DENIED) ? NativeStorageStatus::kPermissionDenied
                                                               : NativeStorageStatus::kDeviceNotFound;
@@ -281,6 +304,14 @@ NativeResult<NativeTemperatureInfo> StorageBackend::ReadTemperature(const std::s
     temp.sensor_id = "composite";
     temp.sensor_name = "Composite";
     result.value = temp;
+    return result;
+  }
+
+  // Non-NVMe drives (ATA/SATA) require write access for ATA PASS THROUGH.
+  if (!hasWriteAccess) {
+    CloseHandle(h);
+    result.status = NativeStorageStatus::kPermissionDenied;
+    result.message = "Reading ATA/SATA SMART data requires administrator privileges.";
     return result;
   }
 
@@ -344,7 +375,8 @@ NativeResult<NativeHealthInfo> StorageBackend::ReadHealth(const std::string& dev
     return result;
   }
 
-  HANDLE h = OpenDrive(index, GENERIC_READ | GENERIC_WRITE);
+  bool hasWriteAccess = true;
+  HANDLE h = OpenDriveWithFallback(index, &hasWriteAccess);
   if (h == INVALID_HANDLE_VALUE) {
     result.status = (GetLastError() == ERROR_ACCESS_DENIED) ? NativeStorageStatus::kPermissionDenied
                                                               : NativeStorageStatus::kDeviceNotFound;
@@ -396,6 +428,14 @@ NativeResult<NativeHealthInfo> StorageBackend::ReadHealth(const std::string& dev
     health.unsafe_shutdowns = static_cast<int64_t>(unsafeShutdowns);
     health.media_errors = static_cast<int64_t>(mediaErrors);
     result.value = health;
+    return result;
+  }
+
+  // Non-NVMe drives (ATA/SATA) require write access for ATA PASS THROUGH.
+  if (!hasWriteAccess) {
+    CloseHandle(h);
+    result.status = NativeStorageStatus::kPermissionDenied;
+    result.message = "Reading ATA/SATA SMART health requires administrator privileges.";
     return result;
   }
 
@@ -452,7 +492,8 @@ NativeResult<std::vector<NativeTemperatureInfo>> StorageBackend::ReadSensors(
     return result;
   }
 
-  HANDLE h = OpenDrive(index, GENERIC_READ | GENERIC_WRITE);
+  bool hasWriteAccess = true;
+  HANDLE h = OpenDriveWithFallback(index, &hasWriteAccess);
   if (h == INVALID_HANDLE_VALUE) {
     result.status = (GetLastError() == ERROR_ACCESS_DENIED) ? NativeStorageStatus::kPermissionDenied
                                                               : NativeStorageStatus::kDeviceNotFound;
@@ -506,6 +547,14 @@ NativeResult<std::vector<NativeTemperatureInfo>> StorageBackend::ReadSensors(
     } else {
       result.status = NativeStorageStatus::kUnsupported;
     }
+    return result;
+  }
+
+  // Non-NVMe drives (ATA/SATA) require write access for ATA PASS THROUGH.
+  if (!hasWriteAccess) {
+    CloseHandle(h);
+    result.status = NativeStorageStatus::kPermissionDenied;
+    result.message = "Reading ATA/SATA sensors requires administrator privileges.";
     return result;
   }
 

@@ -101,6 +101,7 @@ class AppSettings {
     this.uiDensity = 1.0,
     this.startWithOS = false,
     this.startMinimized = false,
+    this.showTrayIcon = true,
     this.minimizeToTray = true,
     this.closeToTray = true,
     this.diagnosticLoggingEnabled = false,
@@ -138,6 +139,7 @@ class AppSettings {
 
   final bool startWithOS;
   final bool startMinimized;
+  final bool showTrayIcon;
   final bool minimizeToTray;
   final bool closeToTray;
 
@@ -180,6 +182,7 @@ class AppSettings {
     double? uiDensity,
     bool? startWithOS,
     bool? startMinimized,
+    bool? showTrayIcon,
     bool? minimizeToTray,
     bool? closeToTray,
     bool? diagnosticLoggingEnabled,
@@ -217,6 +220,7 @@ class AppSettings {
       uiDensity: uiDensity ?? this.uiDensity,
       startWithOS: startWithOS ?? this.startWithOS,
       startMinimized: startMinimized ?? this.startMinimized,
+      showTrayIcon: showTrayIcon ?? this.showTrayIcon,
       minimizeToTray: minimizeToTray ?? this.minimizeToTray,
       closeToTray: closeToTray ?? this.closeToTray,
       diagnosticLoggingEnabled:
@@ -254,6 +258,7 @@ class AppSettings {
     'uiDensity': uiDensity,
     'startWithOS': startWithOS,
     'startMinimized': startMinimized,
+    'showTrayIcon': showTrayIcon,
     'minimizeToTray': minimizeToTray,
     'closeToTray': closeToTray,
     'diagnosticLoggingEnabled': diagnosticLoggingEnabled,
@@ -351,6 +356,7 @@ class AppSettings {
       uiDensity: (json['uiDensity'] as num?)?.toDouble() ?? 1.0,
       startWithOS: json['startWithOS'] as bool? ?? false,
       startMinimized: json['startMinimized'] as bool? ?? false,
+      showTrayIcon: json['showTrayIcon'] as bool? ?? true,
       minimizeToTray: json['minimizeToTray'] as bool? ?? true,
       closeToTray: json['closeToTray'] as bool? ?? true,
       diagnosticLoggingEnabled:

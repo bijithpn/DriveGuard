@@ -5,7 +5,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../application/providers.dart';
@@ -91,6 +90,12 @@ class _AppRootState extends ConsumerState<AppRoot>
   }
 
   Future<void> _initTray() async {
+    final settings = ref.read(settingsProvider);
+    if (!settings.showTrayIcon) {
+      await _syncWidgetMode(settings.widget.enabled);
+      return;
+    }
+
     final tray = AppTrayService(
       onOpenDashboard: () async {
         await _syncWidgetMode(false);
@@ -98,11 +103,11 @@ class _AppRootState extends ConsumerState<AppRoot>
         await windowManager.focus();
       },
       onPauseResume: () {
-        final settings = ref.read(settingsProvider);
+        final currentSettings = ref.read(settingsProvider);
         ref
             .read(settingsProvider.notifier)
             .updateWith(
-              (s) => s.copyWith(monitoringEnabled: !settings.monitoringEnabled),
+              (s) => s.copyWith(monitoringEnabled: !currentSettings.monitoringEnabled),
             );
       },
       onOpenSettings: () async {
@@ -116,7 +121,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       onRescan: () => ref.read(monitoringServiceProvider).rescan(),
       onQuit: () async {
         try {
-          await trayManager.destroy();
+          await _tray?.destroy();
         } catch (_) {}
         exit(0);
       },
@@ -126,12 +131,12 @@ class _AppRootState extends ConsumerState<AppRoot>
       _tray = tray;
 
       await _pushDeviceSummaryToTray(tray);
-      await tray.setPaused(!ref.read(settingsProvider).monitoringEnabled);
+      await tray.setPaused(!settings.monitoringEnabled);
     } catch (e) {
       AppLogger.instance.warning(_tag, 'Tray unavailable: $e');
     }
 
-    await _syncWidgetMode(ref.read(settingsProvider).widget.enabled);
+    await _syncWidgetMode(settings.widget.enabled);
   }
 
   TemperatureSeverity _combinedSeverity(
@@ -264,12 +269,12 @@ class _AppRootState extends ConsumerState<AppRoot>
   void onWindowClose() async {
     final settings = ref.read(settingsProvider);
     final isWidgetActive = ref.read(widgetModeActiveProvider);
-    // If widget mode is active or closeToTray is enabled, keep background monitoring alive and hide main window
-    if (settings.closeToTray || isWidgetActive) {
+    // If widget mode is active or (closeToTray is enabled and tray is active), keep background monitoring alive and hide main window
+    if (isWidgetActive || (settings.closeToTray && settings.showTrayIcon)) {
       await windowManager.hide();
     } else {
       try {
-        await trayManager.destroy();
+        await _tray?.destroy();
       } catch (_) {}
       exit(0);
     }
@@ -278,7 +283,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   @override
   void onWindowMinimize() async {
     final settings = ref.read(settingsProvider);
-    if (settings.minimizeToTray) {
+    if (settings.minimizeToTray && settings.showTrayIcon) {
       await windowManager.hide();
     }
   }
@@ -328,6 +333,14 @@ class _AppRootState extends ConsumerState<AppRoot>
       (previous, enabled) => _syncWidgetMode(enabled),
     );
     ref.listen(settingsProvider, (previous, next) {
+      if (previous?.showTrayIcon != next.showTrayIcon) {
+        if (!next.showTrayIcon) {
+          _tray?.destroy();
+          _tray = null;
+        } else if (_tray == null) {
+          _initTray();
+        }
+      }
       _tray?.setPaused(!next.monitoringEnabled);
       _pushSnapshotToMiniWindowIfActive();
     });

@@ -121,25 +121,50 @@ class LinuxStorageMonitor extends StorageMonitor {
   }
 
   Future<double?> _readHwmonCelsius(String sysName) async {
-    final hwmonRoot = Directory('/sys/block/$sysName/device');
-    if (!hwmonRoot.existsSync()) return null;
-    try {
-      for (final entry in hwmonRoot.listSync()) {
-        if (!entry.path.contains('hwmon')) continue;
-        final hwmonDir = Directory(entry.path);
-        if (!hwmonDir.existsSync()) continue;
-        for (final f in hwmonDir.listSync()) {
-          if (RegExp(r'temp\d+_input$').hasMatch(f.path)) {
-            final raw = _readSysfsString(f.path);
-            if (raw == null) continue;
-            final milli = int.tryParse(raw);
-            if (milli == null) continue;
-            return milli / 1000.0;
+    final searchDirs = [
+      Directory('/sys/block/$sysName/device'),
+      Directory('/sys/class/nvme/${_nvmeControllerName(sysName)}'),
+    ];
+    for (final root in searchDirs) {
+      if (!root.existsSync()) continue;
+      try {
+        for (final entry in root.listSync()) {
+          if (!entry.path.contains('hwmon')) continue;
+          final hwmonDir = Directory(entry.path);
+          if (!hwmonDir.existsSync()) continue;
+
+          // Try temp1_input (Composite) first
+          final temp1File = File('${hwmonDir.path}/temp1_input');
+          if (temp1File.existsSync()) {
+            final raw = _readSysfsString(temp1File.path);
+            if (raw != null) {
+              final milli = int.tryParse(raw);
+              if (milli != null) {
+                final celsius = milli / 1000.0;
+                if (TemperatureUtils.isPlausibleValue(celsius)) {
+                  return celsius;
+                }
+              }
+            }
+          }
+
+          // Check other temp*_input files for plausible values
+          for (final f in hwmonDir.listSync()) {
+            if (RegExp(r'temp\d+_input$').hasMatch(f.path)) {
+              final raw = _readSysfsString(f.path);
+              if (raw == null) continue;
+              final milli = int.tryParse(raw);
+              if (milli == null) continue;
+              final celsius = milli / 1000.0;
+              if (TemperatureUtils.isPlausibleValue(celsius)) {
+                return celsius;
+              }
+            }
           }
         }
+      } catch (e) {
+        AppLogger.instance.debug(_tag, 'hwmon read failed for $sysName: $e');
       }
-    } catch (e) {
-      AppLogger.instance.debug(_tag, 'hwmon read failed for $sysName: $e');
     }
     return null;
   }
@@ -241,7 +266,56 @@ class LinuxStorageMonitor extends StorageMonitor {
     ];
 
     final sysName = _sysName(deviceId);
-    if (sysName.startsWith('nvme') &&
+    final searchDirs = [
+      Directory('/sys/block/$sysName/device'),
+      Directory('/sys/class/nvme/${_nvmeControllerName(sysName)}'),
+    ];
+    for (final root in searchDirs) {
+      if (!root.existsSync()) continue;
+      try {
+        for (final entry in root.listSync()) {
+          if (!entry.path.contains('hwmon')) continue;
+          final hwmonDir = Directory(entry.path);
+          if (!hwmonDir.existsSync()) continue;
+          for (var i = 2; i <= 8; i++) {
+            final inputFile = File('${hwmonDir.path}/temp${i}_input');
+            if (!inputFile.existsSync()) continue;
+            final raw = _readSysfsString(inputFile.path);
+            if (raw == null) continue;
+            final milli = int.tryParse(raw);
+            if (milli == null) continue;
+            final celsius = milli / 1000.0;
+            if (!TemperatureUtils.isPlausibleValue(celsius)) continue;
+
+            final labelFile = File('${hwmonDir.path}/temp${i}_label');
+            final label = labelFile.existsSync()
+                ? _readSysfsString(labelFile.path)
+                : null;
+            sensors.add(
+              StorageSensor(
+                id: 'sensor${i - 1}',
+                name: label ?? 'Sensor ${i - 1}',
+                reading: TemperatureReading(
+                  celsius: celsius,
+                  timestamp: DateTime.now(),
+                  source: TemperatureSource(
+                    backendName: 'sysfs-hwmon',
+                    sensorId: 'sensor${i - 1}',
+                  ),
+                  isValid: true,
+                ),
+                type: TemperatureSensorType.namespace,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        AppLogger.instance.debug(_tag, 'hwmon multi-sensor read failed: $e');
+      }
+    }
+
+    if (sensors.length == 1 &&
+        sysName.startsWith('nvme') &&
         await SafeProcessRunner.instance.exists('nvme')) {
       try {
         final result = await SafeProcessRunner.instance.run('nvme', [
@@ -257,7 +331,7 @@ class LinuxStorageMonitor extends StorageMonitor {
 
           var celsius = raw.toDouble();
           if (celsius > 200) celsius -= 273;
-          if (celsius == 0) continue;
+          if (celsius == 0 || !TemperatureUtils.isPlausibleValue(celsius)) continue;
           sensors.add(
             StorageSensor(
               id: 'sensor$i',
@@ -269,7 +343,7 @@ class LinuxStorageMonitor extends StorageMonitor {
                   backendName: 'nvme-cli',
                   sensorId: 'sensor$i',
                 ),
-                isValid: TemperatureUtils.isPlausibleValue(celsius),
+                isValid: true,
               ),
               type: TemperatureSensorType.namespace,
             ),

@@ -215,40 +215,68 @@ NativeResult<NativeTemperatureInfo> StorageBackend::ReadTemperature(const std::s
 
   // 1. sysfs hwmon - same source the Dart backend already reads, kept
   //    first because it needs no elevated access at all.
-  std::string hwmonRoot = "/sys/block/" + *sysName + "/device";
-  DIR* dir = opendir(hwmonRoot.c_str());
-  if (dir != nullptr) {
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-      std::string name = entry->d_name;
-      if (name.rfind("hwmon", 0) != 0) continue;
-      std::string hwmonDirPath = hwmonRoot + "/" + name;
-      DIR* hwmonDir = opendir(hwmonDirPath.c_str());
-      if (hwmonDir == nullptr) continue;
-      struct dirent* f;
-      while ((f = readdir(hwmonDir)) != nullptr) {
-        std::string fname = f->d_name;
-        if (fname.rfind("temp", 0) == 0 && fname.size() > 10 &&
-            fname.substr(fname.size() - 10) == "_input") {
-          auto raw = ReadSysfsString(hwmonDirPath + "/" + fname);
-          if (raw.has_value()) {
-            try {
-              double milli = std::stod(*raw);
+  std::vector<std::string> hwmonRoots = {
+      "/sys/block/" + *sysName + "/device",
+      "/sys/class/nvme/" + NvmeControllerName(*sysName),
+  };
+  for (const auto& hwmonRoot : hwmonRoots) {
+    DIR* dir = opendir(hwmonRoot.c_str());
+    if (dir != nullptr) {
+      struct dirent* entry;
+      while ((entry = readdir(dir)) != nullptr) {
+        std::string name = entry->d_name;
+        if (name.rfind("hwmon", 0) != 0) continue;
+        std::string hwmonDirPath = hwmonRoot + "/" + name;
+        DIR* hwmonDir = opendir(hwmonDirPath.c_str());
+        if (hwmonDir == nullptr) continue;
+
+        // Try temp1_input first (Linux NVMe hwmon standard composite temperature)
+        auto temp1Raw = ReadSysfsString(hwmonDirPath + "/temp1_input");
+        if (temp1Raw.has_value()) {
+          try {
+            double milli = std::stod(*temp1Raw);
+            double celsius = milli / 1000.0;
+            if (celsius >= -40.0 && celsius <= 125.0) {
               closedir(hwmonDir);
               closedir(dir);
               NativeTemperatureInfo temp;
-              temp.celsius = milli / 1000.0;
+              temp.celsius = celsius;
               temp.sensor_id = "composite";
               result.value = temp;
               return result;
-            } catch (...) {
+            }
+          } catch (...) {
+          }
+        }
+
+        struct dirent* f;
+        while ((f = readdir(hwmonDir)) != nullptr) {
+          std::string fname = f->d_name;
+          if (fname.rfind("temp", 0) == 0 && fname.size() > 6 &&
+              fname.compare(fname.size() - 6, 6, "_input") == 0) {
+            auto raw = ReadSysfsString(hwmonDirPath + "/" + fname);
+            if (raw.has_value()) {
+              try {
+                double milli = std::stod(*raw);
+                double celsius = milli / 1000.0;
+                if (celsius >= -40.0 && celsius <= 125.0) {
+                  closedir(hwmonDir);
+                  closedir(dir);
+                  NativeTemperatureInfo temp;
+                  temp.celsius = celsius;
+                  temp.sensor_id = "composite";
+                  result.value = temp;
+                  return result;
+                }
+              } catch (...) {
+              }
             }
           }
         }
+        closedir(hwmonDir);
       }
-      closedir(hwmonDir);
+      closedir(dir);
     }
-    closedir(dir);
   }
 
   // 2. NVMe admin Get Log Page - richer than hwmon and doesn't need
@@ -380,36 +408,78 @@ NativeResult<std::vector<NativeTemperatureInfo>> StorageBackend::ReadSensors(
     return result;
   }
 
+  std::vector<NativeTemperatureInfo> sensors;
   NativeStorageStatus logStatus;
   auto log = ReadNvmeHealthLog(*sysName, &logStatus);
-  if (!log.has_value()) {
-    result.status = logStatus;
-    return result;
+  if (log.has_value()) {
+    uint16_t composite = ReadU16LE(log->data() + 1);
+    if (composite != 0) {
+      NativeTemperatureInfo t;
+      t.celsius = static_cast<double>(composite) - 273.15;
+      t.sensor_id = "composite";
+      t.sensor_name = "Composite";
+      t.is_primary = true;
+      sensors.push_back(t);
+    }
+    // TemperatureSensor1..8 (u16 Kelvin each) at byte offsets 200..214 in the
+    // SMART/Health Information log page (NVMe base spec section 5.14.1.3).
+    // 0 means the controller does not implement that sensor.
+    for (int i = 0; i < 8; i++) {
+      size_t offset = 200 + i * 2;
+      uint16_t kelvin = ReadU16LE(log->data() + offset);
+      if (kelvin == 0) continue;
+      NativeTemperatureInfo t;
+      t.celsius = static_cast<double>(kelvin) - 273.15;
+      t.sensor_id = "sensor" + std::to_string(i + 1);
+      t.sensor_name = "Sensor " + std::to_string(i + 1);
+      t.is_primary = false;
+      sensors.push_back(t);
+    }
   }
 
-  std::vector<NativeTemperatureInfo> sensors;
-  uint16_t composite = ReadU16LE(log->data() + 1);
-  if (composite != 0) {
-    NativeTemperatureInfo t;
-    t.celsius = static_cast<double>(composite) - 273.15;
-    t.sensor_id = "composite";
-    t.sensor_name = "Composite";
-    t.is_primary = true;
-    sensors.push_back(t);
-  }
-  // TemperatureSensor1..8 (u16 Kelvin each) at byte offsets 200..214 in the
-  // SMART/Health Information log page (NVMe base spec section 5.14.1.3).
-  // 0 means the controller does not implement that sensor.
-  for (int i = 0; i < 8; i++) {
-    size_t offset = 200 + i * 2;
-    uint16_t kelvin = ReadU16LE(log->data() + offset);
-    if (kelvin == 0) continue;
-    NativeTemperatureInfo t;
-    t.celsius = static_cast<double>(kelvin) - 273.15;
-    t.sensor_id = "sensor" + std::to_string(i + 1);
-    t.sensor_name = "Sensor " + std::to_string(i + 1);
-    t.is_primary = false;
-    sensors.push_back(t);
+  // Fallback to sysfs hwmon if admin log was unavailable or had at most 1 sensor
+  if (sensors.size() <= 1) {
+    std::vector<std::string> hwmonRoots = {
+        "/sys/block/" + *sysName + "/device",
+        "/sys/class/nvme/" + NvmeControllerName(*sysName),
+    };
+    std::vector<NativeTemperatureInfo> hwmonSensors;
+    for (const auto& hwmonRoot : hwmonRoots) {
+      DIR* dir = opendir(hwmonRoot.c_str());
+      if (dir != nullptr) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+          std::string name = entry->d_name;
+          if (name.rfind("hwmon", 0) != 0) continue;
+          std::string hwmonDirPath = hwmonRoot + "/" + name;
+          for (int i = 1; i <= 8; i++) {
+            std::string inputFile = hwmonDirPath + "/temp" + std::to_string(i) + "_input";
+            auto raw = ReadSysfsString(inputFile);
+            if (!raw.has_value()) continue;
+            try {
+              double milli = std::stod(*raw);
+              double celsius = milli / 1000.0;
+              if (celsius < -40.0 || celsius > 125.0) continue;
+              std::string labelFile = hwmonDirPath + "/temp" + std::to_string(i) + "_label";
+              auto label = ReadSysfsString(labelFile);
+
+              NativeTemperatureInfo t;
+              t.celsius = celsius;
+              t.sensor_id = (i == 1) ? "composite" : ("sensor" + std::to_string(i - 1));
+              t.sensor_name = label.has_value() ? *label : ((i == 1) ? "Composite" : ("Sensor " + std::to_string(i - 1)));
+              t.is_primary = (i == 1);
+              hwmonSensors.push_back(t);
+            } catch (...) {}
+          }
+          if (hwmonSensors.size() > 1) break;
+        }
+        closedir(dir);
+      }
+      if (hwmonSensors.size() > 1) {
+        sensors = std::move(hwmonSensors);
+        break;
+      }
+    }
   }
 
   if (sensors.size() > 1) {

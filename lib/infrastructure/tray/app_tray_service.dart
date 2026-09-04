@@ -46,16 +46,30 @@ class AppTrayService {
 
   String? _selectedDeviceId;
   bool _selectionIsExplicit = false;
+  _Listener? _listener;
 
   Future<void> initialize() async {
     await _applyIcon(TemperatureSeverity.normal);
     await _rebuildMenu();
-    trayManager.addListener(
-      _Listener(
-        onDoubleClick: onOpenDashboard,
-        onMenuItemClick: handleMenuClick,
-      ),
+    final listener = _Listener(
+      onDoubleClick: onOpenDashboard,
+      onMenuItemClick: handleMenuClick,
     );
+    _listener = listener;
+    trayManager.addListener(listener);
+  }
+
+  Future<void> destroy() async {
+    final listener = _listener;
+    if (listener != null) {
+      trayManager.removeListener(listener);
+      _listener = null;
+    }
+    try {
+      await trayManager.destroy();
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'Failed to destroy tray: $e');
+    }
   }
 
   Future<void> updateSeverity(TemperatureSeverity severity) async {
@@ -106,12 +120,22 @@ class AppTrayService {
       final label = displayed?.valueText;
       final path = await _iconPathFor(severity, label);
       await trayManager.setIcon(path);
-      await trayManager.setToolTip('DriveGuard - ${_tooltipSummary(severity)}');
 
-      if (Platform.isMacOS) {
-        await trayManager.setTitle(
-          displayed == null ? '' : displayed.valueText,
-        );
+      // tray_manager does not implement setToolTip on Linux.
+      if (!Platform.isLinux) {
+        try {
+          await trayManager.setToolTip('DriveGuard - ${_tooltipSummary(severity)}');
+        } catch (_) {}
+      }
+
+      // On macOS and Linux (Ayatana/AppIndicator), setTitle displays the temperature
+      // directly in the top menu bar / system panel beside the icon.
+      if (Platform.isMacOS || Platform.isLinux) {
+        try {
+          await trayManager.setTitle(
+            displayed == null ? '' : displayed.valueText,
+          );
+        } catch (_) {}
       }
     } catch (e) {
       AppLogger.instance.warning(_tag, 'Failed to apply tray icon: $e');
@@ -138,16 +162,47 @@ class AppTrayService {
     TemperatureSeverity.unavailable => 0,
   };
 
+  /// Wraps raw PNG bytes in a standard 22-byte Windows .ico container
+  /// (ICONDIR + single ICONDIRENTRY).
+  ///
+  /// Windows Vista+ Shell_NotifyIcon and LoadImage natively decode PNG-compressed
+  /// icons within .ico files. Passing a raw .png directly causes Win32 LoadImage
+  /// to fail with NULL, which prevents the system tray icon from appearing.
+  static Uint8List wrapPngInIco(Uint8List pngBytes, int width, int height) {
+    final byteData = ByteData(22 + pngBytes.length);
+    // ICONDIR structure (6 bytes)
+    byteData.setUint16(0, 0, Endian.little); // Reserved: must be 0
+    byteData.setUint16(2, 1, Endian.little); // Image type: 1 = ICO (2 = CUR)
+    byteData.setUint16(4, 1, Endian.little); // Number of images: 1
+
+    // ICONDIRENTRY structure (16 bytes)
+    byteData.setUint8(6, width >= 256 ? 0 : width); // Width in pixels (0 means 256)
+    byteData.setUint8(7, height >= 256 ? 0 : height); // Height in pixels (0 means 256)
+    byteData.setUint8(8, 0); // Number of colors in palette (0 = no palette / >=8bpp)
+    byteData.setUint8(9, 0); // Reserved: must be 0
+    byteData.setUint16(10, 1, Endian.little); // Color planes (0 or 1)
+    byteData.setUint16(12, 32, Endian.little); // Bits per pixel (32-bit RGBA)
+    byteData.setUint32(14, pngBytes.length, Endian.little); // Size of image data in bytes
+    byteData.setUint32(18, 22, Endian.little); // File offset of image data (6 + 16 = 22)
+
+    final result = byteData.buffer.asUint8List();
+    result.setRange(22, 22 + pngBytes.length, pngBytes);
+    return result;
+  }
+
   Future<String> _iconPathFor(TemperatureSeverity severity, String? label) async {
-    // Include label in cache key so icon re-renders when temperature changes.
-    final cacheKey = '${severity.name}_${label ?? ''}';
+    // Include label and platform in cache key so icon re-renders when temperature changes.
+    final isWindows = Platform.isWindows;
+    final cacheKey = '${severity.name}_${label ?? ''}_${isWindows ? "ico" : "png"}';
     final cached = _iconPathCache[cacheKey];
     if (cached != null && File(cached).existsSync()) return cached;
 
-    final bytes = await _renderTrayIcon(_severityColor(severity), label);
+    final pngBytes = await _renderTrayIcon(_severityColor(severity), label);
+    final bytes = isWindows ? wrapPngInIco(pngBytes, 64, 64) : pngBytes;
+    final ext = isWindows ? 'ico' : 'png';
     final safe = (label ?? '').replaceAll(RegExp(r'[^\w]'), '_');
     final file = File(
-      '${Directory.systemTemp.path}${Platform.pathSeparator}driveguard_tray_${severity.name}_$safe.png',
+      '${Directory.systemTemp.path}${Platform.pathSeparator}driveguard_tray_${severity.name}_$safe.$ext',
     );
     await file.writeAsBytes(bytes, flush: true);
     _iconPathCache[cacheKey] = file.path;
@@ -192,13 +247,25 @@ class AppTrayService {
       bgPaint,
     );
 
-    if (label != null && label.isNotEmpty) {
+    // If label is too long (e.g. "Permission required", "Disconnected"),
+    // show a clean short fallback or N/A so it doesn't overflow the icon.
+    final displayLabel = (label == null || label.length > 5)
+        ? (label == null ? null : 'N/A')
+        : label;
+
+    if (displayLabel != null && displayLabel.isNotEmpty) {
       // Draw the label text centred in the icon.
       // ui.Paragraph lets us render text onto a canvas in dart:ui.
+      final fontSize = switch (displayLabel.length) {
+        <= 2 => 32.0,
+        3 => 27.0,
+        4 => 23.0,
+        _ => 18.0,
+      };
       final style = ui.TextStyle(
         color: const ui.Color(0xFFFFFFFF),
-        fontSize: label.length <= 4 ? 22.0 : 17.0,
-        fontWeight: ui.FontWeight.w700,
+        fontSize: fontSize,
+        fontWeight: ui.FontWeight.w800,
       );
       final paraStyle = ui.ParagraphStyle(
         textAlign: ui.TextAlign.center,
@@ -206,7 +273,7 @@ class AppTrayService {
       );
       final builder = ui.ParagraphBuilder(paraStyle)
         ..pushStyle(style)
-        ..addText(label);
+        ..addText(displayLabel);
       final para = builder.build();
       para.layout(const ui.ParagraphConstraints(width: size));
       // Centre vertically.
@@ -275,7 +342,11 @@ class AppTrayService {
         MenuItem(key: 'quit', label: 'Quit'),
       ],
     );
-    await trayManager.setContextMenu(menu);
+    try {
+      await trayManager.setContextMenu(menu);
+    } catch (e) {
+      AppLogger.instance.warning(_tag, 'Failed to rebuild tray menu: $e');
+    }
   }
 
   void handleMenuClick(String key) {
@@ -309,7 +380,11 @@ class _Listener with TrayListener {
 
   @override
   void onTrayIconRightMouseDown() {
-    trayManager.popUpContextMenu();
+    if (!Platform.isLinux) {
+      try {
+        trayManager.popUpContextMenu();
+      } catch (_) {}
+    }
   }
 
   @override
