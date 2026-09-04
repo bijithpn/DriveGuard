@@ -1838,10 +1838,10 @@ class _SensorsList extends ConsumerStatefulWidget {
   final TemperatureUnit unit;
   final bool isDark;
 
-  /// True for HDDs and removable drives, which can spin down when idle.
-  /// When true, this widget skips its own auto-refresh timer so it can't
-  /// poll a spin-down-risk drive on top of MonitoringService's already-
-  /// throttled poll loop - see MonitoringService's spin-down safety floor.
+  
+  
+  
+  
   final bool isSpinDownRisk;
 
   @override
@@ -1856,12 +1856,12 @@ class _SensorsListState extends ConsumerState<_SensorsList> {
   void initState() {
     super.initState();
     _load();
-    // HDDs/removable drives are already covered by MonitoringService's own
-    // throttled poll loop (which feeds primaryTemperature/health on the
-    // devices stream). Running a second, independent auto-refresh timer
-    // here would poll the same spin-down-risk drive on top of that, on an
-    // uncoordinated schedule - so it's skipped entirely for those drives.
-    // The initial load above still happens once when the screen opens.
+    
+    
+    
+    
+    
+    
     if (!widget.isSpinDownRisk) {
       _refreshTimer = Timer.periodic(
         const Duration(seconds: 30),

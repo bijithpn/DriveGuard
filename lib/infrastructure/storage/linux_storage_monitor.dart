@@ -115,7 +115,7 @@ class LinuxStorageMonitor extends StorageMonitor {
 
   String _sysName(String deviceId) => deviceId.replaceFirst('linux-', '');
 
-  /// True if smartctl skipped the read because the drive is spun down.
+  
   bool _isSleeping(Map<String, dynamic> json) {
     final mode = (json['power_mode'] as String?)?.toUpperCase();
     if (mode == 'STANDBY' || mode == 'SLEEP') return true;
@@ -208,8 +208,8 @@ class LinuxStorageMonitor extends StorageMonitor {
     final result = await SafeProcessRunner.instance.run('smartctl', [
       '-a',
       '-j',
-      // '-n standby' skips the query instead of spinning up a sleeping HDD
-      // to answer it - a routine poll must never force a spin-up cycle.
+      
+      
       '-n',
       'standby',
       '/dev/$sysName',

@@ -49,4 +49,35 @@ class AppConstants {
   ];
 
   static const int defaultWearJumpAlertPercent = 3;
+
+  
+  
+  
+  
+  
+  static const bool defaultPredictiveAlertsEnabled = true;
+
+  
+  
+  static const double predictiveMinRSquared = 0.6;
+  static const int predictiveMinSamples = 4;
+
+  
+  
+  static const Duration predictiveTemperatureLookback = Duration(minutes: 5);
+  static const Duration predictiveTemperatureLeadTime = Duration(minutes: 15);
+
+  
+  
+  static const Duration predictiveCapacityLookback = Duration(days: 3);
+  static const Duration predictiveCapacityLeadTime = Duration(days: 3);
+  static const Duration predictiveCapacitySampleInterval = Duration(
+    minutes: 15,
+  );
+  static const Duration predictiveCapacityRetention = Duration(days: 14);
+
+  static const Duration predictiveHealthLookback = Duration(days: 7);
+  static const Duration predictiveHealthLeadTime = Duration(days: 14);
+  static const Duration predictiveHealthSampleInterval = Duration(minutes: 30);
+  static const Duration predictiveHealthRetention = Duration(days: 30);
 }

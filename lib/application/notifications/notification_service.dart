@@ -57,4 +57,30 @@ abstract class NotificationService {
     required String message,
     String? detailsText,
   });
+
+  
+  
+  Future<void> showPredictiveTemperature({
+    required String deviceId,
+    required String deviceName,
+    required bool critical,
+    required String etaText,
+    String? detailsText,
+  });
+
+  
+  Future<void> showPredictiveCapacity({
+    required String deviceId,
+    required String deviceName,
+    required bool critical,
+    required String etaText,
+  });
+
+  
+  
+  Future<void> showPredictiveHealth({
+    required String deviceId,
+    required String deviceName,
+    required String etaText,
+  });
 }

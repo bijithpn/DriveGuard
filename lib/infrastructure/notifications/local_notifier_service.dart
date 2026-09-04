@@ -184,4 +184,57 @@ class LocalNotifierService implements NotificationService {
       deviceId,
     );
   }
+
+  @override
+  Future<void> showPredictiveTemperature({
+    required String deviceId,
+    required String deviceName,
+    required bool critical,
+    required String etaText,
+    String? detailsText,
+  }) {
+    return _show(
+      critical
+          ? 'Heading Toward Critical Temperature'
+          : 'Temperature Trending Up',
+      _withDetails(
+        '$deviceName\nProjected to reach ${critical ? 'critical' : 'warning'} '
+        'level in $etaText at the current rate.\n\n'
+        'Based on the recent trend, not the temperature right now - you '
+        'still have time to act.',
+        detailsText,
+      ),
+      deviceId,
+    );
+  }
+
+  @override
+  Future<void> showPredictiveCapacity({
+    required String deviceId,
+    required String deviceName,
+    required bool critical,
+    required String etaText,
+  }) {
+    return _show(
+      critical ? 'Disk Projected to Fill Up' : 'Disk Space Trending Down',
+      '$deviceName\nAt the current usage trend, this drive will reach your '
+      '${critical ? 'critical' : 'warning'} free-space limit in $etaText.',
+      deviceId,
+    );
+  }
+
+  @override
+  Future<void> showPredictiveHealth({
+    required String deviceId,
+    required String deviceName,
+    required String etaText,
+  }) {
+    return _show(
+      'Drive Wear Trending Toward End of Life',
+      '$deviceName\nAt the current wear rate, this drive is projected to '
+          'reach 100% rated wear in $etaText. Consider planning a replacement '
+          'and verifying backups.',
+      deviceId,
+    );
+  }
 }

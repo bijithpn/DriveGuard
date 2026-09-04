@@ -100,4 +100,38 @@ class FakeNotificationService implements NotificationService {
       'health-${critical ? 'critical' : 'warning'}:$deviceName:$message:${detailsText ?? ''}',
     );
   }
+
+  @override
+  Future<void> showPredictiveTemperature({
+    required String deviceId,
+    required String deviceName,
+    required bool critical,
+    required String etaText,
+    String? detailsText,
+  }) async {
+    shown.add(
+      'predictive-temperature-${critical ? 'critical' : 'warning'}:$deviceName:$etaText:${detailsText ?? ''}',
+    );
+  }
+
+  @override
+  Future<void> showPredictiveCapacity({
+    required String deviceId,
+    required String deviceName,
+    required bool critical,
+    required String etaText,
+  }) async {
+    shown.add(
+      'predictive-capacity-${critical ? 'critical' : 'warning'}:$deviceName:$etaText',
+    );
+  }
+
+  @override
+  Future<void> showPredictiveHealth({
+    required String deviceId,
+    required String deviceName,
+    required String etaText,
+  }) async {
+    shown.add('predictive-health:$deviceName:$etaText');
+  }
 }

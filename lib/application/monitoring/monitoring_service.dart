@@ -15,8 +15,11 @@ import '../../domain/entities/storage_volume.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 import '../alerts/alert_engine.dart';
+import '../alerts/predictive_engine.dart';
 import '../notifications/notification_service.dart';
+import '../prediction/trend_analyzer.dart';
 import '../settings/app_settings.dart';
+import 'metric_history_store.dart';
 import 'temperature_history_store.dart';
 
 class MonitoringService {
@@ -24,23 +27,42 @@ class MonitoringService {
     required StorageMonitor backend,
     required NotificationService notifications,
     required TemperatureHistoryStore historyStore,
+    MetricHistoryStore? capacityHistoryStore,
+    MetricHistoryStore? healthHistoryStore,
+    PredictiveEngine predictiveEngine = const PredictiveEngine(),
   }) : _backend = backend,
        _notifications = notifications,
-       _historyStore = historyStore;
+       _historyStore = historyStore,
+       _capacityHistoryStore =
+           capacityHistoryStore ??
+           MetricHistoryStore(
+             retention: AppConstants.predictiveCapacityRetention,
+             minSampleInterval: AppConstants.predictiveCapacitySampleInterval,
+           ),
+       _healthHistoryStore =
+           healthHistoryStore ??
+           MetricHistoryStore(
+             retention: AppConstants.predictiveHealthRetention,
+             minSampleInterval: AppConstants.predictiveHealthSampleInterval,
+           ),
+       _predictiveEngine = predictiveEngine;
 
   static const _tag = 'MonitoringService';
 
   final StorageMonitor _backend;
   final NotificationService _notifications;
   final TemperatureHistoryStore _historyStore;
+  final MetricHistoryStore _capacityHistoryStore;
+  final MetricHistoryStore _healthHistoryStore;
+  final PredictiveEngine _predictiveEngine;
 
-  // Windows has no equivalent of smartctl's '-n standby' - Get-StorageReliabilityCounter
-  // is expected to read driver-cached data rather than issue a live query, but that is
-  // not a documented guarantee and has not been verified on real Windows/HDD hardware
-  // (see docs/platform-support.md). As defense in depth on every platform, spinning and
-  // removable disks are never polled more often than these floors, regardless of the
-  // user's configured interval, so an aggressive setting can't hammer a disk that might
-  // be asleep.
+  
+  
+  
+  
+  
+  
+  
   static const _spinDownRiskMinPollInterval = Duration(seconds: 30);
   static const _spinDownRiskMinHealthPollInterval = Duration(minutes: 5);
 
@@ -53,6 +75,15 @@ class MonitoringService {
   final Map<String, DateTime> _lastRapidRiseNotifiedAt = {};
   final Map<String, DeviceHealth> _lastKnownHealth = {};
   final Set<String> _disconnectedOnce = {};
+
+  
+  
+  
+  final Map<String, DateTime> _lastPredictiveTempAt = {};
+  final Map<String, TemperatureSeverity> _lastPredictiveTempSeverity = {};
+  final Map<String, DateTime> _lastPredictiveCapacityAt = {};
+  final Map<String, CapacitySeverity> _lastPredictiveCapacitySeverity = {};
+  final Map<String, DateTime> _lastPredictiveHealthAt = {};
 
   final _devicesController = StreamController<List<StorageDevice>>.broadcast();
   Stream<List<StorageDevice>> get devicesStream => _devicesController.stream;
@@ -202,6 +233,13 @@ class MonitoringService {
         _lastRapidRiseNotifiedAt.remove(id);
         _lastKnownHealth.remove(id);
         _historyStore.clearDevice(id);
+        _capacityHistoryStore.clearDevice(id);
+        _healthHistoryStore.clearDevice(id);
+        _lastPredictiveTempAt.remove(id);
+        _lastPredictiveTempSeverity.remove(id);
+        _lastPredictiveCapacityAt.remove(id);
+        _lastPredictiveCapacitySeverity.remove(id);
+        _lastPredictiveHealthAt.remove(id);
         _latestActivity.remove(id);
         _lastPolledAt.remove(id);
         _lastHealthPolledAt.remove(id);
@@ -252,6 +290,11 @@ class MonitoringService {
             '${capacity.isValid ? ' (${capacity.usagePercent?.toStringAsFixed(0) ?? '?'}% used)' : ''}, '
             'volumes: ${volumes.length}',
           );
+          final usagePercent = capacity.usagePercent;
+          if (usagePercent != null) {
+            _capacityHistoryStore.record(id, usagePercent);
+          }
+          await _evaluatePredictiveCapacity(id, capacity, updated);
           await _evaluateCapacityAlert(id, capacity, updated);
         } catch (e) {
           AppLogger.instance.debug(
@@ -262,6 +305,63 @@ class MonitoringService {
       }),
     );
     _emit();
+  }
+
+  
+  
+  Future<void> _evaluatePredictiveCapacity(
+    String id,
+    StorageCapacity capacity,
+    StorageDevice device,
+  ) async {
+    if (!_settings.predictiveAlertsEnabled || !_settings.storageAlertsEnabled) {
+      return;
+    }
+    final usagePercent = capacity.usagePercent;
+    if (usagePercent == null) return;
+    
+    final currentSeverity = capacitySeverityFor(id);
+    if (currentSeverity == CapacitySeverity.warning ||
+        currentSeverity == CapacitySeverity.critical) {
+      return;
+    }
+
+    final points = _capacityHistoryStore
+        .pointsFor(id)
+        .map((p) => TrendPoint(p.timestamp, p.value))
+        .toList();
+    final hit = _predictiveEngine.evaluateCapacity(
+      points: points,
+      currentUsagePercent: usagePercent,
+      thresholds: _settings.storageThresholdsFor(id),
+      leadTime: AppConstants.predictiveCapacityLeadTime,
+    );
+    if (hit == null) return;
+
+    final severity = hit.critical
+        ? CapacitySeverity.critical
+        : CapacitySeverity.warning;
+    final lastAt = _lastPredictiveCapacityAt[id];
+    final alreadyWarned =
+        _lastPredictiveCapacitySeverity[id] == severity &&
+        lastAt != null &&
+        DateTime.now().difference(lastAt) < _settings.notificationCooldown;
+    if (alreadyWarned) return;
+
+    _lastPredictiveCapacityAt[id] = DateTime.now();
+    _lastPredictiveCapacitySeverity[id] = severity;
+
+    AppLogger.instance.info(
+      _tag,
+      'Predictive capacity alert for $id: ${hit.etaText} to ${severity.name}',
+    );
+    if (!_settings.notificationsEnabled) return;
+    await _notifications.showPredictiveCapacity(
+      deviceId: id,
+      deviceName: device.displayName,
+      critical: hit.critical,
+      etaText: hit.etaText,
+    );
   }
 
   Future<void> _evaluateCapacityAlert(
@@ -281,6 +381,13 @@ class MonitoringService {
       recoveryNotificationsEnabled: _settings.recoveryNotificationsEnabled,
     );
     if (!result.shouldNotify || !_settings.notificationsEnabled) return;
+
+    if (!result.isRecoveryNotification &&
+        _lastPredictiveCapacitySeverity[id] == result.severity &&
+        _recentlyPredicted(_lastPredictiveCapacityAt[id])) {
+      
+      return;
+    }
 
     final usageText = capacity.usagePercent != null
         ? '${capacity.usagePercent!.toStringAsFixed(0)}% used'
@@ -335,10 +442,61 @@ class MonitoringService {
       if (current == null) return;
       final updated = current.copyWith(health: health);
       _devices[id] = updated;
+      final wear = health.percentageUsed;
+      if (wear != null) {
+        _healthHistoryStore.record(id, wear.toDouble());
+      }
+      await _evaluatePredictiveHealthWear(id, health, updated);
       await _evaluateHealthAlert(id, health, updated);
     } catch (e) {
       AppLogger.instance.debug(_tag, 'Health read failed for $id: $e');
     }
+  }
+
+  
+  
+  
+  
+  
+  
+  
+  
+  Future<void> _evaluatePredictiveHealthWear(
+    String id,
+    DeviceHealth health,
+    StorageDevice device,
+  ) async {
+    if (!_settings.predictiveAlertsEnabled || !_settings.healthAlertsEnabled) {
+      return;
+    }
+    final wear = health.percentageUsed;
+    if (wear == null) return;
+
+    final points = _healthHistoryStore
+        .pointsFor(id)
+        .map((p) => TrendPoint(p.timestamp, p.value))
+        .toList();
+    final hit = _predictiveEngine.evaluateHealthWear(
+      points: points,
+      currentPercentageUsed: wear.toDouble(),
+      leadTime: AppConstants.predictiveHealthLeadTime,
+    );
+    if (hit == null) return;
+
+    final lastAt = _lastPredictiveHealthAt[id];
+    if (_recentlyPredicted(lastAt)) return;
+    _lastPredictiveHealthAt[id] = DateTime.now();
+
+    AppLogger.instance.info(
+      _tag,
+      'Predictive health-wear alert for $id: ${hit.etaText} to end of rated life',
+    );
+    if (!_settings.notificationsEnabled) return;
+    await _notifications.showPredictiveHealth(
+      deviceId: id,
+      deviceName: device.displayName,
+      etaText: hit.etaText,
+    );
   }
 
   Future<void> _evaluateHealthAlert(
@@ -418,6 +576,10 @@ class MonitoringService {
     _emit();
   }
 
+  bool _recentlyPredicted(DateTime? at) =>
+      at != null &&
+      DateTime.now().difference(at) < _settings.notificationCooldown;
+
   bool _isSpinDownRisk(StorageDevice device) =>
       device.type == StorageDeviceType.hdd || device.isRemovable;
 
@@ -491,6 +653,7 @@ class MonitoringService {
             clearLastError: true,
           );
           _devices[id] = updated;
+          await _evaluatePredictiveTemperature(id, reading.celsius, updated);
           await _evaluateAlert(id, reading.celsius, updated);
           await _evaluateRapidRise(id, reading.celsius, updated);
         }
@@ -540,6 +703,61 @@ class MonitoringService {
     }
   }
 
+  
+  
+  
+  Future<void> _evaluatePredictiveTemperature(
+    String id,
+    double celsius,
+    StorageDevice device,
+  ) async {
+    if (!_settings.predictiveAlertsEnabled) return;
+    
+    final currentSeverity = severityFor(id);
+    if (currentSeverity == TemperatureSeverity.warning ||
+        currentSeverity == TemperatureSeverity.critical) {
+      return;
+    }
+
+    final points = _historyStore
+        .pointsFor(id, AppConstants.predictiveTemperatureLookback)
+        .map((p) => TrendPoint(p.timestamp, p.celsius))
+        .toList();
+    final hit = _predictiveEngine.evaluateTemperature(
+      points: points,
+      currentCelsius: celsius,
+      thresholds: _settings.thresholdsFor(id),
+      leadTime: AppConstants.predictiveTemperatureLeadTime,
+    );
+    if (hit == null) return;
+
+    final severity = hit.critical
+        ? TemperatureSeverity.critical
+        : TemperatureSeverity.warning;
+    final lastAt = _lastPredictiveTempAt[id];
+    final alreadyWarned =
+        _lastPredictiveTempSeverity[id] == severity &&
+        lastAt != null &&
+        DateTime.now().difference(lastAt) < _settings.notificationCooldown;
+    if (alreadyWarned) return;
+
+    _lastPredictiveTempAt[id] = DateTime.now();
+    _lastPredictiveTempSeverity[id] = severity;
+
+    AppLogger.instance.info(
+      _tag,
+      'Predictive temperature alert for $id: ${hit.etaText} to ${severity.name}',
+    );
+    if (!_settings.notificationsEnabled) return;
+    await _notifications.showPredictiveTemperature(
+      deviceId: id,
+      deviceName: device.displayName,
+      critical: hit.critical,
+      etaText: hit.etaText,
+      detailsText: _detailsFor(device),
+    );
+  }
+
   Future<void> _evaluateAlert(
     String id,
     double celsius,
@@ -554,6 +772,13 @@ class MonitoringService {
       recoveryNotificationsEnabled: _settings.recoveryNotificationsEnabled,
     );
     if (!result.shouldNotify || !_settings.notificationsEnabled) return;
+
+    if (!result.isRecoveryNotification &&
+        _lastPredictiveTempSeverity[id] == result.severity &&
+        _recentlyPredicted(_lastPredictiveTempAt[id])) {
+      
+      return;
+    }
 
     final tempText = TemperatureUtils.format(
       celsius,

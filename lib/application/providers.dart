@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/constants/app_constants.dart';
 import '../domain/entities/storage_activity.dart';
 import '../domain/entities/storage_device.dart';
 import '../domain/repositories/storage_monitor.dart';
 import '../infrastructure/persistence/settings_repository.dart';
+import 'monitoring/metric_history_store.dart';
 import 'monitoring/monitoring_service.dart';
 import 'monitoring/temperature_history_store.dart';
 import 'notifications/notification_service.dart';
@@ -30,11 +32,27 @@ final historyStoreProvider = Provider<TemperatureHistoryStore>(
   (ref) => TemperatureHistoryStore(),
 );
 
+final capacityHistoryStoreProvider = Provider<MetricHistoryStore>(
+  (ref) => MetricHistoryStore(
+    retention: AppConstants.predictiveCapacityRetention,
+    minSampleInterval: AppConstants.predictiveCapacitySampleInterval,
+  ),
+);
+
+final healthHistoryStoreProvider = Provider<MetricHistoryStore>(
+  (ref) => MetricHistoryStore(
+    retention: AppConstants.predictiveHealthRetention,
+    minSampleInterval: AppConstants.predictiveHealthSampleInterval,
+  ),
+);
+
 final monitoringServiceProvider = Provider<MonitoringService>((ref) {
   final service = MonitoringService(
     backend: ref.watch(storageMonitorProvider),
     notifications: ref.watch(notificationServiceProvider),
     historyStore: ref.watch(historyStoreProvider),
+    capacityHistoryStore: ref.watch(capacityHistoryStoreProvider),
+    healthHistoryStore: ref.watch(healthHistoryStoreProvider),
   );
   ref.onDispose(service.dispose);
   return service;

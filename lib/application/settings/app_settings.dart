@@ -97,6 +97,7 @@ class AppSettings {
     this.perDeviceRapidRiseDelta = const {},
     this.healthPollingInterval = AppConstants.defaultHealthPollingInterval,
     this.healthAlertsEnabled = true,
+    this.predictiveAlertsEnabled = AppConstants.defaultPredictiveAlertsEnabled,
     this.themeMode = ThemeMode.system,
     this.uiDensity = 1.0,
     this.startWithOS = false,
@@ -133,6 +134,11 @@ class AppSettings {
 
   final Duration healthPollingInterval;
   final bool healthAlertsEnabled;
+
+  
+  
+  
+  final bool predictiveAlertsEnabled;
 
   final ThemeMode themeMode;
   final double uiDensity;
@@ -178,6 +184,7 @@ class AppSettings {
     Map<String, double>? perDeviceRapidRiseDelta,
     Duration? healthPollingInterval,
     bool? healthAlertsEnabled,
+    bool? predictiveAlertsEnabled,
     ThemeMode? themeMode,
     double? uiDensity,
     bool? startWithOS,
@@ -216,6 +223,8 @@ class AppSettings {
       healthPollingInterval:
           healthPollingInterval ?? this.healthPollingInterval,
       healthAlertsEnabled: healthAlertsEnabled ?? this.healthAlertsEnabled,
+      predictiveAlertsEnabled:
+          predictiveAlertsEnabled ?? this.predictiveAlertsEnabled,
       themeMode: themeMode ?? this.themeMode,
       uiDensity: uiDensity ?? this.uiDensity,
       startWithOS: startWithOS ?? this.startWithOS,
@@ -254,6 +263,7 @@ class AppSettings {
     'perDeviceRapidRiseDelta': perDeviceRapidRiseDelta,
     'healthPollingIntervalMs': healthPollingInterval.inMilliseconds,
     'healthAlertsEnabled': healthAlertsEnabled,
+    'predictiveAlertsEnabled': predictiveAlertsEnabled,
     'themeMode': themeMode.name,
     'uiDensity': uiDensity,
     'startWithOS': startWithOS,
@@ -349,6 +359,9 @@ class AppSettings {
             AppConstants.defaultHealthPollingInterval.inMilliseconds,
       ),
       healthAlertsEnabled: json['healthAlertsEnabled'] as bool? ?? true,
+      predictiveAlertsEnabled:
+          json['predictiveAlertsEnabled'] as bool? ??
+          AppConstants.defaultPredictiveAlertsEnabled,
       themeMode: ThemeMode.values.firstWhere(
         (m) => m.name == json['themeMode'],
         orElse: () => ThemeMode.system,

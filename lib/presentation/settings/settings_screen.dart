@@ -738,6 +738,19 @@ class _AlertsSection extends ConsumerWidget {
         ),
       ),
       _SettingRow(
+        label: 'Predictive early warnings',
+        subtitle:
+            'Warn ahead of a threshold breach based on the recent trend '
+            '(temperature, storage, and drive wear)',
+        isDark: isDark,
+        trailing: Switch(
+          value: settings.predictiveAlertsEnabled,
+          onChanged: (v) => notifier.updateWith(
+            (s) => s.copyWith(predictiveAlertsEnabled: v),
+          ),
+        ),
+      ),
+      _SettingRow(
         label: 'Notification cooldown',
         isDark: isDark,
         trailing: _NativeDropdown<Duration>(
