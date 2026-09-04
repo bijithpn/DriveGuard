@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/monitoring/temperature_history_store.dart';
 import '../../application/providers.dart';
 import '../../core/utils/temperature_utils.dart';
 import '../../domain/entities/device_capabilities.dart';
@@ -14,6 +15,7 @@ import '../../domain/entities/storage_capacity.dart';
 import '../../domain/entities/storage_device.dart';
 import '../../domain/entities/storage_volume.dart';
 import '../../domain/entities/temperature_reading.dart';
+import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../components/animated_entrance.dart';
 import '../components/device_presentation.dart';
@@ -699,42 +701,93 @@ class _TemperatureTab extends ConsumerWidget {
 
           const SizedBox(height: AppSpacing.lg),
 
-          _SectionLabel(title: 'Temperature History', isDark: isDark),
+          Row(
+            children: [
+              _SectionLabel(title: 'Temperature History', isDark: isDark),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: device.monitoringStatus == MonitoringStatus.active
+                            ? AppColors.normal
+                            : AppColors.textMuted,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${samples.length} readings',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.sm),
 
           Wrap(
             spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
             children: _historyWindows.keys.map((label) {
               final selected = label == windowLabel;
-              return GestureDetector(
-                onTap: () => onWindowChanged(label),
-                child: AnimatedContainer(
-                  duration: AppDurations.fast,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm + 2,
-                    vertical: AppSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.accent
-                        : (isDark ? AppColors.bg2 : AppColors.lightCard),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                    border: Border.all(
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => onWindowChanged(label),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: AnimatedContainer(
+                    duration: AppDurations.fast,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm + 4,
+                      vertical: AppSpacing.xs + 2,
+                    ),
+                    decoration: BoxDecoration(
                       color: selected
                           ? AppColors.accent
-                          : (isDark ? AppColors.border : AppColors.lightBorder),
+                          : (isDark ? AppColors.bg2 : AppColors.lightCard),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      border: Border.all(
+                        color: selected
+                            ? AppColors.accent
+                            : (isDark ? AppColors.border : AppColors.lightBorder),
+                        width: selected ? 1.5 : 1.0,
+                      ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: AppColors.accent.withValues(alpha: 0.25),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
-                  ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: selected
-                          ? Colors.white
-                          : (isDark
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected
+                            ? Colors.white
+                            : (isDark
                                 ? AppColors.textSecondary
                                 : AppColors.lightTextSecondary),
+                      ),
                     ),
                   ),
                 ),
@@ -744,7 +797,6 @@ class _TemperatureTab extends ConsumerWidget {
           const SizedBox(height: AppSpacing.md),
 
           Container(
-            height: 240,
             decoration: BoxDecoration(
               color: isDark ? AppColors.bg1 : AppColors.lightCard,
               borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -752,35 +804,50 @@ class _TemperatureTab extends ConsumerWidget {
                 color: isDark ? AppColors.border : AppColors.lightBorder,
               ),
             ),
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.sm,
-            ),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: samples.length < 2
                 ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.show_chart_rounded,
-                          size: 32,
-                          color: isDark
-                              ? AppColors.textMuted
-                              : AppColors.lightTextSecondary,
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Not enough history yet',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? AppColors.textMuted
-                                : AppColors.lightTextSecondary,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: const Icon(
+                              Icons.show_chart_rounded,
+                              size: 24,
+                              color: AppColors.accent,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Collecting temperature history…',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? AppColors.textPrimary
+                                  : AppColors.lightText,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Readings will appear here as the drive is monitored',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark
+                                  ? AppColors.textMuted
+                                  : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : _HistoryChart(
@@ -788,6 +855,10 @@ class _TemperatureTab extends ConsumerWidget {
                     thresholds: thresholds,
                     unit: unit,
                     isDark: isDark,
+                    window: window,
+                    windowLabel: windowLabel,
+                    stats: stats,
+                    currentCelsius: device.primaryTemperature?.celsius,
                   ),
           ),
 
@@ -975,238 +1046,706 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _HistoryChart extends StatelessWidget {
+class _HistoryChart extends StatefulWidget {
   const _HistoryChart({
     required this.samples,
     required this.thresholds,
     required this.unit,
     required this.isDark,
+    required this.window,
+    required this.windowLabel,
+    required this.stats,
+    this.currentCelsius,
   });
 
-  final List<dynamic> samples;
-  final dynamic thresholds;
+  final List<HistoryPoint> samples;
+  final TemperatureThresholds thresholds;
   final TemperatureUnit unit;
+  final bool isDark;
+  final Duration window;
+  final String windowLabel;
+  final HistoryStats stats;
+  final double? currentCelsius;
+
+  @override
+  State<_HistoryChart> createState() => _HistoryChartState();
+}
+
+class _HistoryChartState extends State<_HistoryChart> {
+  bool _showGrid = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final sortedSamples = List<HistoryPoint>.from(widget.samples)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    final startTime = sortedSamples.first.timestamp;
+    final endTime = sortedSamples.last.timestamp;
+    final totalSpanSeconds = endTime.difference(startTime).inSeconds.toDouble();
+    final effectiveMaxX = totalSpanSeconds < 30 ? 30.0 : totalSpanSeconds;
+
+    // Determine gap threshold for inserting nullSpots so app shutdown periods
+    // don't create false connecting diagonal lines across hours/days.
+    final int gapThresholdSeconds;
+    if (widget.window <= const Duration(minutes: 10)) {
+      gapThresholdSeconds = 60;
+    } else if (widget.window <= const Duration(minutes: 30)) {
+      gapThresholdSeconds = 120;
+    } else if (widget.window <= const Duration(hours: 1)) {
+      gapThresholdSeconds = 300;
+    } else if (widget.window <= const Duration(hours: 6)) {
+      gapThresholdSeconds = 600;
+    } else if (widget.window <= const Duration(hours: 24)) {
+      gapThresholdSeconds = 1800;
+    } else {
+      gapThresholdSeconds = 3600;
+    }
+
+    final spots = <FlSpot>[];
+    for (var i = 0; i < sortedSamples.length; i++) {
+      final point = sortedSamples[i];
+      if (i > 0) {
+        final gap = point.timestamp.difference(sortedSamples[i - 1].timestamp).inSeconds;
+        if (gap > gapThresholdSeconds) {
+          spots.add(FlSpot.nullSpot);
+        }
+      }
+      final x = point.timestamp.difference(startTime).inSeconds.toDouble();
+      final y = TemperatureUtils.convert(point.celsius, widget.unit);
+      spots.add(FlSpot(x, y));
+    }
+
+    final validSpots = spots.where((s) => s != FlSpot.nullSpot && !s.y.isNaN).toList();
+    if (validSpots.isEmpty) {
+      return const SizedBox(height: 220);
+    }
+
+    final allTemps = validSpots.map((s) => s.y).toList();
+    final dataMin = allTemps.reduce(min);
+    final dataMax = allTemps.reduce(max);
+    final span = dataMax - dataMin;
+
+    final double yInterval;
+    if (span <= 6) {
+      yInterval = 2.0;
+    } else if (span <= 15) {
+      yInterval = 5.0;
+    } else if (span <= 35) {
+      yInterval = 5.0;
+    } else if (span <= 70) {
+      yInterval = 10.0;
+    } else {
+      yInterval = 20.0;
+    }
+
+    // Clean padding aligned strictly to the interval to prevent top/bottom edge collisions
+    final paddedMin = dataMin - (yInterval * 0.4);
+    final paddedMax = dataMax + (yInterval * 0.4);
+    final minY = (paddedMin / yInterval).floor() * yInterval;
+    final maxY = (paddedMax / yInterval).ceil() * yInterval;
+
+    final warn = TemperatureUtils.convert(widget.thresholds.warningCelsius, widget.unit);
+    final crit = TemperatureUtils.convert(widget.thresholds.criticalCelsius, widget.unit);
+
+    // Dynamic line color reflecting the current severity
+    final double latestConverted = validSpots.last.y;
+    final Color lineColor;
+    if (latestConverted >= crit) {
+      lineColor = AppColors.critical;
+    } else if (latestConverted >= warn) {
+      lineColor = AppColors.warning;
+    } else if (latestConverted >= warn - (widget.unit == TemperatureUnit.celsius ? 10 : 18)) {
+      lineColor = const Color(0xFFF5A623); // Warm amber
+    } else {
+      lineColor = AppColors.accent;
+    }
+
+    final xInterval = (effectiveMaxX / 4).clamp(15.0, double.infinity);
+
+    // Trend calculation
+    final firstVal = validSpots.first.y;
+    final lastVal = validSpots.last.y;
+    final tempDelta = lastVal - firstVal;
+    final String trendText;
+    final IconData trendIcon;
+    final Color trendColor;
+
+    if (tempDelta.abs() < 0.6) {
+      trendText = 'Steady (±0${TemperatureUtils.unitSuffix(widget.unit)})';
+      trendIcon = Icons.trending_flat_rounded;
+      trendColor = widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary;
+    } else if (tempDelta > 0) {
+      trendText = '+${tempDelta.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(widget.unit)} (Warming)';
+      trendIcon = Icons.trending_up_rounded;
+      trendColor = tempDelta >= 3.0 ? AppColors.warning : AppColors.accent;
+    } else {
+      trendText = '${tempDelta.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(widget.unit)} (Cooling)';
+      trendIcon = Icons.trending_down_rounded;
+      trendColor = AppColors.normal;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Top Metrics Showcase Strip
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          children: [
+            _MetricPill(
+              icon: Icons.thermostat_rounded,
+              label: 'Current',
+              value: TemperatureUtils.format(validSpots.last.y, widget.unit, decimals: 0),
+              color: lineColor,
+              isDark: widget.isDark,
+            ),
+            _MetricPill(
+              icon: Icons.arrow_downward_rounded,
+              label: 'Min',
+              value: '${dataMin.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+              color: AppColors.normal,
+              isDark: widget.isDark,
+            ),
+            _MetricPill(
+              icon: Icons.tune_rounded,
+              label: 'Avg',
+              value: '${((dataMin + dataMax) / 2).round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+              color: widget.isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+              isDark: widget.isDark,
+            ),
+            _MetricPill(
+              icon: Icons.arrow_upward_rounded,
+              label: 'Peak',
+              value: '${dataMax.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+              color: dataMax >= warn ? AppColors.warning : AppColors.accent,
+              isDark: widget.isDark,
+            ),
+            _MetricPill(
+              icon: trendIcon,
+              label: 'Trend',
+              value: trendText,
+              color: trendColor,
+              isDark: widget.isDark,
+            ),
+          ],
+        ),
+
+        const SizedBox(height: AppSpacing.md),
+
+        // Chart Canvas
+        SizedBox(
+          height: 230,
+          child: LineChart(
+            LineChartData(
+              minX: 0,
+              maxX: effectiveMaxX,
+              minY: minY,
+              maxY: maxY,
+              clipData: const FlClipData.all(),
+              gridData: FlGridData(
+                show: _showGrid,
+                drawVerticalLine: true,
+                drawHorizontalLine: true,
+                horizontalInterval: yInterval,
+                verticalInterval: xInterval,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: widget.isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : const Color(0xFFCBD5E1),
+                  strokeWidth: 1.0,
+                  dashArray: [5, 4],
+                ),
+                getDrawingVerticalLine: (_) => FlLine(
+                  color: widget.isDark
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : const Color(0xFFE2E8F0),
+                  strokeWidth: 1.0,
+                  dashArray: [4, 4],
+                ),
+              ),
+              titlesData: FlTitlesData(
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    interval: xInterval,
+                    getTitlesWidget: (value, meta) {
+                      if (value < -0.05 || value > effectiveMaxX + 0.05) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final pointTime = startTime.add(Duration(seconds: value.round()));
+                      final ago = endTime.difference(pointTime);
+
+                      String label;
+                      if (value >= effectiveMaxX - (xInterval * 0.35) || ago.inSeconds < 30) {
+                        label = 'Now';
+                      } else {
+                        if (widget.window <= const Duration(minutes: 10)) {
+                          final s = ago.inSeconds;
+                          label = s < 60 ? '${s}s ago' : '${ago.inMinutes}m ago';
+                        } else if (widget.window <= const Duration(hours: 1)) {
+                          label = '${ago.inMinutes}m ago';
+                        } else if (widget.window <= const Duration(hours: 24)) {
+                          final h = ago.inHours;
+                          final m = ago.inMinutes % 60;
+                          label = m == 0 || h >= 6 ? '${h}h ago' : '${h}h ${m}m ago';
+                        } else {
+                          final d = ago.inDays;
+                          label = d == 0 ? '${ago.inHours}h ago' : '${d}d ago';
+                        }
+                      }
+
+                      return SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        space: 8,
+                        fitInside: SideTitleFitInsideData.fromTitleMeta(
+                          meta,
+                          distanceFromEdge: 4,
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: widget.isDark
+                                ? AppColors.textMuted
+                                : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 46,
+                    interval: yInterval,
+                    getTitlesWidget: (value, meta) {
+                      // Prevent drawing outside [minY, maxY]
+                      if (value < minY - 0.05 || value > maxY + 0.05) {
+                        return const SizedBox.shrink();
+                      }
+
+                      // Check that value lands strictly on our yInterval step
+                      final stepNum = ((value - minY) / yInterval).round();
+                      final expectedValue = minY + (stepNum * yInterval);
+                      if ((value - expectedValue).abs() > 0.05) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return SideTitleWidget(
+                        axisSide: meta.axisSide,
+                        space: 8,
+                        fitInside: SideTitleFitInsideData.fromTitleMeta(
+                          meta,
+                          distanceFromEdge: 2,
+                        ),
+                        child: Text(
+                          '${expectedValue.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: widget.isDark
+                                ? AppColors.textMuted
+                                : AppColors.lightTextSecondary,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  left: BorderSide(
+                    color: widget.isDark
+                        ? Colors.white.withValues(alpha: 0.22)
+                        : const Color(0xFF94A3B8),
+                    width: 1.2,
+                  ),
+                  bottom: BorderSide(
+                    color: widget.isDark
+                        ? Colors.white.withValues(alpha: 0.22)
+                        : const Color(0xFF94A3B8),
+                    width: 1.2,
+                  ),
+                  top: BorderSide.none,
+                  right: BorderSide.none,
+                ),
+              ),
+              extraLinesData: ExtraLinesData(
+                horizontalLines: [
+                  if (warn >= minY && warn <= maxY)
+                    HorizontalLine(
+                      y: warn,
+                      color: AppColors.warning.withValues(alpha: 0.75),
+                      strokeWidth: 1.2,
+                      dashArray: [5, 4],
+                      label: HorizontalLineLabel(
+                        show: true,
+                        alignment: Alignment.topRight,
+                        padding: const EdgeInsets.only(right: 6, bottom: 2),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        labelResolver: (_) => 'Warn (${warn.round()}${TemperatureUtils.unitSuffix(widget.unit)})',
+                      ),
+                    ),
+                  if (crit >= minY && crit <= maxY)
+                    HorizontalLine(
+                      y: crit,
+                      color: AppColors.critical.withValues(alpha: 0.75),
+                      strokeWidth: 1.2,
+                      dashArray: [5, 4],
+                      label: HorizontalLineLabel(
+                        show: true,
+                        alignment: Alignment.topRight,
+                        padding: const EdgeInsets.only(right: 6, bottom: 2),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.critical,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        labelResolver: (_) => 'Crit (${crit.round()}${TemperatureUtils.unitSuffix(widget.unit)})',
+                      ),
+                    ),
+                ],
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: spots,
+                  isCurved: true,
+                  curveSmoothness: 0.22,
+                  preventCurveOverShooting: true,
+                  color: lineColor,
+                  barWidth: 2.8,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    checkToShowDot: (spot, barData) {
+                      return spot == validSpots.last;
+                    },
+                    getDotPainter: (spot, percent, barData, index) {
+                      return FlDotCirclePainter(
+                        radius: 4.5,
+                        color: lineColor,
+                        strokeWidth: 2.5,
+                        strokeColor: Colors.white,
+                      );
+                    },
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        lineColor.withValues(alpha: widget.isDark ? 0.28 : 0.20),
+                        lineColor.withValues(alpha: widget.isDark ? 0.08 : 0.04),
+                        lineColor.withValues(alpha: 0.0),
+                      ],
+                      stops: const [0.0, 0.65, 1.0],
+                    ),
+                  ),
+                ),
+              ],
+              lineTouchData: LineTouchData(
+                handleBuiltInTouches: true,
+                getTouchedSpotIndicator: (barData, spotIndexes) {
+                  return spotIndexes.map((index) {
+                    return TouchedSpotIndicatorData(
+                      FlLine(
+                        color: lineColor.withValues(alpha: 0.6),
+                        strokeWidth: 1.5,
+                        dashArray: [4, 4],
+                      ),
+                      FlDotData(
+                        show: true,
+                        getDotPainter: (spot, percent, barData, index) {
+                          return FlDotCirclePainter(
+                            radius: 5.5,
+                            color: Colors.white,
+                            strokeWidth: 3,
+                            strokeColor: lineColor,
+                          );
+                        },
+                      ),
+                    );
+                  }).toList();
+                },
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) =>
+                      widget.isDark ? const Color(0xFF1E1E26) : Colors.white,
+                  tooltipRoundedRadius: AppRadius.md,
+                  tooltipBorder: BorderSide(
+                    color: widget.isDark ? AppColors.border : AppColors.lightBorder,
+                    width: 1.2,
+                  ),
+                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
+                    if (s == FlSpot.nullSpot || s.y.isNaN) return null;
+                    final spotTime = startTime.add(Duration(seconds: s.x.round()));
+                    final ago = endTime.difference(spotTime);
+
+                    final hour = spotTime.hour % 12 == 0 ? 12 : spotTime.hour % 12;
+                    final minute = spotTime.minute.toString().padLeft(2, '0');
+                    final second = spotTime.second.toString().padLeft(2, '0');
+                    final ampm = spotTime.hour >= 12 ? 'PM' : 'AM';
+                    final exactTime = '$hour:$minute:$second $ampm';
+
+                    final agoStr = ago.inSeconds < 15
+                        ? 'Just now'
+                        : (ago.inMinutes < 60
+                            ? '${ago.inMinutes}m ago'
+                            : '${ago.inHours}h ${ago.inMinutes % 60}m ago');
+
+                    final tempColor = s.y >= crit
+                        ? AppColors.critical
+                        : (s.y >= warn ? AppColors.warning : AppColors.accent);
+
+                    return LineTooltipItem(
+                      '${s.y.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(widget.unit)}\n',
+                      TextStyle(
+                        color: tempColor,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        letterSpacing: -0.2,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: '$exactTime · $agoStr',
+                          style: TextStyle(
+                            color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            duration: AppDurations.medium,
+          ),
+        ),
+
+        const SizedBox(height: AppSpacing.sm),
+
+        // Bottom Legend Row with Responsive Wrap & Grid Toggle
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 520;
+            final content = <Widget>[
+              _ThresholdLegend(
+                label: 'Warning: ${warn.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+                color: AppColors.warning,
+                isDark: widget.isDark,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _ThresholdLegend(
+                label: 'Critical: ${crit.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+                color: AppColors.critical,
+                isDark: widget.isDark,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              _GridToggleChip(
+                showGrid: _showGrid,
+                isDark: widget.isDark,
+                onToggle: () => setState(() => _showGrid = !_showGrid),
+              ),
+              if (!isNarrow) const Spacer(),
+              Text(
+                '${sortedSamples.length} samples · ${widget.windowLabel}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                ),
+              ),
+            ];
+
+            if (isNarrow) {
+              return Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: content.where((w) => w is! SizedBox && w is! Spacer).toList(),
+              );
+            }
+
+            return Row(children: content);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricPill extends StatelessWidget {
+  const _MetricPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final first = samples.first.timestamp as DateTime;
-    final spots = samples
-        .map<FlSpot>(
-          (p) => FlSpot(
-            (p.timestamp as DateTime).difference(first).inSeconds.toDouble(),
-            TemperatureUtils.convert(p.celsius as double, unit),
-          ),
-        )
-        .toList();
-
-    final allTemps = spots.map((s) => s.y).toList();
-    final minTemp = allTemps.reduce(min) - 4;
-    final maxTemp = allTemps.reduce(max) + 4;
-
-    final warn = TemperatureUtils.convert(
-      thresholds.warningCelsius as double,
-      unit,
-    );
-    final crit = TemperatureUtils.convert(
-      thresholds.criticalCelsius as double,
-      unit,
-    );
-
-    const lineColor = AppColors.accent;
-
-    final maxSeconds = spots.isNotEmpty ? spots.last.x : 0.0;
-
-    return LineChart(
-      LineChartData(
-        minY: minTemp,
-        maxY: maxTemp,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: true,
-          horizontalInterval: ((maxTemp - minTemp) / 4).clamp(2.0, 20.0),
-          getDrawingHorizontalLine: (_) => FlLine(
-            color: isDark
-                ? AppColors.divider.withValues(alpha: 0.5)
-                : AppColors.lightBorder.withValues(alpha: 0.6),
-            strokeWidth: 1,
-            dashArray: [4, 4],
-          ),
-          getDrawingVerticalLine: (_) => FlLine(
-            color: isDark
-                ? AppColors.divider.withValues(alpha: 0.3)
-                : AppColors.lightBorder.withValues(alpha: 0.4),
-            strokeWidth: 1,
-            dashArray: [4, 6],
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.bg2 : const Color(0xFFF0F2F5),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: isDark ? AppColors.border : AppColors.lightBorder,
         ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: maxSeconds > 60 ? maxSeconds / 3 : 30,
-              getTitlesWidget: (val, meta) {
-                if (val == meta.min || val == meta.max) return const SizedBox.shrink();
-                final agoSeconds = (maxSeconds - val).round();
-                final String timeLabel;
-                if (agoSeconds <= 5) {
-                  timeLabel = 'Now';
-                } else if (agoSeconds < 60) {
-                  timeLabel = '-${agoSeconds}s';
-                } else if (agoSeconds < 3600) {
-                  timeLabel = '-${(agoSeconds / 60).round()}m';
-                } else {
-                  timeLabel = '-${(agoSeconds / 3600).toStringAsFixed(1)}h';
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    timeLabel,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: isDark
-                          ? AppColors.textMuted
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                );
-              },
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
             ),
           ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 40,
-              getTitlesWidget: (value, meta) => Text(
-                '${value.toInt()}${TemperatureUtils.unitSuffix(unit)}',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.textMuted
-                      : AppColors.lightTextSecondary,
-                ),
-              ),
-            ),
-          ),
-        ),
-        borderData: FlBorderData(show: false),
-        extraLinesData: ExtraLinesData(
-          horizontalLines: [
-            HorizontalLine(
-              y: warn,
-              color: AppColors.warning.withValues(alpha: 0.7),
-              strokeWidth: 1.2,
-              dashArray: [5, 4],
-              label: HorizontalLineLabel(
-                show: true,
-                alignment: Alignment.topRight,
-                padding: const EdgeInsets.only(right: 6, bottom: 2),
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.warning,
-                  fontWeight: FontWeight.w700,
-                ),
-                labelResolver: (_) => 'Warn (${warn.toInt()}${TemperatureUtils.unitSuffix(unit)})',
-              ),
-            ),
-            HorizontalLine(
-              y: crit,
-              color: AppColors.critical.withValues(alpha: 0.7),
-              strokeWidth: 1.2,
-              dashArray: [5, 4],
-              label: HorizontalLineLabel(
-                show: true,
-                alignment: Alignment.topRight,
-                padding: const EdgeInsets.only(right: 6, bottom: 2),
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppColors.critical,
-                  fontWeight: FontWeight.w700,
-                ),
-                labelResolver: (_) => 'Crit (${crit.toInt()}${TemperatureUtils.unitSuffix(unit)})',
-              ),
-            ),
-          ],
-        ),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
-            curveSmoothness: 0.35,
-            preventCurveOverShooting: true,
-            color: lineColor,
-            barWidth: 2.5,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: spots.length < 25,
-              getDotPainter: (spot, percent, barData, index) {
-                final isLast = index == spots.length - 1;
-                return FlDotCirclePainter(
-                  radius: isLast ? 4 : 2,
-                  color: isLast ? Colors.white : lineColor,
-                  strokeWidth: isLast ? 2.5 : 1.5,
-                  strokeColor: lineColor,
-                );
-              },
-            ),
-            belowBarData: BarAreaData(
-              show: true,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  lineColor.withValues(alpha: isDark ? 0.28 : 0.20),
-                  lineColor.withValues(alpha: 0.02),
-                ],
-              ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
           ),
         ],
-        lineTouchData: LineTouchData(
-          handleBuiltInTouches: true,
-          touchTooltipData: LineTouchTooltipData(
-            getTooltipColor: (_) =>
-                isDark ? const Color(0xFF1E1E22) : Colors.white,
-            tooltipRoundedRadius: AppRadius.md,
-            tooltipBorder: BorderSide(
-              color: isDark ? AppColors.border : AppColors.lightBorder,
+      ),
+    );
+  }
+}
+
+class _ThresholdLegend extends StatelessWidget {
+  const _ThresholdLegend({
+    required this.label,
+    required this.color,
+    required this.isDark,
+  });
+
+  final String label;
+  final Color color;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 3,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(1.5),
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w500,
+            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GridToggleChip extends StatelessWidget {
+  const _GridToggleChip({
+    required this.showGrid,
+    required this.isDark,
+    required this.onToggle,
+  });
+
+  final bool showGrid;
+  final bool isDark;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155);
+    final inactiveColor = isDark ? AppColors.textMuted : AppColors.lightTextSecondary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+          decoration: BoxDecoration(
+            color: showGrid
+                ? (isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : const Color(0xFFF1F5F9))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: showGrid
+                  ? (isDark
+                      ? Colors.white.withValues(alpha: 0.22)
+                      : const Color(0xFFCBD5E1))
+                  : (isDark
+                      ? AppColors.border.withValues(alpha: 0.5)
+                      : AppColors.lightBorder),
+              width: 1,
             ),
-            tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
-              final secondsAgo = (maxSeconds - s.x).round();
-              final timeStr = secondsAgo <= 5 ? 'Just now' : '${secondsAgo}s ago';
-              return LineTooltipItem(
-                '${s.y.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)}\n',
-                const TextStyle(
-                  color: lineColor,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                showGrid ? Icons.grid_on_rounded : Icons.grid_off_rounded,
+                size: 13,
+                color: showGrid ? activeColor : inactiveColor,
+              ),
+              const SizedBox(width: 4.5),
+              Text(
+                showGrid ? 'Grid on' : 'Grid off',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: showGrid ? FontWeight.w600 : FontWeight.w500,
+                  color: showGrid ? activeColor : inactiveColor,
                 ),
-                children: [
-                  TextSpan(
-                    text: timeStr,
-                    style: TextStyle(
-                      color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.normal,
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+              ),
+            ],
           ),
         ),
       ),
-      duration: AppDurations.medium,
     );
   }
 }
