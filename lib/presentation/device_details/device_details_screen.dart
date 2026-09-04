@@ -247,29 +247,53 @@ class _DeviceInfoPanel extends StatelessWidget {
     report.writeln('  Display Name:    ${device.displayName}');
     report.writeln('  Device ID:       ${device.id}');
     report.writeln('  Type:            ${_typeLabel()}');
-    report.writeln('  Interface:       ${device.interfaceType.name.toUpperCase()}');
+    report.writeln(
+      '  Interface:       ${device.interfaceType.name.toUpperCase()}',
+    );
     report.writeln('  Serial Number:   ${device.serialNumber ?? "N/A"}');
     report.writeln('  Firmware:        ${device.firmwareVersion ?? "N/A"}');
     report.writeln('  Capacity:        ${_capacityText()}\n');
     report.writeln('TEMPERATURE METRICS:');
-    report.writeln('  Current Temp:    ${primaryTemp != null ? "${primaryTemp.celsius.toStringAsFixed(1)} °C" : "Unavailable"}');
-    report.writeln('  Severity:        ${presentation.severity.name.toUpperCase()}');
-    report.writeln('  Sensor Source:   ${primaryTemp?.source.toString() ?? "N/A"}\n');
+    report.writeln(
+      '  Current Temp:    ${primaryTemp != null ? "${primaryTemp.celsius.toStringAsFixed(1)} °C" : "Unavailable"}',
+    );
+    report.writeln(
+      '  Severity:        ${presentation.severity.name.toUpperCase()}',
+    );
+    report.writeln(
+      '  Sensor Source:   ${primaryTemp?.source.toString() ?? "N/A"}\n',
+    );
     report.writeln('S.M.A.R.T. & HEALTH:');
     report.writeln('  Health Status:   ${health.status.name.toUpperCase()}');
-    report.writeln('  SMART Passed:    ${health.smartPassed == null ? "N/A" : (health.smartPassed! ? "PASSED" : "FAILED")}');
-    report.writeln('  Percentage Used: ${health.percentageUsed != null ? "${health.percentageUsed}%" : "N/A"}');
-    report.writeln('  Life Remaining:  ${health.percentageUsed != null ? "${(100 - health.percentageUsed!).clamp(0, 100)}%" : "N/A"}');
-    report.writeln('  Available Spare: ${health.availableSparePercent != null ? "${health.availableSparePercent}%" : "N/A"}');
+    report.writeln(
+      '  SMART Passed:    ${health.smartPassed == null ? "N/A" : (health.smartPassed! ? "PASSED" : "FAILED")}',
+    );
+    report.writeln(
+      '  Percentage Used: ${health.percentageUsed != null ? "${health.percentageUsed}%" : "N/A"}',
+    );
+    report.writeln(
+      '  Life Remaining:  ${health.percentageUsed != null ? "${(100 - health.percentageUsed!).clamp(0, 100)}%" : "N/A"}',
+    );
+    report.writeln(
+      '  Available Spare: ${health.availableSparePercent != null ? "${health.availableSparePercent}%" : "N/A"}',
+    );
     report.writeln('  Power Cycles:    ${health.powerCycles ?? "N/A"}');
-    report.writeln('  Power-On Hours:  ${health.powerOnHours != null ? "${health.powerOnHours} h" : "N/A"}');
+    report.writeln(
+      '  Power-On Hours:  ${health.powerOnHours != null ? "${health.powerOnHours} h" : "N/A"}',
+    );
     report.writeln('  Media Errors:    ${health.mediaErrors ?? "0"}');
-    report.writeln('  Total Read:      ${health.totalBytesRead != null ? _formatBytes(health.totalBytesRead!) : "N/A"}');
-    report.writeln('  Total Written:   ${health.totalBytesWritten != null ? _formatBytes(health.totalBytesWritten!) : "N/A"}\n');
+    report.writeln(
+      '  Total Read:      ${health.totalBytesRead != null ? _formatBytes(health.totalBytesRead!) : "N/A"}',
+    );
+    report.writeln(
+      '  Total Written:   ${health.totalBytesWritten != null ? _formatBytes(health.totalBytesWritten!) : "N/A"}\n',
+    );
     if (device.volumes.isNotEmpty) {
       report.writeln('VOLUMES:');
       for (final v in device.volumes) {
-        report.writeln('  - ${v.volumeName ?? v.mountPoint ?? v.id} (${v.filesystem ?? "Unknown FS"}, Total: ${v.totalBytes != null ? _formatBytes(v.totalBytes!) : "N/A"})');
+        report.writeln(
+          '  - ${v.volumeName ?? v.mountPoint ?? v.id} (${v.filesystem ?? "Unknown FS"}, Total: ${v.totalBytes != null ? _formatBytes(v.totalBytes!) : "N/A"})',
+        );
       }
     }
     report.writeln('\n========================================');
@@ -718,7 +742,8 @@ class _TemperatureTab extends ConsumerWidget {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: device.monitoringStatus == MonitoringStatus.active
+                        color:
+                            device.monitoringStatus == MonitoringStatus.active
                             ? AppColors.normal
                             : AppColors.textMuted,
                         shape: BoxShape.circle,
@@ -764,7 +789,9 @@ class _TemperatureTab extends ConsumerWidget {
                       border: Border.all(
                         color: selected
                             ? AppColors.accent
-                            : (isDark ? AppColors.border : AppColors.lightBorder),
+                            : (isDark
+                                  ? AppColors.border
+                                  : AppColors.lightBorder),
                         width: selected ? 1.5 : 1.0,
                       ),
                       boxShadow: selected
@@ -781,12 +808,14 @@ class _TemperatureTab extends ConsumerWidget {
                       label,
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                         color: selected
                             ? Colors.white
                             : (isDark
-                                ? AppColors.textSecondary
-                                : AppColors.lightTextSecondary),
+                                  ? AppColors.textSecondary
+                                  : AppColors.lightTextSecondary),
                       ),
                     ),
                   ),
@@ -808,7 +837,9 @@ class _TemperatureTab extends ConsumerWidget {
             child: samples.length < 2
                 ? Center(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xl,
+                      ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1104,7 +1135,9 @@ class _HistoryChartState extends State<_HistoryChart> {
       spots.add(FlSpot(x, y));
     }
 
-    final validSpots = spots.where((s) => s != FlSpot.nullSpot && !s.y.isNaN).toList();
+    final validSpots = spots
+        .where((s) => s != FlSpot.nullSpot && !s.y.isNaN)
+        .toList();
     if (validSpots.isEmpty) {
       return const SizedBox(height: 220);
     }
@@ -1127,31 +1160,35 @@ class _HistoryChartState extends State<_HistoryChart> {
       yInterval = 20.0;
     }
 
-    // Clean padding aligned strictly to the interval to prevent top/bottom edge collisions
     final paddedMin = dataMin - (yInterval * 0.4);
     final paddedMax = dataMax + (yInterval * 0.4);
     final minY = (paddedMin / yInterval).floor() * yInterval;
     final maxY = (paddedMax / yInterval).ceil() * yInterval;
 
-    final warn = TemperatureUtils.convert(widget.thresholds.warningCelsius, widget.unit);
-    final crit = TemperatureUtils.convert(widget.thresholds.criticalCelsius, widget.unit);
+    final warn = TemperatureUtils.convert(
+      widget.thresholds.warningCelsius,
+      widget.unit,
+    );
+    final crit = TemperatureUtils.convert(
+      widget.thresholds.criticalCelsius,
+      widget.unit,
+    );
 
-    // Dynamic line color reflecting the current severity
     final double latestConverted = validSpots.last.y;
     final Color lineColor;
     if (latestConverted >= crit) {
       lineColor = AppColors.critical;
     } else if (latestConverted >= warn) {
       lineColor = AppColors.warning;
-    } else if (latestConverted >= warn - (widget.unit == TemperatureUnit.celsius ? 10 : 18)) {
-      lineColor = const Color(0xFFF5A623); // Warm amber
+    } else if (latestConverted >=
+        warn - (widget.unit == TemperatureUnit.celsius ? 10 : 18)) {
+      lineColor = const Color(0xFFF5A623);
     } else {
       lineColor = AppColors.accent;
     }
 
     final xInterval = (effectiveMaxX / 4).clamp(15.0, double.infinity);
 
-    // Trend calculation
     final firstVal = validSpots.first.y;
     final lastVal = validSpots.last.y;
     final tempDelta = lastVal - firstVal;
@@ -1162,13 +1199,17 @@ class _HistoryChartState extends State<_HistoryChart> {
     if (tempDelta.abs() < 0.6) {
       trendText = 'Steady (±0${TemperatureUtils.unitSuffix(widget.unit)})';
       trendIcon = Icons.trending_flat_rounded;
-      trendColor = widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary;
+      trendColor = widget.isDark
+          ? AppColors.textMuted
+          : AppColors.lightTextSecondary;
     } else if (tempDelta > 0) {
-      trendText = '+${tempDelta.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(widget.unit)} (Warming)';
+      trendText =
+          '+${tempDelta.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(widget.unit)} (Warming)';
       trendIcon = Icons.trending_up_rounded;
       trendColor = tempDelta >= 3.0 ? AppColors.warning : AppColors.accent;
     } else {
-      trendText = '${tempDelta.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(widget.unit)} (Cooling)';
+      trendText =
+          '${tempDelta.toStringAsFixed(1)}${TemperatureUtils.unitSuffix(widget.unit)} (Cooling)';
       trendIcon = Icons.trending_down_rounded;
       trendColor = AppColors.normal;
     }
@@ -1176,7 +1217,6 @@ class _HistoryChartState extends State<_HistoryChart> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Top Metrics Showcase Strip
         Wrap(
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.xs,
@@ -1184,28 +1224,37 @@ class _HistoryChartState extends State<_HistoryChart> {
             _MetricPill(
               icon: Icons.thermostat_rounded,
               label: 'Current',
-              value: TemperatureUtils.format(validSpots.last.y, widget.unit, decimals: 0),
+              value: TemperatureUtils.format(
+                validSpots.last.y,
+                widget.unit,
+                decimals: 0,
+              ),
               color: lineColor,
               isDark: widget.isDark,
             ),
             _MetricPill(
               icon: Icons.arrow_downward_rounded,
               label: 'Min',
-              value: '${dataMin.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+              value:
+                  '${dataMin.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
               color: AppColors.normal,
               isDark: widget.isDark,
             ),
             _MetricPill(
               icon: Icons.tune_rounded,
               label: 'Avg',
-              value: '${((dataMin + dataMax) / 2).round()}${TemperatureUtils.unitSuffix(widget.unit)}',
-              color: widget.isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+              value:
+                  '${((dataMin + dataMax) / 2).round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+              color: widget.isDark
+                  ? AppColors.textSecondary
+                  : AppColors.lightTextSecondary,
               isDark: widget.isDark,
             ),
             _MetricPill(
               icon: Icons.arrow_upward_rounded,
               label: 'Peak',
-              value: '${dataMax.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+              value:
+                  '${dataMax.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
               color: dataMax >= warn ? AppColors.warning : AppColors.accent,
               isDark: widget.isDark,
             ),
@@ -1221,7 +1270,6 @@ class _HistoryChartState extends State<_HistoryChart> {
 
         const SizedBox(height: AppSpacing.md),
 
-        // Chart Canvas
         SizedBox(
           height: 230,
           child: LineChart(
@@ -1269,22 +1317,29 @@ class _HistoryChartState extends State<_HistoryChart> {
                         return const SizedBox.shrink();
                       }
 
-                      final pointTime = startTime.add(Duration(seconds: value.round()));
+                      final pointTime = startTime.add(
+                        Duration(seconds: value.round()),
+                      );
                       final ago = endTime.difference(pointTime);
 
                       String label;
-                      if (value >= effectiveMaxX - (xInterval * 0.35) || ago.inSeconds < 30) {
+                      if (value >= effectiveMaxX - (xInterval * 0.35) ||
+                          ago.inSeconds < 30) {
                         label = 'Now';
                       } else {
                         if (widget.window <= const Duration(minutes: 10)) {
                           final s = ago.inSeconds;
-                          label = s < 60 ? '${s}s ago' : '${ago.inMinutes}m ago';
+                          label = s < 60
+                              ? '${s}s ago'
+                              : '${ago.inMinutes}m ago';
                         } else if (widget.window <= const Duration(hours: 1)) {
                           label = '${ago.inMinutes}m ago';
                         } else if (widget.window <= const Duration(hours: 24)) {
                           final h = ago.inHours;
                           final m = ago.inMinutes % 60;
-                          label = m == 0 || h >= 6 ? '${h}h ago' : '${h}h ${m}m ago';
+                          label = m == 0 || h >= 6
+                              ? '${h}h ago'
+                              : '${h}h ${m}m ago';
                         } else {
                           final d = ago.inDays;
                           label = d == 0 ? '${ago.inHours}h ago' : '${d}d ago';
@@ -1318,12 +1373,10 @@ class _HistoryChartState extends State<_HistoryChart> {
                     reservedSize: 46,
                     interval: yInterval,
                     getTitlesWidget: (value, meta) {
-                      // Prevent drawing outside [minY, maxY]
                       if (value < minY - 0.05 || value > maxY + 0.05) {
                         return const SizedBox.shrink();
                       }
 
-                      // Check that value lands strictly on our yInterval step
                       final stepNum = ((value - minY) / yInterval).round();
                       final expectedValue = minY + (stepNum * yInterval);
                       if ((value - expectedValue).abs() > 0.05) {
@@ -1388,7 +1441,8 @@ class _HistoryChartState extends State<_HistoryChart> {
                           color: AppColors.warning,
                           fontWeight: FontWeight.w700,
                         ),
-                        labelResolver: (_) => 'Warn (${warn.round()}${TemperatureUtils.unitSuffix(widget.unit)})',
+                        labelResolver: (_) =>
+                            'Warn (${warn.round()}${TemperatureUtils.unitSuffix(widget.unit)})',
                       ),
                     ),
                   if (crit >= minY && crit <= maxY)
@@ -1406,7 +1460,8 @@ class _HistoryChartState extends State<_HistoryChart> {
                           color: AppColors.critical,
                           fontWeight: FontWeight.w700,
                         ),
-                        labelResolver: (_) => 'Crit (${crit.round()}${TemperatureUtils.unitSuffix(widget.unit)})',
+                        labelResolver: (_) =>
+                            'Crit (${crit.round()}${TemperatureUtils.unitSuffix(widget.unit)})',
                       ),
                     ),
                 ],
@@ -1440,8 +1495,12 @@ class _HistoryChartState extends State<_HistoryChart> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        lineColor.withValues(alpha: widget.isDark ? 0.28 : 0.20),
-                        lineColor.withValues(alpha: widget.isDark ? 0.08 : 0.04),
+                        lineColor.withValues(
+                          alpha: widget.isDark ? 0.28 : 0.20,
+                        ),
+                        lineColor.withValues(
+                          alpha: widget.isDark ? 0.08 : 0.04,
+                        ),
                         lineColor.withValues(alpha: 0.0),
                       ],
                       stops: const [0.0, 0.65, 1.0],
@@ -1478,16 +1537,25 @@ class _HistoryChartState extends State<_HistoryChart> {
                       widget.isDark ? const Color(0xFF1E1E26) : Colors.white,
                   tooltipRoundedRadius: AppRadius.md,
                   tooltipBorder: BorderSide(
-                    color: widget.isDark ? AppColors.border : AppColors.lightBorder,
+                    color: widget.isDark
+                        ? AppColors.border
+                        : AppColors.lightBorder,
                     width: 1.2,
                   ),
-                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  tooltipPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   getTooltipItems: (touchedSpots) => touchedSpots.map((s) {
                     if (s == FlSpot.nullSpot || s.y.isNaN) return null;
-                    final spotTime = startTime.add(Duration(seconds: s.x.round()));
+                    final spotTime = startTime.add(
+                      Duration(seconds: s.x.round()),
+                    );
                     final ago = endTime.difference(spotTime);
 
-                    final hour = spotTime.hour % 12 == 0 ? 12 : spotTime.hour % 12;
+                    final hour = spotTime.hour % 12 == 0
+                        ? 12
+                        : spotTime.hour % 12;
                     final minute = spotTime.minute.toString().padLeft(2, '0');
                     final second = spotTime.second.toString().padLeft(2, '0');
                     final ampm = spotTime.hour >= 12 ? 'PM' : 'AM';
@@ -1496,8 +1564,8 @@ class _HistoryChartState extends State<_HistoryChart> {
                     final agoStr = ago.inSeconds < 15
                         ? 'Just now'
                         : (ago.inMinutes < 60
-                            ? '${ago.inMinutes}m ago'
-                            : '${ago.inHours}h ${ago.inMinutes % 60}m ago');
+                              ? '${ago.inMinutes}m ago'
+                              : '${ago.inHours}h ${ago.inMinutes % 60}m ago');
 
                     final tempColor = s.y >= crit
                         ? AppColors.critical
@@ -1515,7 +1583,9 @@ class _HistoryChartState extends State<_HistoryChart> {
                         TextSpan(
                           text: '$exactTime · $agoStr',
                           style: TextStyle(
-                            color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                            color: widget.isDark
+                                ? AppColors.textMuted
+                                : AppColors.lightTextSecondary,
                             fontSize: 10.5,
                             fontWeight: FontWeight.normal,
                           ),
@@ -1532,19 +1602,20 @@ class _HistoryChartState extends State<_HistoryChart> {
 
         const SizedBox(height: AppSpacing.sm),
 
-        // Bottom Legend Row with Responsive Wrap & Grid Toggle
         LayoutBuilder(
           builder: (context, constraints) {
             final isNarrow = constraints.maxWidth < 520;
             final content = <Widget>[
               _ThresholdLegend(
-                label: 'Warning: ${warn.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+                label:
+                    'Warning: ${warn.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
                 color: AppColors.warning,
                 isDark: widget.isDark,
               ),
               const SizedBox(width: AppSpacing.md),
               _ThresholdLegend(
-                label: 'Critical: ${crit.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
+                label:
+                    'Critical: ${crit.round()}${TemperatureUtils.unitSuffix(widget.unit)}',
                 color: AppColors.critical,
                 isDark: widget.isDark,
               ),
@@ -1560,7 +1631,9 @@ class _HistoryChartState extends State<_HistoryChart> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: widget.isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                  color: widget.isDark
+                      ? AppColors.textMuted
+                      : AppColors.lightTextSecondary,
                 ),
               ),
             ];
@@ -1570,7 +1643,9 @@ class _HistoryChartState extends State<_HistoryChart> {
                 spacing: AppSpacing.md,
                 runSpacing: AppSpacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
-                children: content.where((w) => w is! SizedBox && w is! Spacer).toList(),
+                children: content
+                    .where((w) => w is! SizedBox && w is! Spacer)
+                    .toList(),
               );
             }
 
@@ -1618,7 +1693,9 @@ class _MetricPill extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+              color: isDark
+                  ? AppColors.textMuted
+                  : AppColors.lightTextSecondary,
             ),
           ),
           Text(
@@ -1686,8 +1763,12 @@ class _GridToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF334155);
-    final inactiveColor = isDark ? AppColors.textMuted : AppColors.lightTextSecondary;
+    final activeColor = isDark
+        ? Colors.white.withValues(alpha: 0.9)
+        : const Color(0xFF334155);
+    final inactiveColor = isDark
+        ? AppColors.textMuted
+        : AppColors.lightTextSecondary;
 
     return Material(
       color: Colors.transparent,
@@ -1699,18 +1780,18 @@ class _GridToggleChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: showGrid
                 ? (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : const Color(0xFFF1F5F9))
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : const Color(0xFFF1F5F9))
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(
               color: showGrid
                   ? (isDark
-                      ? Colors.white.withValues(alpha: 0.22)
-                      : const Color(0xFFCBD5E1))
+                        ? Colors.white.withValues(alpha: 0.22)
+                        : const Color(0xFFCBD5E1))
                   : (isDark
-                      ? AppColors.border.withValues(alpha: 0.5)
-                      : AppColors.lightBorder),
+                        ? AppColors.border.withValues(alpha: 0.5)
+                        : AppColors.lightBorder),
               width: 1,
             ),
           ),
@@ -2123,10 +2204,10 @@ class _HealthTab extends StatelessWidget {
                 icon: Icons.favorite_rounded,
                 statusColor: health.percentageUsed != null
                     ? (health.percentageUsed! > 90
-                        ? AppColors.critical
-                        : health.percentageUsed! > 75
-                            ? AppColors.warning
-                            : AppColors.normal)
+                          ? AppColors.critical
+                          : health.percentageUsed! > 75
+                          ? AppColors.warning
+                          : AppColors.normal)
                     : null,
                 available: health.percentageUsed != null,
               ),
@@ -2158,7 +2239,9 @@ class _HealthTab extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.textPrimary : AppColors.lightText,
+                        color: isDark
+                            ? AppColors.textPrimary
+                            : AppColors.lightText,
                       ),
                     ),
                     Text(
@@ -2170,11 +2253,13 @@ class _HealthTab extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: health.percentageUsed != null
                             ? (health.percentageUsed! > 90
-                                ? AppColors.critical
-                                : health.percentageUsed! > 75
-                                    ? AppColors.warning
-                                    : AppColors.normal)
-                            : (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary),
+                                  ? AppColors.critical
+                                  : health.percentageUsed! > 75
+                                  ? AppColors.warning
+                                  : AppColors.normal)
+                            : (isDark
+                                  ? AppColors.textSecondary
+                                  : AppColors.lightTextSecondary),
                       ),
                     ),
                   ],
@@ -2184,16 +2269,23 @@ class _HealthTab extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   child: LinearProgressIndicator(
                     value: health.percentageUsed != null
-                        ? ((100 - health.percentageUsed!) / 100.0).clamp(0.0, 1.0)
+                        ? ((100 - health.percentageUsed!) / 100.0).clamp(
+                            0.0,
+                            1.0,
+                          )
                         : 1.0,
                     minHeight: 8,
-                    backgroundColor: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
+                    backgroundColor: isDark
+                        ? AppColors.bg2
+                        : AppColors.lightSurfaceMuted,
                     valueColor: AlwaysStoppedAnimation(
-                      health.percentageUsed != null && health.percentageUsed! > 90
+                      health.percentageUsed != null &&
+                              health.percentageUsed! > 90
                           ? AppColors.critical
-                          : health.percentageUsed != null && health.percentageUsed! > 75
-                              ? AppColors.warning
-                              : AppColors.normal,
+                          : health.percentageUsed != null &&
+                                health.percentageUsed! > 75
+                          ? AppColors.warning
+                          : AppColors.normal,
                     ),
                   ),
                 ),
@@ -2204,7 +2296,9 @@ class _HealthTab extends StatelessWidget {
                       : 'Accumulated TBW and endurance telemetry are queried via WMI / sysfs.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+                    color: isDark
+                        ? AppColors.textSecondary
+                        : AppColors.lightTextSecondary,
                   ),
                 ),
               ],

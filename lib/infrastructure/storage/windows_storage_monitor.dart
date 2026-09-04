@@ -58,12 +58,7 @@ if (\$null -eq \$disk) { exit 2 }
   }) async {
     final result = await SafeProcessRunner.instance.run(
       'powershell',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        script,
-      ],
+      ['-NoProfile', '-NonInteractive', '-Command', script],
       timeout: timeout,
       requireZeroExit: false,
     );
@@ -251,7 +246,6 @@ if (\$null -eq \$disk) { exit 2 }
       AppLogger.instance.debug(_tag, 'reliability counter read failed: $e');
     }
 
-    // Fallback: Query Win32_DiskDrive for status when non-admin/WMI reliability counters are unavailable
     try {
       final script =
           'Get-CimInstance Win32_DiskDrive | '
@@ -264,13 +258,16 @@ if (\$null -eq \$disk) { exit 2 }
           status: statusStr == 'OK'
               ? DeviceHealthStatus.healthy
               : (statusStr.contains('BAD') || statusStr.contains('PRED FAIL'))
-                  ? DeviceHealthStatus.critical
-                  : DeviceHealthStatus.warning,
+              ? DeviceHealthStatus.critical
+              : DeviceHealthStatus.warning,
           smartPassed: statusStr == 'OK',
         );
       }
     } catch (e) {
-      AppLogger.instance.debug(_tag, 'Win32_DiskDrive fallback health read failed: $e');
+      AppLogger.instance.debug(
+        _tag,
+        'Win32_DiskDrive fallback health read failed: $e',
+      );
     }
 
     return DeviceHealth.unavailable;
@@ -280,7 +277,6 @@ if (\$null -eq \$disk) { exit 2 }
   Future<StorageCapacity> getCapacity(String deviceId) async {
     final rawId = _rawId(deviceId);
     try {
-      // Find drive letters matching this physical disk index
       final script =
           'Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | '
           'Where-Object { \$_.Name -match "^$rawId\\s" } | '
@@ -288,10 +284,14 @@ if (\$null -eq \$disk) { exit 2 }
       final raw = await _runPowerShellJson(script);
       if (raw == null) return StorageCapacity.unavailable;
       final name = raw is Map ? (raw['Name'] ?? '').toString() : '';
-      final letters = RegExp(r'([A-Z]):').allMatches(name).map((m) => m.group(1)!).toList();
+      final letters = RegExp(
+        r'([A-Z]):',
+      ).allMatches(name).map((m) => m.group(1)!).toList();
       if (letters.isEmpty) return StorageCapacity.unavailable;
 
-      final letterFilter = letters.map((l) => "\$_.DeviceID -eq '$l:'").join(' -or ');
+      final letterFilter = letters
+          .map((l) => "\$_.DeviceID -eq '$l:'")
+          .join(' -or ');
       final volScript =
           "Get-CimInstance Win32_LogicalDisk | "
           "Where-Object { $letterFilter } | "
@@ -330,10 +330,14 @@ if (\$null -eq \$disk) { exit 2 }
       final raw = await _runPowerShellJson(script);
       if (raw == null) return const [];
       final name = raw is Map ? (raw['Name'] ?? '').toString() : '';
-      final letters = RegExp(r'([A-Z]):').allMatches(name).map((m) => m.group(1)!).toList();
+      final letters = RegExp(
+        r'([A-Z]):',
+      ).allMatches(name).map((m) => m.group(1)!).toList();
       if (letters.isEmpty) return const [];
 
-      final letterFilter = letters.map((l) => "\$_.DeviceID -eq '$l:'").join(' -or ');
+      final letterFilter = letters
+          .map((l) => "\$_.DeviceID -eq '$l:'")
+          .join(' -or ');
       final volScript =
           "Get-CimInstance Win32_LogicalDisk | "
           "Where-Object { $letterFilter } | "
@@ -353,7 +357,9 @@ if (\$null -eq \$disk) { exit 2 }
           StorageVolume(
             id: devId,
             mountPoint: devId,
-            volumeName: (v['VolumeName'] ?? '').toString().isNotEmpty ? v['VolumeName']!.toString() : devId,
+            volumeName: (v['VolumeName'] ?? '').toString().isNotEmpty
+                ? v['VolumeName']!.toString()
+                : devId,
             filesystem: v['FileSystem']?.toString(),
             totalBytes: total,
             usedBytes: used,
@@ -393,7 +399,7 @@ if (\$null -eq \$disk) { exit 2 }
           if (item is! Map<String, dynamic>) continue;
           final name = (item['Name'] ?? '').toString();
           if (name.isEmpty || name == '_Total') continue;
-          // Name is typically "0 C: D:" or "1 E:"
+
           final driveNumMatch = RegExp(r'^(\d+)').firstMatch(name);
           final diskIndex = driveNumMatch?.group(1);
           if (diskIndex == null) continue;

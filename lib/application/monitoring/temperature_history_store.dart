@@ -30,7 +30,7 @@ class HistoryStats {
 
 class TemperatureHistoryStore {
   TemperatureHistoryStore({TelemetryPersistenceRepository? persistence})
-      : _persistence = persistence ?? TelemetryPersistenceRepository();
+    : _persistence = persistence ?? TelemetryPersistenceRepository();
 
   final TelemetryPersistenceRepository _persistence;
   final Map<String, Queue<HistoryPoint>> _raw = {};
@@ -61,7 +61,7 @@ class TemperatureHistoryStore {
 
     final count = (_writesSinceLastSave[deviceId] ?? 0) + 1;
     _writesSinceLastSave[deviceId] = count;
-    // Persist every 10 readings (~2.5 minutes at default 15s poll)
+
     if (count >= 10) {
       _writesSinceLastSave[deviceId] = 0;
       persistDevice(deviceId);
@@ -72,7 +72,10 @@ class TemperatureHistoryStore {
     final points = pointsFor(deviceId, const Duration(days: 7));
     if (points.isEmpty) return;
     final toSave = points
-        .map((p) => LocalTelemetryPoint(timestamp: p.timestamp, celsius: p.celsius))
+        .map(
+          (p) =>
+              LocalTelemetryPoint(timestamp: p.timestamp, celsius: p.celsius),
+        )
         .toList();
     await _persistence.saveDevicePoints(deviceId, toSave);
   }

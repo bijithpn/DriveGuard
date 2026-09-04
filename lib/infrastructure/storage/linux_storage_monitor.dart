@@ -133,7 +133,6 @@ class LinuxStorageMonitor extends StorageMonitor {
           final hwmonDir = Directory(entry.path);
           if (!hwmonDir.existsSync()) continue;
 
-          // Try temp1_input (Composite) first
           final temp1File = File('${hwmonDir.path}/temp1_input');
           if (temp1File.existsSync()) {
             final raw = _readSysfsString(temp1File.path);
@@ -148,7 +147,6 @@ class LinuxStorageMonitor extends StorageMonitor {
             }
           }
 
-          // Check other temp*_input files for plausible values
           for (final f in hwmonDir.listSync()) {
             if (RegExp(r'temp\d+_input$').hasMatch(f.path)) {
               final raw = _readSysfsString(f.path);
@@ -331,7 +329,9 @@ class LinuxStorageMonitor extends StorageMonitor {
 
           var celsius = raw.toDouble();
           if (celsius > 200) celsius -= 273;
-          if (celsius == 0 || !TemperatureUtils.isPlausibleValue(celsius)) continue;
+          if (celsius == 0 || !TemperatureUtils.isPlausibleValue(celsius)) {
+            continue;
+          }
           sensors.add(
             StorageSensor(
               id: 'sensor$i',

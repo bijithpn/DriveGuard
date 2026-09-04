@@ -220,6 +220,7 @@ class _BootstrapperState extends ConsumerState<_Bootstrapper> {
     return AppRoot(windowController: widget.windowController);
   }
 }
+
 /*
 
 2026-09-04T10:07:28.245571 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3

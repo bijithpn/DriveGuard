@@ -121,15 +121,14 @@ class AppTrayService {
       final path = await _iconPathFor(severity, label);
       await trayManager.setIcon(path);
 
-      // tray_manager does not implement setToolTip on Linux.
       if (!Platform.isLinux) {
         try {
-          await trayManager.setToolTip('DriveGuard - ${_tooltipSummary(severity)}');
+          await trayManager.setToolTip(
+            'DriveGuard - ${_tooltipSummary(severity)}',
+          );
         } catch (_) {}
       }
 
-      // On macOS and Linux (Ayatana/AppIndicator), setTitle displays the temperature
-      // directly in the top menu bar / system panel beside the icon.
       if (Platform.isMacOS || Platform.isLinux) {
         try {
           await trayManager.setTitle(
@@ -162,38 +161,34 @@ class AppTrayService {
     TemperatureSeverity.unavailable => 0,
   };
 
-  /// Wraps raw PNG bytes in a standard 22-byte Windows .ico container
-  /// (ICONDIR + single ICONDIRENTRY).
-  ///
-  /// Windows Vista+ Shell_NotifyIcon and LoadImage natively decode PNG-compressed
-  /// icons within .ico files. Passing a raw .png directly causes Win32 LoadImage
-  /// to fail with NULL, which prevents the system tray icon from appearing.
   static Uint8List wrapPngInIco(Uint8List pngBytes, int width, int height) {
     final byteData = ByteData(22 + pngBytes.length);
-    // ICONDIR structure (6 bytes)
-    byteData.setUint16(0, 0, Endian.little); // Reserved: must be 0
-    byteData.setUint16(2, 1, Endian.little); // Image type: 1 = ICO (2 = CUR)
-    byteData.setUint16(4, 1, Endian.little); // Number of images: 1
 
-    // ICONDIRENTRY structure (16 bytes)
-    byteData.setUint8(6, width >= 256 ? 0 : width); // Width in pixels (0 means 256)
-    byteData.setUint8(7, height >= 256 ? 0 : height); // Height in pixels (0 means 256)
-    byteData.setUint8(8, 0); // Number of colors in palette (0 = no palette / >=8bpp)
-    byteData.setUint8(9, 0); // Reserved: must be 0
-    byteData.setUint16(10, 1, Endian.little); // Color planes (0 or 1)
-    byteData.setUint16(12, 32, Endian.little); // Bits per pixel (32-bit RGBA)
-    byteData.setUint32(14, pngBytes.length, Endian.little); // Size of image data in bytes
-    byteData.setUint32(18, 22, Endian.little); // File offset of image data (6 + 16 = 22)
+    byteData.setUint16(0, 0, Endian.little);
+    byteData.setUint16(2, 1, Endian.little);
+    byteData.setUint16(4, 1, Endian.little);
+
+    byteData.setUint8(6, width >= 256 ? 0 : width);
+    byteData.setUint8(7, height >= 256 ? 0 : height);
+    byteData.setUint8(8, 0);
+    byteData.setUint8(9, 0);
+    byteData.setUint16(10, 1, Endian.little);
+    byteData.setUint16(12, 32, Endian.little);
+    byteData.setUint32(14, pngBytes.length, Endian.little);
+    byteData.setUint32(18, 22, Endian.little);
 
     final result = byteData.buffer.asUint8List();
     result.setRange(22, 22 + pngBytes.length, pngBytes);
     return result;
   }
 
-  Future<String> _iconPathFor(TemperatureSeverity severity, String? label) async {
-    // Include label and platform in cache key so icon re-renders when temperature changes.
+  Future<String> _iconPathFor(
+    TemperatureSeverity severity,
+    String? label,
+  ) async {
     final isWindows = Platform.isWindows;
-    final cacheKey = '${severity.name}_${label ?? ''}_${isWindows ? "ico" : "png"}';
+    final cacheKey =
+        '${severity.name}_${label ?? ''}_${isWindows ? "ico" : "png"}';
     final cached = _iconPathCache[cacheKey];
     if (cached != null && File(cached).existsSync()) return cached;
 
@@ -223,19 +218,11 @@ class AppTrayService {
     }
   }
 
-  /// Renders a 64×64 tray icon.
-  ///
-  /// When [label] is provided (e.g. "38°C", "N/A") it is drawn as white text
-  /// centred on a coloured rounded-rectangle — giving a visible temperature
-  /// reading directly in the Windows system tray.
-  /// When [label] is null the original dot + lines design is used as a
-  /// fallback (e.g. before any device is discovered).
   Future<Uint8List> _renderTrayIcon(ui.Color color, String? label) async {
     const double size = 64;
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
 
-    // Background rounded rectangle.
     final bgPaint = ui.Paint()
       ..color = color
       ..isAntiAlias = true;
@@ -247,15 +234,11 @@ class AppTrayService {
       bgPaint,
     );
 
-    // If label is too long (e.g. "Permission required", "Disconnected"),
-    // show a clean short fallback or N/A so it doesn't overflow the icon.
     final displayLabel = (label == null || label.length > 5)
         ? (label == null ? null : 'N/A')
         : label;
 
     if (displayLabel != null && displayLabel.isNotEmpty) {
-      // Draw the label text centred in the icon.
-      // ui.Paragraph lets us render text onto a canvas in dart:ui.
       final fontSize = switch (displayLabel.length) {
         <= 2 => 32.0,
         3 => 27.0,
@@ -276,11 +259,10 @@ class AppTrayService {
         ..addText(displayLabel);
       final para = builder.build();
       para.layout(const ui.ParagraphConstraints(width: size));
-      // Centre vertically.
+
       final yOffset = (size - para.height) / 2;
       canvas.drawParagraph(para, ui.Offset(0, yOffset));
     } else {
-      // Fallback: three horizontal lines (hamburger / scanning indicator).
       final linePaint = ui.Paint()
         ..blendMode = ui.BlendMode.clear
         ..style = ui.PaintingStyle.stroke
@@ -288,11 +270,7 @@ class AppTrayService {
         ..strokeCap = ui.StrokeCap.round
         ..isAntiAlias = true;
       for (final y in [23.0, 32.0, 41.0]) {
-        canvas.drawLine(
-          ui.Offset(17, y),
-          ui.Offset(size - 17, y),
-          linePaint,
-        );
+        canvas.drawLine(ui.Offset(17, y), ui.Offset(size - 17, y), linePaint);
       }
     }
 

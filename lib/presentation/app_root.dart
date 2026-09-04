@@ -82,8 +82,12 @@ class _AppRootState extends ConsumerState<AppRoot>
           final updated = settings.widget.copyWith(
             x: (geometry['x'] as num?)?.toDouble() ?? settings.widget.x,
             y: (geometry['y'] as num?)?.toDouble() ?? settings.widget.y,
-            width: (geometry['width'] as num?)?.toDouble() ?? settings.widget.width,
-            height: (geometry['height'] as num?)?.toDouble() ?? settings.widget.height,
+            width:
+                (geometry['width'] as num?)?.toDouble() ??
+                settings.widget.width,
+            height:
+                (geometry['height'] as num?)?.toDouble() ??
+                settings.widget.height,
           );
           ref
               .read(settingsProvider.notifier)
@@ -140,7 +144,9 @@ class _AppRootState extends ConsumerState<AppRoot>
         ref
             .read(settingsProvider.notifier)
             .updateWith(
-              (s) => s.copyWith(monitoringEnabled: !currentSettings.monitoringEnabled),
+              (s) => s.copyWith(
+                monitoringEnabled: !currentSettings.monitoringEnabled,
+              ),
             );
       },
       onOpenSettings: () async {
@@ -307,7 +313,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   void onWindowClose() async {
     final settings = ref.read(settingsProvider);
     final isWidgetActive = ref.read(widgetModeActiveProvider);
-    // If widget mode is active or (closeToTray is enabled and tray is active), keep background monitoring alive and hide main window
+
     if (isWidgetActive || (settings.closeToTray && settings.showTrayIcon)) {
       await windowManager.hide();
     } else {
@@ -388,12 +394,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       if (tray != null) _pushDeviceSummaryToTray(tray);
       _pushSnapshotToMiniWindowIfActive();
     });
-    // Read/write speed in the mini widget comes from activityProvider, which
-    // updates on its own (faster) cadence independent of devicesProvider -
-    // without this listener the mini widget would only get a fresh snapshot
-    // whenever the device list happens to change, showing stale MB/s values
-    // in between (device_details_screen.dart watches this provider directly
-    // for the same reason).
+
     ref.listen(activityProvider, (previous, next) {
       _pushSnapshotToMiniWindowIfActive();
     });

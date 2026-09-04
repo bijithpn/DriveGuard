@@ -495,7 +495,9 @@ class _GridCard extends StatelessWidget {
                           Icon(
                             Icons.access_time_rounded,
                             size: 11,
-                            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                            color: isDark
+                                ? AppColors.textMuted
+                                : AppColors.lightTextSecondary,
                           ),
                           const SizedBox(width: 4),
                           Text(
@@ -503,7 +505,9 @@ class _GridCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
-                              color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+                              color: isDark
+                                  ? AppColors.textMuted
+                                  : AppColors.lightTextSecondary,
                             ),
                           ),
                         ],

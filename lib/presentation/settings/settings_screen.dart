@@ -502,8 +502,7 @@ class _GeneralSection extends ConsumerWidget {
         trailing: Switch(
           value: settings.minimizeToTray && settings.showTrayIcon,
           onChanged: settings.showTrayIcon
-              ? (v) =>
-                  notifier.updateWith((s) => s.copyWith(minimizeToTray: v))
+              ? (v) => notifier.updateWith((s) => s.copyWith(minimizeToTray: v))
               : null,
         ),
       ),
@@ -515,8 +514,7 @@ class _GeneralSection extends ConsumerWidget {
         trailing: Switch(
           value: settings.closeToTray && settings.showTrayIcon,
           onChanged: settings.showTrayIcon
-              ? (v) =>
-                  notifier.updateWith((s) => s.copyWith(closeToTray: v))
+              ? (v) => notifier.updateWith((s) => s.copyWith(closeToTray: v))
               : null,
         ),
       ),

@@ -62,10 +62,10 @@ class _MiniMonitorViewState extends State<MiniMonitorView> {
     final statusColor = currentDevice == null
         ? AppColors.textMuted
         : currentDevice.severity == TemperatureSeverity.critical
-            ? AppColors.critical
-            : currentDevice.severity == TemperatureSeverity.warning
-                ? AppColors.warning
-                : AppColors.normal;
+        ? AppColors.critical
+        : currentDevice.severity == TemperatureSeverity.warning
+        ? AppColors.warning
+        : AppColors.normal;
 
     return Material(
       color: Colors.transparent,
@@ -81,15 +81,17 @@ class _MiniMonitorViewState extends State<MiniMonitorView> {
                 onExpand: widget.onExpand,
                 compact: compact,
                 onClose: widget.onClose,
-                onPrev: _currentIndex > 0 ? () => _goTo(_currentIndex - 1) : null,
-                onNext: _currentIndex < devices.length - 1 ? () => _goTo(_currentIndex + 1) : null,
+                onPrev: _currentIndex > 0
+                    ? () => _goTo(_currentIndex - 1)
+                    : null,
+                onNext: _currentIndex < devices.length - 1
+                    ? () => _goTo(_currentIndex + 1)
+                    : null,
               ),
             ),
             if (devices.isEmpty)
               Expanded(
-                child: Center(
-                  child: _EmptyBody(compact: compact),
-                ),
+                child: Center(child: _EmptyBody(compact: compact)),
               )
             else
               Expanded(
@@ -112,12 +114,8 @@ class _MiniMonitorViewState extends State<MiniMonitorView> {
   }
 }
 
-
 class _SingleDeviceCard extends StatelessWidget {
-  const _SingleDeviceCard({
-    required this.device,
-    required this.compact,
-  });
+  const _SingleDeviceCard({required this.device, required this.compact});
 
   final MiniWidgetDeviceSnapshot device;
   final bool compact;
@@ -130,7 +128,6 @@ class _SingleDeviceCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 2, 14, 8),
       child: Column(
         children: [
-          // Device Model Header with Type Icon
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -138,8 +135,8 @@ class _SingleDeviceCard extends StatelessWidget {
                 device.type == StorageDeviceType.nvme
                     ? Icons.memory_rounded
                     : device.type == StorageDeviceType.ssd
-                        ? Icons.storage_rounded
-                        : Icons.album_rounded,
+                    ? Icons.storage_rounded
+                    : Icons.album_rounded,
                 size: 13,
                 color: const Color(0xFF98989D),
               ),
@@ -160,7 +157,6 @@ class _SingleDeviceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
 
-          // Central Radial Gauge
           Expanded(
             child: Center(
               child: SizedBox(
@@ -205,7 +201,6 @@ class _SingleDeviceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
 
-          // Enriched Drive Metrics Chips (Health, TBW/Hours, Live I/O)
           Row(
             children: [
               _MiniStatChip(
@@ -214,7 +209,9 @@ class _SingleDeviceCard extends StatelessWidget {
                     ? '${device.lifePercent}%'
                     : device.healthStatus,
                 icon: Icons.favorite_rounded,
-                color: device.healthStatus == 'HEALTHY' || device.healthStatus == 'OK'
+                color:
+                    device.healthStatus == 'HEALTHY' ||
+                        device.healthStatus == 'OK'
                     ? AppColors.normal
                     : AppColors.warning,
               ),
@@ -230,7 +227,8 @@ class _SingleDeviceCard extends StatelessWidget {
               const SizedBox(width: 5),
               _MiniStatChip(
                 label: 'Live I/O',
-                value: device.readSpeedText ?? device.writeSpeedText ?? '0.0 MB/s',
+                value:
+                    device.readSpeedText ?? device.writeSpeedText ?? '0.0 MB/s',
                 icon: Icons.speed_rounded,
                 color: AppColors.accent,
               ),
@@ -594,7 +592,9 @@ class _CloseWidgetButtonState extends State<_CloseWidgetButton> {
                   : const Color(0xFF3A3A3C),
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: _hovered ? const Color(0xFFFF453A) : const Color(0xFF48484A),
+                color: _hovered
+                    ? const Color(0xFFFF453A)
+                    : const Color(0xFF48484A),
                 width: 1,
               ),
             ),
@@ -658,7 +658,6 @@ class _ExpandButtonState extends State<_ExpandButton> {
   }
 }
 
-
 class _EmptyBody extends StatelessWidget {
   const _EmptyBody({required this.compact});
   final bool compact;
@@ -691,5 +690,3 @@ class _EmptyBody extends StatelessWidget {
     );
   }
 }
-
-

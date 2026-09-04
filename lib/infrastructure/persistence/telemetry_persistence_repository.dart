@@ -3,10 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/logging/app_logger.dart';
 
 class LocalTelemetryPoint {
-  const LocalTelemetryPoint({
-    required this.timestamp,
-    required this.celsius,
-  });
+  const LocalTelemetryPoint({required this.timestamp, required this.celsius});
 
   final DateTime timestamp;
   final double celsius;

@@ -112,13 +112,21 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
       await windowManager.setPosition(Offset(x, y));
       await windowManager.setResizable(true);
     } catch (e) {
-      AppLogger.instance.error('MiniWidgetApp', 'Error applying window state', e);
+      AppLogger.instance.error(
+        'MiniWidgetApp',
+        'Error applying window state',
+        e,
+      );
     } finally {
       try {
         await windowManager.show();
         await windowManager.focus();
       } catch (e) {
-        AppLogger.instance.error('MiniWidgetApp', 'windowManager.show failed', e);
+        AppLogger.instance.error(
+          'MiniWidgetApp',
+          'windowManager.show failed',
+          e,
+        );
       }
       try {
         await widget.controller.show();

@@ -26,11 +26,14 @@ void main() {
       // ICONDIRENTRY (16 bytes)
       expect(bd.getUint8(6), equals(64)); // Width = 64
       expect(bd.getUint8(7), equals(64)); // Height = 64
-      expect(bd.getUint8(8), equals(0));  // ColorCount = 0
-      expect(bd.getUint8(9), equals(0));  // Reserved = 0
-      expect(bd.getUint16(10, Endian.little), equals(1));  // Planes = 1
+      expect(bd.getUint8(8), equals(0)); // ColorCount = 0
+      expect(bd.getUint8(9), equals(0)); // Reserved = 0
+      expect(bd.getUint16(10, Endian.little), equals(1)); // Planes = 1
       expect(bd.getUint16(12, Endian.little), equals(32)); // BitCount = 32
-      expect(bd.getUint32(14, Endian.little), equals(fakePng.length)); // BytesInRes
+      expect(
+        bd.getUint32(14, Endian.little),
+        equals(fakePng.length),
+      ); // BytesInRes
       expect(bd.getUint32(18, Endian.little), equals(22)); // ImageOffset = 22
 
       // Payload verification

@@ -91,20 +91,20 @@ class MiniWidgetDeviceSnapshot {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        name,
-        valueText,
-        fraction,
-        severity,
-        type,
-        healthStatus,
-        lifePercent,
-        freeCapacityText,
-        readSpeedText,
-        writeSpeedText,
-        tbwText,
-        powerOnHoursText,
-      );
+    id,
+    name,
+    valueText,
+    fraction,
+    severity,
+    type,
+    healthStatus,
+    lifePercent,
+    freeCapacityText,
+    readSpeedText,
+    writeSpeedText,
+    tbwText,
+    powerOnHoursText,
+  );
 }
 
 class MiniWidgetSnapshot {

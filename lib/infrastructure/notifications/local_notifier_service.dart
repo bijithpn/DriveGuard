@@ -27,7 +27,6 @@ class LocalNotifierService implements NotificationService {
   Future<void> _show(String title, String body, String deviceId) async {
     if (!_initialized) return;
     try {
-      // Sanitize text to ensure WinRT XML doesn't reject control characters
       final cleanTitle = title.trim();
       final cleanBody = body.replaceAll('\r', '').trim();
 
@@ -38,12 +37,15 @@ class LocalNotifierService implements NotificationService {
       notification.onClick = () {
         if (!_clicksController.isClosed) _clicksController.add(deviceId);
       };
-      // Schedule presentation asynchronously so WinRT toast callback doesn't block polling thread
+
       scheduleMicrotask(() async {
         try {
           await notification.show();
         } catch (e) {
-          AppLogger.instance.warning(_tag, 'Failed to display notification: $e');
+          AppLogger.instance.warning(
+            _tag,
+            'Failed to display notification: $e',
+          );
         }
       });
     } catch (e) {

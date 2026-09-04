@@ -1,5 +1,7 @@
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart';
+
 enum LogLevel { debug, info, warning, error }
 
 class LogEntry {
@@ -43,8 +45,9 @@ class AppLogger {
       _entries.removeFirst();
     }
 
-    // ignore: avoid_print
-    print(entry);
+    if (kDebugMode) {
+      print(entry);
+    }
   }
 
   List<LogEntry> recent({int? limit}) {

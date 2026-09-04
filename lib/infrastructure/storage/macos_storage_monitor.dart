@@ -158,22 +158,13 @@ class MacOSStorageMonitor extends StorageMonitor {
     }
   }
 
-  /// Resolves [deviceId] to a BSD name (e.g. "disk0"), first from the cache
-  /// populated by this backend's own [getDevices], and falling back to
-  /// stripping the "macos-" prefix this backend and [NativeStorageMonitor]
-  /// both use to build device IDs. The fallback matters because when the
-  /// native IOKit backend supplies devices (the common path), this legacy
-  /// backend's own [getDevices] never runs, leaving the cache empty even
-  /// though the ID itself still encodes the real BSD name.
   String? _resolveBsdName(String deviceId) {
     final cached = _bsdNameById[deviceId];
     if (cached != null) return cached;
     const prefix = 'macos-';
     if (!deviceId.startsWith(prefix)) return null;
     final candidate = deviceId.substring(prefix.length);
-    // The legacy fallback ID is "macos-${model.hashCode}" when no bsd_name
-    // was available - that's not a real BSD name, so don't hand it to
-    // smartctl as one. Real BSD names always look like "diskN".
+
     if (!RegExp(r'^disk\d+$').hasMatch(candidate)) return null;
     return candidate;
   }
