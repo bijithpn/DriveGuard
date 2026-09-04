@@ -41,6 +41,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   AppTrayService? _tray;
   bool _widgetModeSyncInFlight = false;
   StreamSubscription<String>? _notificationClickSub;
+  MiniWidgetSnapshot? _lastPushedSnapshot;
 
   @override
   void initState() {
@@ -60,7 +61,6 @@ class _AppRootState extends ConsumerState<AppRoot>
   }
 
   Future<void> _onNotificationClicked(String deviceId) async {
-    await _syncWidgetMode(false);
     await windowManager.show();
     await windowManager.focus();
     rootNavigatorKey.currentState?.push(
@@ -77,14 +77,48 @@ class _AppRootState extends ConsumerState<AppRoot>
         final geometry = raw is String && raw.isNotEmpty
             ? jsonDecode(raw) as Map<String, dynamic>
             : null;
-        await _syncWidgetMode(false, geometry: geometry);
+        if (geometry != null) {
+          final settings = ref.read(settingsProvider);
+          final updated = settings.widget.copyWith(
+            x: (geometry['x'] as num?)?.toDouble() ?? settings.widget.x,
+            y: (geometry['y'] as num?)?.toDouble() ?? settings.widget.y,
+            width: (geometry['width'] as num?)?.toDouble() ?? settings.widget.width,
+            height: (geometry['height'] as num?)?.toDouble() ?? settings.widget.height,
+          );
+          ref
+              .read(settingsProvider.notifier)
+              .updateWith((s) => s.copyWith(widget: updated));
+        }
+        await windowManager.show();
+        await windowManager.focus();
       case 'widget_closed':
+        _lastPushedSnapshot = null;
+        widget.windowController.clearMiniWindow();
+        final raw = call.arguments;
+        final geometry = raw is String && raw.isNotEmpty
+            ? jsonDecode(raw) as Map<String, dynamic>
+            : null;
         ref.read(widgetModeActiveProvider.notifier).state = false;
-        ref
-            .read(settingsProvider.notifier)
-            .updateWith((s) => s.copyWith(widget: s.widget.copyWith(enabled: false)));
+        ref.read(settingsProvider.notifier).updateWith((s) {
+          var w = s.widget.copyWith(enabled: false);
+          if (geometry != null) {
+            w = w.copyWith(
+              x: (geometry['x'] as num?)?.toDouble() ?? w.x,
+              y: (geometry['y'] as num?)?.toDouble() ?? w.y,
+              width: (geometry['width'] as num?)?.toDouble() ?? w.width,
+              height: (geometry['height'] as num?)?.toDouble() ?? w.height,
+            );
+          }
+          return s.copyWith(widget: w);
+        });
+        final isMainVisible = await windowManager.isVisible();
+        final settings = ref.read(settingsProvider);
+        if (!isMainVisible && (!settings.showTrayIcon || _tray == null)) {
+          exit(0);
+        }
       case 'ready':
-        await _pushSnapshotToMiniWindowIfActive();
+        await widget.windowController.showMiniWindow();
+        await _pushSnapshotToMiniWindowIfActive(force: true);
     }
     return null;
   }
@@ -98,7 +132,6 @@ class _AppRootState extends ConsumerState<AppRoot>
 
     final tray = AppTrayService(
       onOpenDashboard: () async {
-        await _syncWidgetMode(false);
         await windowManager.show();
         await windowManager.focus();
       },
@@ -111,7 +144,6 @@ class _AppRootState extends ConsumerState<AppRoot>
             );
       },
       onOpenSettings: () async {
-        await _syncWidgetMode(false);
         await windowManager.show();
         await windowManager.focus();
         rootNavigatorKey.currentState?.push(
@@ -190,8 +222,7 @@ class _AppRootState extends ConsumerState<AppRoot>
     await tray.updateSeverity(worst);
   }
 
-  Future<void> _pushSnapshotToMiniWindowIfActive() async {
-    if (!ref.read(widgetModeActiveProvider)) return;
+  MiniWidgetSnapshot _buildSnapshot() {
     final settings = ref.read(settingsProvider);
     final deviceList = ref.read(devicesProvider);
     final snapshotDevices = <MiniWidgetDeviceSnapshot>[];
@@ -242,12 +273,19 @@ class _AppRootState extends ConsumerState<AppRoot>
         ),
       );
     }
-    await widget.windowController.updateMiniWindowSnapshot(
-      MiniWidgetSnapshot(
-        devices: snapshotDevices,
-        compact: settings.widget.compact,
-      ),
+    return MiniWidgetSnapshot(
+      devices: snapshotDevices,
+      compact: settings.widget.compact,
     );
+  }
+
+  Future<void> _pushSnapshotToMiniWindowIfActive({bool force = false}) async {
+    if (!ref.read(widgetModeActiveProvider)) return;
+    final snapshot = _buildSnapshot();
+    if (!force && _lastPushedSnapshot == snapshot) return;
+    _lastPushedSnapshot = snapshot;
+
+    await widget.windowController.updateMiniWindowSnapshot(snapshot);
   }
 
   @override
@@ -299,12 +337,15 @@ class _AppRootState extends ConsumerState<AppRoot>
     try {
       final settings = ref.read(settingsProvider);
       if (shouldBeActive) {
-        await widget.windowController.enterWidgetMode(settings.widget);
+        final initialSnapshot = _buildSnapshot();
+        await widget.windowController.enterWidgetMode(
+          settings.widget,
+          initialSnapshot: initialSnapshot,
+        );
         ref.read(widgetModeActiveProvider.notifier).state = true;
-        await windowManager.hide();
-
-        await _pushSnapshotToMiniWindowIfActive();
+        _lastPushedSnapshot = initialSnapshot;
       } else {
+        _lastPushedSnapshot = null;
         final restored = await widget.windowController.exitWidgetMode(
           settings.widget,
           geometry: geometry,
@@ -316,8 +357,6 @@ class _AppRootState extends ConsumerState<AppRoot>
               (s) => s.copyWith(widget: restored.copyWith(enabled: false)),
             );
         ref.read(widgetModeActiveProvider.notifier).state = false;
-        await windowManager.show();
-        await windowManager.focus();
       }
     } finally {
       _widgetModeSyncInFlight = false;

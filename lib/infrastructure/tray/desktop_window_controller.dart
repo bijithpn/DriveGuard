@@ -23,6 +23,16 @@ class DesktopWindowController with WindowListener {
 
   bool get isMiniWindowOpen => _miniWindow != null;
 
+  void clearMiniWindow() {
+    _miniWindow = null;
+  }
+
+  Future<void> showMiniWindow() async {
+    try {
+      await _miniWindow?.show();
+    } catch (_) {}
+  }
+
   Future<void> initialize({required bool startMinimized}) async {
     await windowManager.ensureInitialized();
     windowManager.addListener(this);
@@ -61,13 +71,35 @@ class DesktopWindowController with WindowListener {
     }
   }
 
-  Future<void> enterWidgetMode(WidgetSettings widgetSettings) async {
-    if (_miniWindow != null) return;
+  Future<void> enterWidgetMode(
+    WidgetSettings widgetSettings, {
+    MiniWidgetSnapshot? initialSnapshot,
+  }) async {
+    if (_miniWindow != null) {
+      try {
+        final windows = await WindowController.getAll();
+        if (!windows.any((w) => w.windowId == _miniWindow!.windowId)) {
+          _miniWindow = null;
+        }
+      } catch (_) {
+        _miniWindow = null;
+      }
+    }
+    if (_miniWindow != null) {
+      try {
+        await _miniWindow!.show();
+      } catch (_) {}
+      return;
+    }
     try {
+      final args = widgetSettings.toJson();
+      if (initialSnapshot != null) {
+        args['snapshot'] = initialSnapshot.toJson();
+      }
       _miniWindow = await WindowController.create(
         WindowConfiguration(
-          arguments: jsonEncode(widgetSettings.toJson()),
-          hiddenAtLaunch: true,
+          arguments: jsonEncode(args),
+          hiddenAtLaunch: false,
         ),
       );
     } catch (e) {
@@ -89,6 +121,9 @@ class DesktopWindowController with WindowListener {
           'Failed asking mini widget to close: $e',
         );
       }
+      try {
+        await _miniWindow?.hide();
+      } catch (_) {}
     }
     _miniWindow = null;
     if (geometry == null) return widgetSettings;

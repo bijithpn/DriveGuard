@@ -576,7 +576,7 @@ class _DriveListToolbar extends StatelessWidget {
                 height: 26,
                 child: Tooltip(
                   message: isWidgetActive
-                      ? 'Hide Mini Widget'
+                      ? 'Close Mini Widget'
                       : 'Open Mini Widget (HUD)',
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(

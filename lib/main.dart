@@ -220,3 +220,47 @@ class _BootstrapperState extends ConsumerState<_Bootstrapper> {
     return AppRoot(windowController: widget.windowController);
   }
 }
+/*
+
+2026-09-04T10:07:28.245571 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:07:28.245989 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:07:43.247180 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:07:43.247326 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:07:58.244674 [WARNING] StorageNativeChannel: getHealth failed: PERMISSION_DENIED 
+2026-09-04T10:07:58.244791 [DEBUG  ] FallbackStorageMonitor: Native health read failed for linux-nvme0n1: PermissionDeniedException(linux-nvme0n1): 
+2026-09-04T10:07:58.245196 [WARNING] StorageNativeChannel: getHealth failed: PERMISSION_DENIED 
+2026-09-04T10:07:58.245253 [DEBUG  ] FallbackStorageMonitor: Native health read failed for linux-nvme1n1: PermissionDeniedException(linux-nvme1n1): 
+2026-09-04T10:07:58.287685 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:07:58.287897 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:08:13.247514 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:08:13.247674 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:08:28.247518 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:08:28.247876 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:08:43.250708 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:08:43.250836 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:08:49.955972 [INFO   ] MonitoringService: Hot-plug event: added linux-hint
+2026-09-04T10:08:49.963074 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:08:49.963340 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:08:58.242891 [WARNING] StorageNativeChannel: getHealth failed: PERMISSION_DENIED 
+2026-09-04T10:08:58.243025 [DEBUG  ] FallbackStorageMonitor: Native health read failed for linux-nvme0n1: PermissionDeniedException(linux-nvme0n1): 
+2026-09-04T10:08:58.243464 [WARNING] StorageNativeChannel: getHealth failed: PERMISSION_DENIED 
+2026-09-04T10:08:58.243522 [DEBUG  ] FallbackStorageMonitor: Native health read failed for linux-nvme1n1: PermissionDeniedException(linux-nvme1n1): 
+2026-09-04T10:08:58.278121 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:08:58.278326 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:09:13.246514 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:09:13.246875 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:09:28.249084 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:09:28.249276 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:09:43.247669 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:09:43.247874 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:09:58.242978 [WARNING] StorageNativeChannel: getHealth failed: PERMISSION_DENIED 
+2026-09-04T10:09:58.243121 [DEBUG  ] FallbackStorageMonitor: Native health read failed for linux-nvme0n1: PermissionDeniedException(linux-nvme0n1): 
+2026-09-04T10:09:58.243663 [WARNING] StorageNativeChannel: getHealth failed: PERMISSION_DENIED 
+2026-09-04T10:09:58.243726 [DEBUG  ] FallbackStorageMonitor: Native health read failed for linux-nvme1n1: PermissionDeniedException(linux-nvme1n1): 
+2026-09-04T10:09:58.295985 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:09:58.296277 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:10:13.247675 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:10:13.247852 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+2026-09-04T10:10:28.254013 [DEBUG  ] MonitoringService: Capacity for linux-nvme0n1: available (?% used), volumes: 3
+2026-09-04T10:10:28.254159 [DEBUG  ] MonitoringService: Capacity for linux-nvme1n1: available (5% used), volumes: 5
+*/

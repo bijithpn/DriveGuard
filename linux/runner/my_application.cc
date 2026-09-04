@@ -85,7 +85,18 @@ static void my_application_activate(GApplication* application) {
   // own frameless/always-on-top/position independent of the main dashboard
   // window - which only happens via this callback.
   desktop_multi_window_plugin_set_window_created_callback(
-      [](FlPluginRegistry* registry) { fl_register_plugins(registry); });
+      [](FlPluginRegistry* registry) {
+        fl_register_plugins(registry);
+        if (FL_IS_VIEW(registry)) {
+          FlView* view = FL_VIEW(registry);
+          GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(view));
+          if (GTK_IS_WINDOW(window)) {
+            gtk_window_set_default_size(GTK_WINDOW(window), 290, 250);
+            gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+          }
+          gtk_widget_realize(GTK_WIDGET(view));
+        }
+      });
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

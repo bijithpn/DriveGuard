@@ -86,7 +86,11 @@ class _MiniMonitorViewState extends State<MiniMonitorView> {
               ),
             ),
             if (devices.isEmpty)
-              _EmptyBody(compact: compact)
+              Expanded(
+                child: Center(
+                  child: _EmptyBody(compact: compact),
+                ),
+              )
             else
               Expanded(
                 child: PageView.builder(
@@ -367,8 +371,10 @@ class _WidgetShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
+      height: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xEA1C1C1E),
+        color: const Color(0xFF1C1C1E),
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: const Color(0xFF3A3A3C), width: 1),
         boxShadow: const [

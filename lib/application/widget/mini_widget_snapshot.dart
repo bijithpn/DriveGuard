@@ -69,6 +69,42 @@ class MiniWidgetDeviceSnapshot {
         tbwText: json['tbwText'] as String?,
         powerOnHoursText: json['powerOnHoursText'] as String?,
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MiniWidgetDeviceSnapshot &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          valueText == other.valueText &&
+          fraction == other.fraction &&
+          severity == other.severity &&
+          type == other.type &&
+          healthStatus == other.healthStatus &&
+          lifePercent == other.lifePercent &&
+          freeCapacityText == other.freeCapacityText &&
+          readSpeedText == other.readSpeedText &&
+          writeSpeedText == other.writeSpeedText &&
+          tbwText == other.tbwText &&
+          powerOnHoursText == other.powerOnHoursText;
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        name,
+        valueText,
+        fraction,
+        severity,
+        type,
+        healthStatus,
+        lifePercent,
+        freeCapacityText,
+        readSpeedText,
+        writeSpeedText,
+        tbwText,
+        powerOnHoursText,
+      );
 }
 
 class MiniWidgetSnapshot {
@@ -94,4 +130,22 @@ class MiniWidgetSnapshot {
             .toList(),
         compact: json['compact'] as bool? ?? false,
       );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! MiniWidgetSnapshot || runtimeType != other.runtimeType) {
+      return false;
+    }
+    if (compact != other.compact || devices.length != other.devices.length) {
+      return false;
+    }
+    for (var i = 0; i < devices.length; i++) {
+      if (devices[i] != other.devices[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(compact, Object.hashAll(devices));
 }

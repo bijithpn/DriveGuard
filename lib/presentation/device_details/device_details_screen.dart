@@ -1079,37 +1079,26 @@ class _HistoryChartState extends State<_HistoryChart> {
     final sortedSamples = List<HistoryPoint>.from(widget.samples)
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
+    final now = DateTime.now();
+    if (widget.currentCelsius != null) {
+      if (sortedSamples.isEmpty ||
+          now.difference(sortedSamples.last.timestamp).inSeconds >= 2) {
+        sortedSamples.add(HistoryPoint(now, widget.currentCelsius!));
+      }
+    }
+
+    if (sortedSamples.isEmpty) {
+      return const SizedBox(height: 220);
+    }
+
     final startTime = sortedSamples.first.timestamp;
     final endTime = sortedSamples.last.timestamp;
     final totalSpanSeconds = endTime.difference(startTime).inSeconds.toDouble();
     final effectiveMaxX = totalSpanSeconds < 30 ? 30.0 : totalSpanSeconds;
 
-    // Determine gap threshold for inserting nullSpots so app shutdown periods
-    // don't create false connecting diagonal lines across hours/days.
-    final int gapThresholdSeconds;
-    if (widget.window <= const Duration(minutes: 10)) {
-      gapThresholdSeconds = 60;
-    } else if (widget.window <= const Duration(minutes: 30)) {
-      gapThresholdSeconds = 120;
-    } else if (widget.window <= const Duration(hours: 1)) {
-      gapThresholdSeconds = 300;
-    } else if (widget.window <= const Duration(hours: 6)) {
-      gapThresholdSeconds = 600;
-    } else if (widget.window <= const Duration(hours: 24)) {
-      gapThresholdSeconds = 1800;
-    } else {
-      gapThresholdSeconds = 3600;
-    }
-
     final spots = <FlSpot>[];
     for (var i = 0; i < sortedSamples.length; i++) {
       final point = sortedSamples[i];
-      if (i > 0) {
-        final gap = point.timestamp.difference(sortedSamples[i - 1].timestamp).inSeconds;
-        if (gap > gapThresholdSeconds) {
-          spots.add(FlSpot.nullSpot);
-        }
-      }
       final x = point.timestamp.difference(startTime).inSeconds.toDouble();
       final y = TemperatureUtils.convert(point.celsius, widget.unit);
       spots.add(FlSpot(x, y));
@@ -1241,7 +1230,7 @@ class _HistoryChartState extends State<_HistoryChart> {
               maxX: effectiveMaxX,
               minY: minY,
               maxY: maxY,
-              clipData: const FlClipData.all(),
+              clipData: const FlClipData.vertical(),
               gridData: FlGridData(
                 show: _showGrid,
                 drawVerticalLine: true,
