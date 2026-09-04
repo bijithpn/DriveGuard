@@ -388,6 +388,15 @@ class _AppRootState extends ConsumerState<AppRoot>
       if (tray != null) _pushDeviceSummaryToTray(tray);
       _pushSnapshotToMiniWindowIfActive();
     });
+    // Read/write speed in the mini widget comes from activityProvider, which
+    // updates on its own (faster) cadence independent of devicesProvider -
+    // without this listener the mini widget would only get a fresh snapshot
+    // whenever the device list happens to change, showing stale MB/s values
+    // in between (device_details_screen.dart watches this provider directly
+    // for the same reason).
+    ref.listen(activityProvider, (previous, next) {
+      _pushSnapshotToMiniWindowIfActive();
+    });
 
     return MaterialApp(
       navigatorKey: rootNavigatorKey,
