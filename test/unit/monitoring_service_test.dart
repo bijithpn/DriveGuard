@@ -23,6 +23,7 @@ class _ScriptedMonitor extends StorageMonitor {
   final Map<String, StorageCapacity> nextCapacity = {};
   final Map<String, List<StorageVolume>> nextVolumes = {};
   final Map<String, DeviceHealth> nextHealth = {};
+  final Map<String, int> readTemperatureCallCount = {};
 
   _ScriptedMonitor(this.devices);
 
@@ -43,6 +44,8 @@ class _ScriptedMonitor extends StorageMonitor {
 
   @override
   Future<TemperatureReading?> readTemperature(String deviceId) async {
+    readTemperatureCallCount[deviceId] =
+        (readTemperatureCallCount[deviceId] ?? 0) + 1;
     final scripted = nextReadingOrError[deviceId];
     if (scripted is StorageMonitorException) throw scripted;
     if (scripted is double) {
@@ -390,6 +393,66 @@ void main() {
         ),
         isTrue,
       );
+
+      await service.dispose();
+    },
+  );
+
+  test(
+    'a spinning HDD is never re-polled faster than the spin-down safety '
+    'floor, even when reinitialized repeatedly',
+    () async {
+      final hdd = StorageDevice(
+        id: 'hdd-1',
+        type: StorageDeviceType.hdd,
+        interfaceType: StorageInterfaceType.sata,
+        sensorAvailability: SensorAvailability.unavailable,
+        model: 'hdd-1',
+      );
+      final backend = _ScriptedMonitor([hdd]);
+      backend.nextReadingOrError['hdd-1'] = 35.0;
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+
+      await service.start(const AppSettings());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(backend.readTemperatureCallCount['hdd-1'], 1);
+
+      // Forcing extra poll cycles immediately must not touch the drive
+      // again until the safety floor elapses - an aggressive polling
+      // setting must never be able to hammer a spinning disk.
+      await service.reinitializeAfterResume();
+      await service.reinitializeAfterResume();
+      expect(backend.readTemperatureCallCount['hdd-1'], 1);
+
+      await service.dispose();
+    },
+  );
+
+  test(
+    'a non-spinning device (NVMe/SSD) is re-polled normally on '
+    'reinitialize, unaffected by the HDD spin-down safety floor',
+    () async {
+      final device = _device('nvme-1');
+      final backend = _ScriptedMonitor([device]);
+      backend.nextReadingOrError['nvme-1'] = 35.0;
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+
+      await service.start(const AppSettings());
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(backend.readTemperatureCallCount['nvme-1'], 1);
+
+      await service.reinitializeAfterResume();
+      expect(backend.readTemperatureCallCount['nvme-1'], 2);
 
       await service.dispose();
     },

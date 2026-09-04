@@ -34,7 +34,19 @@ class MonitoringService {
   final NotificationService _notifications;
   final TemperatureHistoryStore _historyStore;
 
+  // Windows has no equivalent of smartctl's '-n standby' - Get-StorageReliabilityCounter
+  // is expected to read driver-cached data rather than issue a live query, but that is
+  // not a documented guarantee and has not been verified on real Windows/HDD hardware
+  // (see docs/platform-support.md). As defense in depth on every platform, spinning and
+  // removable disks are never polled more often than these floors, regardless of the
+  // user's configured interval, so an aggressive setting can't hammer a disk that might
+  // be asleep.
+  static const _spinDownRiskMinPollInterval = Duration(seconds: 30);
+  static const _spinDownRiskMinHealthPollInterval = Duration(minutes: 5);
+
   final Map<String, StorageDevice> _devices = {};
+  final Map<String, DateTime> _lastPolledAt = {};
+  final Map<String, DateTime> _lastHealthPolledAt = {};
   final Map<String, DeviceAlertState> _alertStates = {};
   final Map<String, StorageAlertState> _capacityAlertStates = {};
   final Map<String, bool> _rapidRiseArmed = {};
@@ -191,6 +203,8 @@ class MonitoringService {
         _lastKnownHealth.remove(id);
         _historyStore.clearDevice(id);
         _latestActivity.remove(id);
+        _lastPolledAt.remove(id);
+        _lastHealthPolledAt.remove(id);
         _disconnectedOnce.remove(id);
         AppLogger.instance.info(_tag, 'Device removed after disconnect: $id');
       } else {
@@ -304,7 +318,15 @@ class MonitoringService {
   }
 
   Future<void> _pollHealthOne(String id) async {
-    if (_devices[id] == null) return;
+    final device = _devices[id];
+    if (device == null) return;
+    if (_throttledBySpinDownGuard(
+      device,
+      _lastHealthPolledAt,
+      _spinDownRiskMinHealthPollInterval,
+    )) {
+      return;
+    }
     try {
       final health = await _backend.getHealth(id);
       if (health == null) return;
@@ -396,9 +418,33 @@ class MonitoringService {
     _emit();
   }
 
+  bool _isSpinDownRisk(StorageDevice device) =>
+      device.type == StorageDeviceType.hdd || device.isRemovable;
+
+  bool _throttledBySpinDownGuard(
+    StorageDevice device,
+    Map<String, DateTime> lastPolledAt,
+    Duration minInterval,
+  ) {
+    if (!_isSpinDownRisk(device)) return false;
+    final last = lastPolledAt[device.id];
+    if (last != null && DateTime.now().difference(last) < minInterval) {
+      return true;
+    }
+    lastPolledAt[device.id] = DateTime.now();
+    return false;
+  }
+
   Future<void> _pollOne(String id) async {
     final device = _devices[id];
     if (device == null) return;
+    if (_throttledBySpinDownGuard(
+      device,
+      _lastPolledAt,
+      _spinDownRiskMinPollInterval,
+    )) {
+      return;
+    }
 
     final previousReading = device.primaryTemperature;
 

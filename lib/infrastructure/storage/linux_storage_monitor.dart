@@ -115,6 +115,18 @@ class LinuxStorageMonitor extends StorageMonitor {
 
   String _sysName(String deviceId) => deviceId.replaceFirst('linux-', '');
 
+  /// True if smartctl skipped the read because the drive is spun down.
+  bool _isSleeping(Map<String, dynamic> json) {
+    final mode = (json['power_mode'] as String?)?.toUpperCase();
+    if (mode == 'STANDBY' || mode == 'SLEEP') return true;
+    final messages = (json['smartctl'] as Map<String, dynamic>?)?['messages'];
+    if (messages is List) {
+      final text = messages.map((m) => m['string']).join(' ').toLowerCase();
+      if (text.contains('standby') || text.contains('sleep')) return true;
+    }
+    return false;
+  }
+
   String _nvmeControllerName(String blockDeviceName) {
     final match = RegExp(r'^(nvme\d+)n\d+$').firstMatch(blockDeviceName);
     return match?.group(1) ?? blockDeviceName;
@@ -196,6 +208,10 @@ class LinuxStorageMonitor extends StorageMonitor {
     final result = await SafeProcessRunner.instance.run('smartctl', [
       '-a',
       '-j',
+      // '-n standby' skips the query instead of spinning up a sleeping HDD
+      // to answer it - a routine poll must never force a spin-up cycle.
+      '-n',
+      'standby',
       '/dev/$sysName',
     ], requireZeroExit: false);
     Map<String, dynamic> json;
@@ -204,6 +220,7 @@ class LinuxStorageMonitor extends StorageMonitor {
     } catch (_) {
       return null;
     }
+    if (_isSleeping(json)) return null;
     final messages = (json['smartctl'] as Map<String, dynamic>?)?['messages'];
     if (messages is List && messages.isNotEmpty) {
       final text = messages.map((m) => m['string']).join(' ').toLowerCase();
@@ -403,9 +420,12 @@ class LinuxStorageMonitor extends StorageMonitor {
       final result = await SafeProcessRunner.instance.run('smartctl', [
         '-a',
         '-j',
+        '-n',
+        'standby',
         '/dev/$sysName',
       ], requireZeroExit: false);
       final json = jsonDecode(result.stdout) as Map<String, dynamic>;
+      if (_isSleeping(json)) return DeviceHealth.unavailable;
       final passed =
           (json['smart_status'] as Map<String, dynamic>?)?['passed'] as bool?;
       final powerOnTime = json['power_on_time'] as Map<String, dynamic>?;

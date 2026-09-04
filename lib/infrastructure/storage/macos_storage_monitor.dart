@@ -184,15 +184,31 @@ class MacOSStorageMonitor extends StorageMonitor {
     }
     final result = await SafeProcessRunner.instance.run(
       _smartctl,
-      ['-a', '-j', '/dev/$bsdName'],
+      // '-n standby' skips the query instead of spinning up a sleeping HDD
+      // to answer it - a routine poll must never force a spin-up cycle.
+      ['-a', '-j', '-n', 'standby', '/dev/$bsdName'],
       extraPaths: const ['/opt/homebrew/bin', '/usr/local/bin'],
       requireZeroExit: false,
     );
     try {
-      return jsonDecode(result.stdout) as Map<String, dynamic>;
+      final json = jsonDecode(result.stdout) as Map<String, dynamic>;
+      if (_isSleeping(json)) return null;
+      return json;
     } catch (_) {
       return null;
     }
+  }
+
+  /// True if smartctl skipped the read because the drive is spun down.
+  bool _isSleeping(Map<String, dynamic> json) {
+    final mode = (json['power_mode'] as String?)?.toUpperCase();
+    if (mode == 'STANDBY' || mode == 'SLEEP') return true;
+    final messages = (json['smartctl'] as Map<String, dynamic>?)?['messages'];
+    if (messages is List) {
+      final text = messages.map((m) => m['string']).join(' ').toLowerCase();
+      if (text.contains('standby') || text.contains('sleep')) return true;
+    }
+    return false;
   }
 
   @override
