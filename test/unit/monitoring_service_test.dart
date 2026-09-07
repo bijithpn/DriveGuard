@@ -398,102 +398,93 @@ void main() {
     },
   );
 
-  test(
-    'a spinning HDD is never re-polled faster than the spin-down safety '
-    'floor, even when reinitialized repeatedly',
-    () async {
-      final hdd = StorageDevice(
-        id: 'hdd-1',
-        type: StorageDeviceType.hdd,
-        interfaceType: StorageInterfaceType.sata,
-        sensorAvailability: SensorAvailability.unavailable,
-        model: 'hdd-1',
-      );
-      final backend = _ScriptedMonitor([hdd]);
-      backend.nextReadingOrError['hdd-1'] = 35.0;
+  test('a spinning HDD is never re-polled faster than the spin-down safety '
+      'floor, even when reinitialized repeatedly', () async {
+    final hdd = StorageDevice(
+      id: 'hdd-1',
+      type: StorageDeviceType.hdd,
+      interfaceType: StorageInterfaceType.sata,
+      sensorAvailability: SensorAvailability.unavailable,
+      model: 'hdd-1',
+    );
+    final backend = _ScriptedMonitor([hdd]);
+    backend.nextReadingOrError['hdd-1'] = 35.0;
 
-      final service = MonitoringService(
-        backend: backend,
-        notifications: FakeNotificationService(),
-        historyStore: TemperatureHistoryStore(),
-      );
+    final service = MonitoringService(
+      backend: backend,
+      notifications: FakeNotificationService(),
+      historyStore: TemperatureHistoryStore(),
+    );
 
-      await service.start(const AppSettings());
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(backend.readTemperatureCallCount['hdd-1'], 1);
+    await service.start(const AppSettings());
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(backend.readTemperatureCallCount['hdd-1'], 1);
 
-      // Forcing extra poll cycles immediately must not touch the drive
-      // again until the safety floor elapses - an aggressive polling
-      // setting must never be able to hammer a spinning disk.
-      await service.reinitializeAfterResume();
-      await service.reinitializeAfterResume();
-      expect(backend.readTemperatureCallCount['hdd-1'], 1);
+    // Forcing extra poll cycles immediately must not touch the drive
+    // again until the safety floor elapses - an aggressive polling
+    // setting must never be able to hammer a spinning disk.
+    await service.reinitializeAfterResume();
+    await service.reinitializeAfterResume();
+    expect(backend.readTemperatureCallCount['hdd-1'], 1);
 
-      await service.dispose();
-    },
-  );
+    await service.dispose();
+  });
 
-  test(
-    'a non-spinning device (NVMe/SSD) is re-polled normally on '
-    'reinitialize, unaffected by the HDD spin-down safety floor',
-    () async {
-      final device = _device('nvme-1');
-      final backend = _ScriptedMonitor([device]);
-      backend.nextReadingOrError['nvme-1'] = 35.0;
+  test('a non-spinning device (NVMe/SSD) is re-polled normally on '
+      'reinitialize, unaffected by the HDD spin-down safety floor', () async {
+    final device = _device('nvme-1');
+    final backend = _ScriptedMonitor([device]);
+    backend.nextReadingOrError['nvme-1'] = 35.0;
 
-      final service = MonitoringService(
-        backend: backend,
-        notifications: FakeNotificationService(),
-        historyStore: TemperatureHistoryStore(),
-      );
+    final service = MonitoringService(
+      backend: backend,
+      notifications: FakeNotificationService(),
+      historyStore: TemperatureHistoryStore(),
+    );
 
-      await service.start(const AppSettings());
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(backend.readTemperatureCallCount['nvme-1'], 1);
+    await service.start(const AppSettings());
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(backend.readTemperatureCallCount['nvme-1'], 1);
 
-      await service.reinitializeAfterResume();
-      expect(backend.readTemperatureCallCount['nvme-1'], 2);
+    await service.reinitializeAfterResume();
+    expect(backend.readTemperatureCallCount['nvme-1'], 2);
 
-      await service.dispose();
-    },
-  );
+    await service.dispose();
+  });
 
-  test(
-    'refreshNow polls a single device immediately without waiting for the '
-    'next timer tick',
-    () async {
-      final device = _device('nvme-1');
-      final backend = _ScriptedMonitor([device]);
-      backend.nextReadingOrError['nvme-1'] = 40.0;
+  test('refreshNow polls a single device immediately without waiting for the '
+      'next timer tick', () async {
+    final device = _device('nvme-1');
+    final backend = _ScriptedMonitor([device]);
+    backend.nextReadingOrError['nvme-1'] = 40.0;
 
-      final service = MonitoringService(
-        backend: backend,
-        notifications: FakeNotificationService(),
-        historyStore: TemperatureHistoryStore(),
-        // A polling interval long enough that nothing would happen from
-        // the timer within this test's lifetime.
-      );
+    final service = MonitoringService(
+      backend: backend,
+      notifications: FakeNotificationService(),
+      historyStore: TemperatureHistoryStore(),
+      // A polling interval long enough that nothing would happen from
+      // the timer within this test's lifetime.
+    );
 
-      await service.start(
-        const AppSettings(pollingInterval: Duration(minutes: 5)),
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(backend.readTemperatureCallCount['nvme-1'], 1);
+    await service.start(
+      const AppSettings(pollingInterval: Duration(minutes: 5)),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(backend.readTemperatureCallCount['nvme-1'], 1);
 
-      backend.nextReadingOrError['nvme-1'] = 41.0;
-      await service.refreshNow(deviceId: 'nvme-1');
-      expect(backend.readTemperatureCallCount['nvme-1'], 2);
-      expect(
-        service.currentDevices
-            .firstWhere((d) => d.id == 'nvme-1')
-            .primaryTemperature
-            ?.celsius,
-        41.0,
-      );
+    backend.nextReadingOrError['nvme-1'] = 41.0;
+    await service.refreshNow(deviceId: 'nvme-1');
+    expect(backend.readTemperatureCallCount['nvme-1'], 2);
+    expect(
+      service.currentDevices
+          .firstWhere((d) => d.id == 'nvme-1')
+          .primaryTemperature
+          ?.celsius,
+      41.0,
+    );
 
-      await service.dispose();
-    },
-  );
+    await service.dispose();
+  });
 
   test('refreshNow works even while monitoring is paused', () async {
     final device = _device('nvme-1');

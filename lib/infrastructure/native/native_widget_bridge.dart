@@ -8,25 +8,6 @@ import 'package:path_provider/path_provider.dart';
 import '../../application/widget/mini_widget_snapshot.dart';
 import '../../core/logging/app_logger.dart';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class NativeWidgetBridge {
   NativeWidgetBridge._();
 
@@ -42,17 +23,7 @@ class NativeWidgetBridge {
   static Future<void> pushSnapshot(MiniWidgetSnapshot snapshot) async {
     if (!isSupported) return;
     final json = jsonEncode({
-      'devices': snapshot.devices
-          .map(
-            (d) => {
-              'id': d.id,
-              'name': d.name,
-              'valueText': d.valueText,
-              'fraction': d.fraction,
-              'severity': d.severity.name,
-            },
-          )
-          .toList(),
+      'devices': snapshot.devices.map((d) => d.toJson()).toList(),
       'updatedAt': DateTime.now().toIso8601String(),
     });
 
@@ -60,8 +31,6 @@ class NativeWidgetBridge {
       try {
         await _channel.invokeMethod('updateSnapshot', json);
       } catch (e) {
-        
-        
         AppLogger.instance.warning(
           _tag,
           'Failed pushing native widget snapshot: $e',
@@ -78,9 +47,7 @@ class NativeWidgetBridge {
           dir.createSync(recursive: true);
         }
         final file = File(p.join(dir.path, _snapshotFileName));
-        
-        
-        
+
         final tmp = File('${file.path}.tmp');
         await tmp.writeAsString(json, flush: true);
         await tmp.rename(file.path);

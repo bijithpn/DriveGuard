@@ -24,18 +24,8 @@ import 'infrastructure/tray/desktop_window_controller.dart';
 import 'presentation/app_root.dart';
 import 'presentation/widget/mini_widget_app.dart';
 
-
-
-
-
 IncidentRepository? _crashRepository;
 String? _crashSessionId;
-
-
-
-
-
-
 
 void _recordCrash(String source, Object error, StackTrace? stack) {
   final repo = _crashRepository;
@@ -54,9 +44,7 @@ void _recordCrash(String source, Object error, StackTrace? stack) {
         ),
       ]),
     );
-  } catch (_) {
-    
-  }
+  } catch (_) {}
 }
 
 void main() {
@@ -189,16 +177,6 @@ Future<void> _bootstrap() async {
     runApp(_BootstrapFailureApp(error: error, stack: stack));
   }
 }
-
-
-
-
-
-
-
-
-
-
 
 void _armTerminationSignalHandlers(ProviderContainer container) {
   var handled = false;

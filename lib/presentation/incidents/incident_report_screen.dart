@@ -78,7 +78,8 @@ class _ReportBody extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         if (incident.diagnosticEvents.isEmpty)
           _InfoNote(
-            text: 'No platform diagnostic events or application errors '
+            text:
+                'No platform diagnostic events or application errors '
                 'were found for this session (the diagnostic utility may '
                 'be unavailable, or the window had no relevant entries).',
             isDark: isDark,
@@ -264,9 +265,7 @@ class _TimelineChart extends StatelessWidget {
         )
         .toList();
     final dataMaxX = spots.last.x;
-    
-    
-    
+
     final maxX = dataMaxX == 0
         ? 1.0
         : dataMaxX + (dataMaxX * 0.05).clamp(8.0, 60.0);
@@ -552,9 +551,7 @@ class _DiagnosticEventRowState extends State<_DiagnosticEventRow> {
   Widget build(BuildContext context) {
     final event = widget.event;
     final isDark = widget.isDark;
-    
-    
-    
+
     final hasDetail = event.raw != null && event.raw != event.summary;
 
     return Container(
@@ -580,9 +577,7 @@ class _DiagnosticEventRowState extends State<_DiagnosticEventRow> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    _isCrash
-                        ? Icons.bug_report_outlined
-                        : Icons.circle,
+                    _isCrash ? Icons.bug_report_outlined : Icons.circle,
                     size: _isCrash ? 14 : 6,
                     color: _categoryColor,
                   ),
@@ -619,9 +614,7 @@ class _DiagnosticEventRowState extends State<_DiagnosticEventRow> {
                                   vertical: 1,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: _categoryColor.withValues(
-                                    alpha: 0.14,
-                                  ),
+                                  color: _categoryColor.withValues(alpha: 0.14),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -660,9 +653,7 @@ class _DiagnosticEventRowState extends State<_DiagnosticEventRow> {
                     color: isDark ? AppColors.bg0 : AppColors.lightSurfaceMuted,
                     borderRadius: BorderRadius.circular(AppRadius.sm),
                     border: Border.all(
-                      color: isDark
-                          ? AppColors.border
-                          : AppColors.lightBorder,
+                      color: isDark ? AppColors.border : AppColors.lightBorder,
                     ),
                   ),
                   child: Row(
@@ -683,9 +674,8 @@ class _DiagnosticEventRowState extends State<_DiagnosticEventRow> {
                         icon: const Icon(Icons.copy_rounded, size: 15),
                         color: AppColors.textMuted,
                         tooltip: 'Copy',
-                        onPressed: () => Clipboard.setData(
-                          ClipboardData(text: event.raw!),
-                        ),
+                        onPressed: () =>
+                            Clipboard.setData(ClipboardData(text: event.raw!)),
                       ),
                     ],
                   ),
@@ -716,7 +706,9 @@ class _InfoNote extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: 12,
-          color: isDark ? AppColors.textSecondary : AppColors.lightTextSecondary,
+          color: isDark
+              ? AppColors.textSecondary
+              : AppColors.lightTextSecondary,
         ),
       ),
     );

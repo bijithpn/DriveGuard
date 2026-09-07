@@ -4,10 +4,6 @@ import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/enums/incident_enums.dart';
 import '../theme/app_theme.dart';
 
-
-
-
-
 Future<void> showStartupIncidentDialog(
   BuildContext context,
   ShutdownIncident incident, {
@@ -21,7 +17,9 @@ Future<void> showStartupIncidentDialog(
           orElse: () => incident.deviceStats.first,
         );
 
-  final title = incident.classification == ShutdownClassification.appSessionEndedUnexpectedly
+  final title =
+      incident.classification ==
+          ShutdownClassification.appSessionEndedUnexpectedly
       ? 'Previous Session Ended Unexpectedly'
       : 'Unexpected Shutdown Detected';
 

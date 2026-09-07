@@ -6,10 +6,6 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../core/logging/app_logger.dart';
 
-
-
-
-
 class AppDatabase {
   AppDatabase._(this._db);
 
@@ -43,10 +39,6 @@ class AppDatabase {
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) {
-            
-            
-            
-            
             await db.execute(
               'ALTER TABLE diagnostic_events ADD COLUMN error_code TEXT',
             );
@@ -132,12 +124,6 @@ class AppDatabase {
     );
   }
 
-  
-  
-  
-  
-  
-  
   static Future<AppDatabase> openInMemoryForTesting() async {
     sqfliteFfiInit();
     final db = await databaseFactoryFfi.openDatabase(
@@ -151,8 +137,6 @@ class AppDatabase {
     return AppDatabase._(db);
   }
 
-  
-  
   Future<void> pruneOldSamples(DateTime before) async {
     await _db.delete(
       'pre_incident_samples',

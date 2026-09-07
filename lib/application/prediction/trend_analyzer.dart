@@ -1,12 +1,8 @@
-
-
-
 class TrendPoint {
   const TrendPoint(this.timestamp, this.value);
   final DateTime timestamp;
   final double value;
 }
-
 
 class TrendResult {
   const TrendResult({
@@ -15,18 +11,12 @@ class TrendResult {
     required this.sampleCount,
   });
 
-  
   final double slopePerSecond;
 
-  
-  
   final double rSquared;
 
   final int sampleCount;
 
-  
-  
-  
   Duration? timeToReach(double from, double target) {
     if (slopePerSecond == 0) return null;
     final seconds = (target - from) / slopePerSecond;
@@ -35,18 +25,9 @@ class TrendResult {
   }
 }
 
-
-
-
-
-
-
-
 class TrendAnalyzer {
   const TrendAnalyzer();
 
-  
-  
   TrendResult? fit(List<TrendPoint> points, {int minSamples = 4}) {
     if (points.length < minSamples) return null;
 
@@ -71,14 +52,14 @@ class TrendAnalyzer {
       sxx += dx * dx;
       syy += dy * dy;
     }
-    if (sxx == 0) return null; 
+    if (sxx == 0) return null;
 
     final slope = sxy / sxx;
     final intercept = meanY - slope * meanX;
 
     double rSquared;
     if (syy == 0) {
-      rSquared = 1.0; 
+      rSquared = 1.0;
     } else {
       var ssRes = 0.0;
       for (var i = 0; i < n; i++) {

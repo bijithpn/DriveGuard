@@ -2,10 +2,6 @@ import 'dart:async';
 
 import '../../infrastructure/persistence/incident_repository.dart';
 
-
-
-
-
 class HeartbeatService {
   HeartbeatService({
     required IncidentRepository repository,

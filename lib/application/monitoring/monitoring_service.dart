@@ -24,9 +24,6 @@ import '../settings/app_settings.dart';
 import 'metric_history_store.dart';
 import 'temperature_history_store.dart';
 
-
-
-
 const Duration _preIncidentWindow = Duration(minutes: 10);
 
 class MonitoringService {
@@ -69,13 +66,6 @@ class MonitoringService {
   final IncidentRepository? _incidentRepository;
   final String? _sessionId;
 
-  
-  
-  
-  
-  
-  
-  
   static const _spinDownRiskMinPollInterval = Duration(seconds: 30);
   static const _spinDownRiskMinHealthPollInterval = Duration(minutes: 5);
 
@@ -89,9 +79,6 @@ class MonitoringService {
   final Map<String, DeviceHealth> _lastKnownHealth = {};
   final Set<String> _disconnectedOnce = {};
 
-  
-  
-  
   final Map<String, DateTime> _lastPredictiveTempAt = {};
   final Map<String, TemperatureSeverity> _lastPredictiveTempSeverity = {};
   final Map<String, DateTime> _lastPredictiveCapacityAt = {};
@@ -198,13 +185,6 @@ class MonitoringService {
 
   Future<void> rescan() => _discoverDevices();
 
-  
-  
-  
-  
-  
-  
-  
   Future<void> refreshNow({String? deviceId}) async {
     final ids = deviceId != null
         ? [
@@ -348,8 +328,6 @@ class MonitoringService {
     _emit();
   }
 
-  
-  
   Future<void> _evaluatePredictiveCapacity(
     String id,
     StorageCapacity capacity,
@@ -360,7 +338,7 @@ class MonitoringService {
     }
     final usagePercent = capacity.usagePercent;
     if (usagePercent == null) return;
-    
+
     final currentSeverity = capacitySeverityFor(id);
     if (currentSeverity == CapacitySeverity.warning ||
         currentSeverity == CapacitySeverity.critical) {
@@ -426,7 +404,6 @@ class MonitoringService {
     if (!result.isRecoveryNotification &&
         _lastPredictiveCapacitySeverity[id] == result.severity &&
         _recentlyPredicted(_lastPredictiveCapacityAt[id])) {
-      
       return;
     }
 
@@ -494,14 +471,6 @@ class MonitoringService {
     }
   }
 
-  
-  
-  
-  
-  
-  
-  
-  
   Future<void> _evaluatePredictiveHealthWear(
     String id,
     DeviceHealth health,
@@ -744,16 +713,13 @@ class MonitoringService {
     }
   }
 
-  
-  
-  
   Future<void> _evaluatePredictiveTemperature(
     String id,
     double celsius,
     StorageDevice device,
   ) async {
     if (!_settings.predictiveAlertsEnabled) return;
-    
+
     final currentSeverity = severityFor(id);
     if (currentSeverity == TemperatureSeverity.warning ||
         currentSeverity == TemperatureSeverity.critical) {
@@ -822,7 +788,6 @@ class MonitoringService {
     if (!result.isRecoveryNotification &&
         _lastPredictiveTempSeverity[id] == result.severity &&
         _recentlyPredicted(_lastPredictiveTempAt[id])) {
-
       return;
     }
 
@@ -955,14 +920,6 @@ class MonitoringService {
     );
   }
 
-  
-  
-  
-  
-  
-  
-  
-  
   Future<void> flushForShutdown() async {
     AppLogger.instance.warning(_tag, 'Flushing telemetry before shutdown');
     try {

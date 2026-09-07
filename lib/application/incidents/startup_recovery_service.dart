@@ -11,10 +11,6 @@ import '../../infrastructure/diagnostics/system_diagnostics_factory.dart';
 import '../../infrastructure/persistence/incident_repository.dart';
 import 'incident_correlation_engine.dart';
 
-
-
-
-
 class StartupRecoveryService {
   StartupRecoveryService({
     required IncidentRepository repository,
@@ -33,9 +29,6 @@ class StartupRecoveryService {
   final IncidentCorrelationEngine _engine;
   final Uuid _uuid;
 
-  
-  
-  
   Future<MonitoringSession> startNewSession({
     required String appVersion,
     required Duration pollingInterval,
@@ -51,11 +44,6 @@ class StartupRecoveryService {
     return session;
   }
 
-  
-  
-  
-  
-  
   Future<ShutdownIncident?> recoverPreviousSession({
     required String currentSessionId,
     required double Function(String deviceId) warningCelsiusFor,

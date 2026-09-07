@@ -4,26 +4,9 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import '../../infrastructure/diagnostics/system_diagnostics.dart';
 
-
-
-
-
-
-
-
-
-
 class IncidentCorrelationEngine {
   const IncidentCorrelationEngine();
 
-  
-  
-  
-  
-  
-  
-  
-  
   ShutdownIncident? analyze({
     required MonitoringSession previousSession,
     required PreviousBootDiagnosis diagnosis,
@@ -37,8 +20,6 @@ class IncidentCorrelationEngine {
 
     final classification = _classify(previousSession, diagnosis);
 
-    
-    
     if (classification == ShutdownClassification.appSessionEndedUnexpectedly) {
       return ShutdownIncident(
         id: newIncidentId,
@@ -100,7 +81,6 @@ class IncidentCorrelationEngine {
       );
     }
 
-    
     DeviceIncidentStat? primary;
     for (final s in stats) {
       if (s.maxCelsius == null) continue;
@@ -151,8 +131,6 @@ class IncidentCorrelationEngine {
     switch (diagnosis.classification) {
       case ShutdownClassification.osShutdownClean:
       case ShutdownClassification.osRebootClean:
-        
-        
         return ShutdownClassification.appSessionEndedUnexpectedly;
       case ShutdownClassification.kernelPanic:
       case ShutdownClassification.bsod:
@@ -162,9 +140,6 @@ class IncidentCorrelationEngine {
       case ShutdownClassification.unknown:
       case ShutdownClassification.cleanAppExit:
       case ShutdownClassification.appSessionEndedUnexpectedly:
-        
-        
-        
         return ShutdownClassification.unknown;
     }
   }
@@ -220,7 +195,11 @@ class IncidentCorrelationEngine {
       }
       if (i == samples.length - 1) label = 'Last reading';
       result.add(
-        TimelineSample(timestamp: s.timestamp, celsius: s.celsius, label: label),
+        TimelineSample(
+          timestamp: s.timestamp,
+          celsius: s.celsius,
+          label: label,
+        ),
       );
     }
     if (shutdownAt != null) {

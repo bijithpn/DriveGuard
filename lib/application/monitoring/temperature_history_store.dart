@@ -80,10 +80,6 @@ class TemperatureHistoryStore {
     await _persistence.saveDevicePoints(deviceId, toSave);
   }
 
-  
-  
-  
-  
   Future<void> persistAll() async {
     final ids = {..._raw.keys, ..._aggregated.keys};
     for (final id in ids) {

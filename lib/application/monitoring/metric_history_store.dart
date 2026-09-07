@@ -1,20 +1,10 @@
 import 'dart:collection';
 
-
 class MetricPoint {
   const MetricPoint(this.timestamp, this.value);
   final DateTime timestamp;
   final double value;
 }
-
-
-
-
-
-
-
-
-
 
 class MetricHistoryStore {
   MetricHistoryStore({

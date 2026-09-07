@@ -913,14 +913,6 @@ class _TemperatureTab extends ConsumerWidget {
   }
 }
 
-
-
-
-
-
-
-
-
 class _CollectingHistoryPlaceholder extends ConsumerStatefulWidget {
   const _CollectingHistoryPlaceholder({
     required this.deviceId,
@@ -1242,12 +1234,7 @@ class _HistoryChartState extends State<_HistoryChart> {
     final endTime = sortedSamples.last.timestamp;
     final totalSpanSeconds = endTime.difference(startTime).inSeconds.toDouble();
     final effectiveMaxX = totalSpanSeconds < 30 ? 30.0 : totalSpanSeconds;
-    
-    
-    
-    
-    
-    
+
     final rightPadding = (effectiveMaxX * 0.05).clamp(8.0, 60.0);
     final plotMaxX = effectiveMaxX + rightPadding;
 

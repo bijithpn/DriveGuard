@@ -4,10 +4,6 @@ import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/entities/system_diagnostic_event.dart';
 import 'app_database.dart';
 
-
-
-
-
 class IncidentRepository {
   IncidentRepository(this._appDb);
 
@@ -48,8 +44,6 @@ class IncidentRepository {
     }
   }
 
-  
-  
   Future<MonitoringSession?> previousSession({String? excludeId}) async {
     try {
       final rows = await _appDb.db.query(
@@ -67,9 +61,7 @@ class IncidentRepository {
     }
   }
 
-  Future<void> recordPreIncidentSamples(
-    List<PreIncidentSample> samples,
-  ) async {
+  Future<void> recordPreIncidentSamples(List<PreIncidentSample> samples) async {
     if (samples.isEmpty) return;
     try {
       final batch = _appDb.db.batch();
@@ -120,9 +112,6 @@ class IncidentRepository {
     }
   }
 
-  
-  
-  
   Future<bool> saveIncidentIfNew(
     ShutdownIncident incident,
     List<SystemDiagnosticEvent> diagnosticEvents,
@@ -218,9 +207,7 @@ class IncidentRepository {
         whereArgs: [incident['session_id']],
         orderBy: 'timestamp ASC',
       );
-      final diagEvents = diagRows
-          .map(SystemDiagnosticEvent.fromMap)
-          .toList();
+      final diagEvents = diagRows.map(SystemDiagnosticEvent.fromMap).toList();
 
       final primaryDeviceId = incident['primary_device_id'] as String?;
       var timeline = <TimelineSample>[];
@@ -230,7 +217,9 @@ class IncidentRepository {
           deviceId: primaryDeviceId,
         );
         timeline = samples
-            .map((s) => TimelineSample(timestamp: s.timestamp, celsius: s.celsius))
+            .map(
+              (s) => TimelineSample(timestamp: s.timestamp, celsius: s.celsius),
+            )
             .toList();
       }
 

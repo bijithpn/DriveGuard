@@ -45,6 +45,10 @@ class _AppRootState extends ConsumerState<AppRoot>
   bool _widgetModeSyncInFlight = false;
   StreamSubscription<String>? _notificationClickSub;
   MiniWidgetSnapshot? _lastPushedSnapshot;
+  MiniWidgetSnapshot? _lastNativeWidgetSnapshot;
+  DateTime? _lastNativeWidgetPushAt;
+
+  static const _nativeWidgetPushInterval = Duration(seconds: 20);
 
   @override
   void initState() {
@@ -62,7 +66,9 @@ class _AppRootState extends ConsumerState<AppRoot>
         .deviceClicks
         .listen(_onNotificationClicked);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowStartupIncident());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _maybeShowStartupIncident(),
+    );
   }
 
   Future<void> _maybeShowStartupIncident() async {
@@ -154,11 +160,7 @@ class _AppRootState extends ConsumerState<AppRoot>
           }
           return s.copyWith(widget: w);
         });
-        
-        
-        
-        
-        
+
         final isMainVisible = await windowManager.isVisible();
         final settings = ref.read(settingsProvider);
         if (!isMainVisible && (!settings.showTrayIcon || _tray == null)) {
@@ -325,13 +327,27 @@ class _AppRootState extends ConsumerState<AppRoot>
     );
   }
 
+  void _maybePushNativeWidgetSnapshot(
+    MiniWidgetSnapshot snapshot, {
+    bool force = false,
+  }) {
+    if (!force && snapshot == _lastNativeWidgetSnapshot) return;
+    final now = DateTime.now();
+    final last = _lastNativeWidgetPushAt;
+    if (!force &&
+        last != null &&
+        now.difference(last) < _nativeWidgetPushInterval) {
+      return;
+    }
+    _lastNativeWidgetSnapshot = snapshot;
+    _lastNativeWidgetPushAt = now;
+    unawaited(NativeWidgetBridge.pushSnapshot(snapshot));
+  }
+
   Future<void> _pushSnapshotToMiniWindowIfActive({bool force = false}) async {
     final snapshot = _buildSnapshot();
 
-    
-    
-    
-    unawaited(NativeWidgetBridge.pushSnapshot(snapshot));
+    _maybePushNativeWidgetSnapshot(snapshot, force: force);
 
     if (!ref.read(widgetModeActiveProvider)) return;
     if (!force && _lastPushedSnapshot == snapshot) return;

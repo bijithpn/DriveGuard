@@ -45,14 +45,9 @@ class AppDurations {
   static const Duration verySlow = Duration(milliseconds: 800);
 }
 
-
-
-
-
 class AppColors {
   const AppColors._();
 
-  
   static const Color bg0 = Color(0xFF0D1117);
   static const Color bg1 = Color(0xFF161B22);
   static const Color bg2 = Color(0xFF1F2630);
@@ -77,7 +72,6 @@ class AppColors {
   static const Color border = Color(0xFF262E3A);
   static const Color shadowDark = Color(0x40000000);
 
-  
   static const Color lightBg = Color(0xFFF5F7FA);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightSurfaceMuted = Color(0xFFECF0F5);

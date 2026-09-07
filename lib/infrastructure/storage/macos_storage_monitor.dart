@@ -184,8 +184,7 @@ class MacOSStorageMonitor extends StorageMonitor {
     }
     final result = await SafeProcessRunner.instance.run(
       _smartctl,
-      
-      
+
       ['-a', '-j', '-n', 'standby', '/dev/$bsdName'],
       extraPaths: const ['/opt/homebrew/bin', '/usr/local/bin'],
       requireZeroExit: false,
@@ -199,7 +198,6 @@ class MacOSStorageMonitor extends StorageMonitor {
     }
   }
 
-  
   bool _isSleeping(Map<String, dynamic> json) {
     final mode = (json['power_mode'] as String?)?.toUpperCase();
     if (mode == 'STANDBY' || mode == 'SLEEP') return true;

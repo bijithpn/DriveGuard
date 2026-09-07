@@ -115,7 +115,6 @@ class LinuxStorageMonitor extends StorageMonitor {
 
   String _sysName(String deviceId) => deviceId.replaceFirst('linux-', '');
 
-  
   bool _isSleeping(Map<String, dynamic> json) {
     final mode = (json['power_mode'] as String?)?.toUpperCase();
     if (mode == 'STANDBY' || mode == 'SLEEP') return true;
@@ -208,8 +207,7 @@ class LinuxStorageMonitor extends StorageMonitor {
     final result = await SafeProcessRunner.instance.run('smartctl', [
       '-a',
       '-j',
-      
-      
+
       '-n',
       'standby',
       '/dev/$sysName',

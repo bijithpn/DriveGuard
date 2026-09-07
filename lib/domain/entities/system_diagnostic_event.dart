@@ -1,9 +1,3 @@
-
-
-
-
-
-
 class SystemDiagnosticEvent {
   const SystemDiagnosticEvent({
     required this.timestamp,
@@ -14,27 +8,16 @@ class SystemDiagnosticEvent {
     this.errorCode,
   });
 
-  
   final DateTime timestamp;
 
-  
-  
   final String source;
 
-  
-  
   final String category;
 
-  
   final String summary;
 
-  
   final String? raw;
 
-  
-  
-  
-  
   final String? errorCode;
 
   Map<String, Object?> toMap() => {
@@ -48,9 +31,7 @@ class SystemDiagnosticEvent {
 
   factory SystemDiagnosticEvent.fromMap(Map<String, Object?> map) {
     return SystemDiagnosticEvent(
-      timestamp: DateTime.fromMillisecondsSinceEpoch(
-        map['timestamp'] as int,
-      ),
+      timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
       source: map['source'] as String,
       category: map['category'] as String,
       summary: map['summary'] as String,

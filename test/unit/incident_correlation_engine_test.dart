@@ -56,135 +56,120 @@ void main() {
     expect(result, isNull);
   });
 
-  test(
-    'app crash test: unclosed session but OS shut down cleanly is reported '
-    'as an app-level event, never a system shutdown',
-    () {
-      final result = engine.analyze(
-        previousSession: session(
-          endedCleanly: false,
-          lastHeartbeatAt: DateTime(2026, 9, 7, 10, 6, 10),
-        ),
-        diagnosis: PreviousBootDiagnosis(
-          classification: ShutdownClassification.osShutdownClean,
-          events: [
-            SystemDiagnosticEvent(
-              timestamp: DateTime(2026, 9, 7, 10, 30),
-              source: 'test',
-              category: 'shutdown-clean',
-              summary: 'clean shutdown',
-            ),
-          ],
-        ),
-        samplesByDevice: {
-          'nvme0': samples([('10:06', 79.0)]),
-        },
-        warningCelsiusFor: (_) => warning,
-        criticalCelsiusFor: (_) => critical,
-        newIncidentId: 'incident-2',
-        now: DateTime(2026, 9, 7, 10, 32),
-      );
+  test('app crash test: unclosed session but OS shut down cleanly is reported '
+      'as an app-level event, never a system shutdown', () {
+    final result = engine.analyze(
+      previousSession: session(
+        endedCleanly: false,
+        lastHeartbeatAt: DateTime(2026, 9, 7, 10, 6, 10),
+      ),
+      diagnosis: PreviousBootDiagnosis(
+        classification: ShutdownClassification.osShutdownClean,
+        events: [
+          SystemDiagnosticEvent(
+            timestamp: DateTime(2026, 9, 7, 10, 30),
+            source: 'test',
+            category: 'shutdown-clean',
+            summary: 'clean shutdown',
+          ),
+        ],
+      ),
+      samplesByDevice: {
+        'nvme0': samples([('10:06', 79.0)]),
+      },
+      warningCelsiusFor: (_) => warning,
+      criticalCelsiusFor: (_) => critical,
+      newIncidentId: 'incident-2',
+      now: DateTime(2026, 9, 7, 10, 32),
+    );
 
-      expect(result, isNotNull);
-      expect(
-        result!.classification,
-        ShutdownClassification.appSessionEndedUnexpectedly,
-      );
-      expect(result.correlationLevel, CorrelationLevel.none);
-      expect(
-        result.summary,
-        isNot(contains('Samsung')),
-        reason: 'must not claim a thermal cause for an app-level event',
-      );
-    },
-  );
+    expect(result, isNotNull);
+    expect(
+      result!.classification,
+      ShutdownClassification.appSessionEndedUnexpectedly,
+    );
+    expect(result.correlationLevel, CorrelationLevel.none);
+    expect(
+      result.summary,
+      isNot(contains('Samsung')),
+      reason: 'must not claim a thermal cause for an app-level event',
+    );
+  });
 
-  test(
-    'critical test scenario: sustained critical temperature shortly before '
-    'an unexpected OS shutdown is at least a moderate correlation',
-    () {
-      final result = engine.analyze(
-        previousSession: session(
-          endedCleanly: false,
-          lastHeartbeatAt: DateTime(2026, 9, 7, 10, 6, 10),
-        ),
-        diagnosis: PreviousBootDiagnosis(
-          classification: ShutdownClassification.osShutdownUnexpected,
-          shutdownAt: DateTime(2026, 9, 7, 10, 6, 14),
-          events: [
-            SystemDiagnosticEvent(
-              timestamp: DateTime(2026, 9, 7, 10, 6, 14),
-              source: 'test',
-              category: 'shutdown',
-              summary: 'Kernel-Power 41',
-            ),
-          ],
-        ),
-        samplesByDevice: {
-          'nvme0': samples([
-            ('10:00', 48.0),
-            ('10:01', 50.0),
-            ('10:02', 55.0),
-            ('10:03', 64.0),
-            ('10:04', 68.0),
-            ('10:05', 72.0),
-            ('10:06', 79.0),
-          ]),
-        },
-        warningCelsiusFor: (_) => warning,
-        criticalCelsiusFor: (_) => critical,
-        newIncidentId: 'incident-3',
-        now: DateTime(2026, 9, 7, 10, 8, 5),
-      );
+  test('critical test scenario: sustained critical temperature shortly before '
+      'an unexpected OS shutdown is at least a moderate correlation', () {
+    final result = engine.analyze(
+      previousSession: session(
+        endedCleanly: false,
+        lastHeartbeatAt: DateTime(2026, 9, 7, 10, 6, 10),
+      ),
+      diagnosis: PreviousBootDiagnosis(
+        classification: ShutdownClassification.osShutdownUnexpected,
+        shutdownAt: DateTime(2026, 9, 7, 10, 6, 14),
+        events: [
+          SystemDiagnosticEvent(
+            timestamp: DateTime(2026, 9, 7, 10, 6, 14),
+            source: 'test',
+            category: 'shutdown',
+            summary: 'Kernel-Power 41',
+          ),
+        ],
+      ),
+      samplesByDevice: {
+        'nvme0': samples([
+          ('10:00', 48.0),
+          ('10:01', 50.0),
+          ('10:02', 55.0),
+          ('10:03', 64.0),
+          ('10:04', 68.0),
+          ('10:05', 72.0),
+          ('10:06', 79.0),
+        ]),
+      },
+      warningCelsiusFor: (_) => warning,
+      criticalCelsiusFor: (_) => critical,
+      newIncidentId: 'incident-3',
+      now: DateTime(2026, 9, 7, 10, 8, 5),
+    );
 
-      expect(result, isNotNull);
-      expect(
-        result!.classification,
-        ShutdownClassification.osShutdownUnexpected,
-      );
-      expect(result.primaryDeviceId, 'nvme0');
-      expect(result.deviceStats.single.maxCelsius, 79.0);
-      expect(result.deviceStats.single.criticalExceeded, isTrue);
-      expect(
-        result.correlationLevel,
-        anyOf(CorrelationLevel.moderate, CorrelationLevel.high),
-      );
-      expect(result.summary, isNot(contains('caused')));
-    },
-  );
+    expect(result, isNotNull);
+    expect(result!.classification, ShutdownClassification.osShutdownUnexpected);
+    expect(result.primaryDeviceId, 'nvme0');
+    expect(result.deviceStats.single.maxCelsius, 79.0);
+    expect(result.deviceStats.single.criticalExceeded, isTrue);
+    expect(
+      result.correlationLevel,
+      anyOf(CorrelationLevel.moderate, CorrelationLevel.high),
+    );
+    expect(result.summary, isNot(contains('caused')));
+  });
 
-  test(
-    'power loss test: recovers previous session data with no clean-shutdown '
-    'evidence at all',
-    () {
-      final result = engine.analyze(
-        previousSession: session(
-          endedCleanly: false,
-          lastHeartbeatAt: DateTime(2026, 9, 7, 10, 6, 10),
-        ),
-        diagnosis: const PreviousBootDiagnosis(
-          classification: ShutdownClassification.possiblePowerLoss,
-          events: [],
-        ),
-        samplesByDevice: {
-          'nvme0': samples([('10:06', 79.0)]),
-        },
-        warningCelsiusFor: (_) => warning,
-        criticalCelsiusFor: (_) => critical,
-        newIncidentId: 'incident-4',
-        now: DateTime(2026, 9, 7, 10, 9),
-      );
+  test('power loss test: recovers previous session data with no clean-shutdown '
+      'evidence at all', () {
+    final result = engine.analyze(
+      previousSession: session(
+        endedCleanly: false,
+        lastHeartbeatAt: DateTime(2026, 9, 7, 10, 6, 10),
+      ),
+      diagnosis: const PreviousBootDiagnosis(
+        classification: ShutdownClassification.possiblePowerLoss,
+        events: [],
+      ),
+      samplesByDevice: {
+        'nvme0': samples([('10:06', 79.0)]),
+      },
+      warningCelsiusFor: (_) => warning,
+      criticalCelsiusFor: (_) => critical,
+      newIncidentId: 'incident-4',
+      now: DateTime(2026, 9, 7, 10, 9),
+    );
 
-      expect(result, isNotNull);
-      expect(
-        result!.classification,
-        ShutdownClassification.possiblePowerLoss,
-      );
-      expect(result.deviceStats.single.lastCelsius, 79.0);
-      // No corroborating diagnostic events -> capped at moderate, never high.
-      expect(result.correlationLevel, isNot(CorrelationLevel.high));
-    },
-  );
+    expect(result, isNotNull);
+    expect(result!.classification, ShutdownClassification.possiblePowerLoss);
+    expect(result.deviceStats.single.lastCelsius, 79.0);
+    // No corroborating diagnostic events -> capped at moderate, never high.
+    expect(result.correlationLevel, isNot(CorrelationLevel.high));
+  });
 
   test('no elevated temperature at all yields CorrelationLevel.none', () {
     final result = engine.analyze(

@@ -177,7 +177,9 @@ class _IncidentTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _formatDate(incident.estimatedShutdownAt ?? incident.detectedAt),
+                    _formatDate(
+                      incident.estimatedShutdownAt ?? incident.detectedAt,
+                    ),
                     style: TextStyle(
                       fontSize: 11.5,
                       color: isDark
@@ -191,7 +193,9 @@ class _IncidentTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isDark ? AppColors.textPrimary : AppColors.lightText,
+                      color: isDark
+                          ? AppColors.textPrimary
+                          : AppColors.lightText,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -233,7 +237,9 @@ class _IncidentTile extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Icon(
               Icons.chevron_right_rounded,
-              color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
+              color: isDark
+                  ? AppColors.textMuted
+                  : AppColors.lightTextSecondary,
             ),
           ],
         ),
@@ -243,8 +249,18 @@ class _IncidentTile extends StatelessWidget {
 
   String _formatDate(DateTime dt) {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
     final minute = dt.minute.toString().padLeft(2, '0');

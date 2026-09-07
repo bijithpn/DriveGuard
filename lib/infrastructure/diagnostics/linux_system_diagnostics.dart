@@ -4,17 +4,6 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import 'system_diagnostics.dart';
 
-
-
-
-
-
-
-
-
-
-
-
 class LinuxSystemDiagnostics implements SystemDiagnostics {
   static const _tag = 'LinuxSystemDiagnostics';
 
@@ -22,8 +11,7 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
   String get backendName => 'systemd journal (journalctl)';
 
   @override
-  Future<bool> isAvailable() =>
-      SafeProcessRunner.instance.exists('journalctl');
+  Future<bool> isAvailable() => SafeProcessRunner.instance.exists('journalctl');
 
   @override
   Future<PreviousBootDiagnosis> diagnosePreviousBoot({
@@ -38,15 +26,13 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
 
     List<String> lines;
     try {
-      final result = await SafeProcessRunner.instance.run('journalctl', [
-        '-b',
-        '-1',
-        '--no-pager',
-        '-o',
-        'short-iso',
-      ], requireZeroExit: false, timeout: const Duration(seconds: 10));
+      final result = await SafeProcessRunner.instance.run(
+        'journalctl',
+        ['-b', '-1', '--no-pager', '-o', 'short-iso'],
+        requireZeroExit: false,
+        timeout: const Duration(seconds: 10),
+      );
       if (result.exitCode != 0 || result.stdout.trim().isEmpty) {
-
         return const PreviousBootDiagnosis(
           classification: ShutdownClassification.unknown,
           events: [],
@@ -151,7 +137,6 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
     } else if (lines.where((l) => l.trim().isNotEmpty).isEmpty) {
       classification = ShutdownClassification.unknown;
     } else {
-
       classification = ShutdownClassification.possiblePowerLoss;
     }
 
@@ -160,8 +145,8 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
       events: events,
       shutdownAt: events.isNotEmpty
           ? events
-              .map((e) => e.timestamp)
-              .reduce((a, b) => a.isAfter(b) ? a : b)
+                .map((e) => e.timestamp)
+                .reduce((a, b) => a.isAfter(b) ? a : b)
           : null,
     );
   }
@@ -174,6 +159,5 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
     return DateTime.tryParse(match.group(1)!) ?? DateTime.now();
   }
 
-  String _truncate(String s) =>
-      s.length > 160 ? '${s.substring(0, 160)}…' : s;
+  String _truncate(String s) => s.length > 160 ? '${s.substring(0, 160)}…' : s;
 }

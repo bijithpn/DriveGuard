@@ -2,34 +2,19 @@ import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../prediction/trend_analyzer.dart';
 
-
-
 class PredictiveHit {
   const PredictiveHit({required this.etaText, required this.critical});
 
-  
   final String etaText;
 
-  
   final bool critical;
 }
-
-
-
-
-
-
-
 
 class PredictiveEngine {
   const PredictiveEngine({this.minRSquared = 0.6, this.minSamples = 4});
 
-  
-  
-  
   final double minRSquared;
 
-  
   final int minSamples;
 
   static const _analyzer = TrendAnalyzer();
@@ -40,7 +25,6 @@ class PredictiveEngine {
     return result;
   }
 
-  
   PredictiveHit? evaluateTemperature({
     required List<TrendPoint> points,
     required double currentCelsius,
@@ -59,7 +43,6 @@ class PredictiveEngine {
     );
   }
 
-  
   PredictiveHit? evaluateCapacity({
     required List<TrendPoint> points,
     required double currentUsagePercent,
@@ -78,8 +61,6 @@ class PredictiveEngine {
     );
   }
 
-  
-  
   PredictiveHit? evaluateHealthWear({
     required List<TrendPoint> points,
     required double currentPercentageUsed,

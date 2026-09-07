@@ -6,20 +6,6 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import 'system_diagnostics.dart';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class MacOSSystemDiagnostics implements SystemDiagnostics {
   static const _tag = 'MacOSSystemDiagnostics';
 
@@ -107,16 +93,21 @@ class MacOSSystemDiagnostics implements SystemDiagnostics {
 
   Future<List<SystemDiagnosticEvent>> _scanUnifiedLog() async {
     try {
-      final result = await SafeProcessRunner.instance.run('log', [
-        'show',
-        '--last',
-        '10m',
-        '--predicate',
-        'eventMessage contains "SIGTERM" OR eventMessage contains '
-            '"shutdown cause" OR eventMessage contains "restart cause"',
-        '--style',
-        'compact',
-      ], requireZeroExit: false, timeout: const Duration(seconds: 10));
+      final result = await SafeProcessRunner.instance.run(
+        'log',
+        [
+          'show',
+          '--last',
+          '10m',
+          '--predicate',
+          'eventMessage contains "SIGTERM" OR eventMessage contains '
+              '"shutdown cause" OR eventMessage contains "restart cause"',
+          '--style',
+          'compact',
+        ],
+        requireZeroExit: false,
+        timeout: const Duration(seconds: 10),
+      );
       if (result.stdout.trim().isEmpty) return const [];
 
       final events = <SystemDiagnosticEvent>[];

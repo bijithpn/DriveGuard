@@ -1,8 +1,6 @@
 class AppConstants {
   const AppConstants._();
 
-  
-  
   static const String appVersion = '1.0.0';
 
   static const Duration defaultPollingInterval = Duration(seconds: 5);
@@ -54,25 +52,14 @@ class AppConstants {
 
   static const int defaultWearJumpAlertPercent = 3;
 
-  
-  
-  
-  
-  
   static const bool defaultPredictiveAlertsEnabled = true;
 
-  
-  
   static const double predictiveMinRSquared = 0.6;
   static const int predictiveMinSamples = 4;
 
-  
-  
   static const Duration predictiveTemperatureLookback = Duration(minutes: 5);
   static const Duration predictiveTemperatureLeadTime = Duration(minutes: 15);
 
-  
-  
   static const Duration predictiveCapacityLookback = Duration(days: 3);
   static const Duration predictiveCapacityLeadTime = Duration(days: 3);
   static const Duration predictiveCapacitySampleInterval = Duration(

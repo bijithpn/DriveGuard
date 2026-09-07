@@ -207,6 +207,15 @@ private final class ActivityStreamHandler: NSObject, FlutterStreamHandler {
     let t = Timer.scheduledTimer(withTimeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
       self?.tick()
     }
+    // A default Timer fires at an exact wall-clock instant, which forces a
+    // dedicated CPU wake every 1.5s for the app's entire runtime - this
+    // alone was enough to keep the whole process "High" energy impact /
+    // App-Nap- and idle-prevented in Activity Monitor, independent of the
+    // 5s/15s/60s Dart-side polling timers. Giving it tolerance lets the OS
+    // coalesce this wake with others already happening nearby instead of
+    // waking the CPU on its own schedule - same effective ~1.5s cadence,
+    // far fewer discrete wakes.
+    t.tolerance = Self.pollInterval * 0.3
     RunLoop.main.add(t, forMode: .common)
     timer = t
     return nil

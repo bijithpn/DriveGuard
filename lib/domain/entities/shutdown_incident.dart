@@ -1,8 +1,6 @@
 import '../enums/incident_enums.dart';
 import 'system_diagnostic_event.dart';
 
-
-
 class DeviceIncidentStat {
   const DeviceIncidentStat({
     required this.deviceId,
@@ -51,9 +49,6 @@ class DeviceIncidentStat {
   }
 }
 
-
-
-
 class ShutdownIncident {
   const ShutdownIncident({
     required this.id,
@@ -73,8 +68,6 @@ class ShutdownIncident {
 
   final String id;
 
-  
-  
   final String sessionId;
 
   final DateTime detectedAt;
@@ -83,14 +76,11 @@ class ShutdownIncident {
   final ShutdownClassification classification;
   final CorrelationLevel correlationLevel;
 
-  
   final String summary;
 
   final String? primaryDeviceId;
   final List<DeviceIncidentStat> deviceStats;
 
-  
-  
   final List<TimelineSample> timeline;
   final List<SystemDiagnosticEvent> diagnosticEvents;
   final bool notificationShown;
@@ -151,7 +141,6 @@ class ShutdownIncident {
   }
 }
 
-
 class TimelineSample {
   const TimelineSample({
     required this.timestamp,
@@ -162,6 +151,5 @@ class TimelineSample {
   final DateTime timestamp;
   final double celsius;
 
-  
   final String? label;
 }

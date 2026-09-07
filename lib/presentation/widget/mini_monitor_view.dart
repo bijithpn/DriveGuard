@@ -543,9 +543,7 @@ class _NavArrowButtonState extends State<_NavArrowButton> {
           width: widget.compact ? 22 : 24,
           height: widget.compact ? 22 : 24,
           decoration: BoxDecoration(
-            color: enabled && _hovered
-                ? AppColors.border
-                : Colors.transparent,
+            color: enabled && _hovered ? AppColors.border : Colors.transparent,
             borderRadius: BorderRadius.circular(5),
           ),
           child: Icon(
@@ -587,23 +585,17 @@ class _CloseWidgetButtonState extends State<_CloseWidgetButton> {
             width: widget.compact ? 22 : 24,
             height: widget.compact ? 22 : 24,
             decoration: BoxDecoration(
-              color: _hovered
-                  ? AppColors.criticalDim
-                  : AppColors.bg3,
+              color: _hovered ? AppColors.criticalDim : AppColors.bg3,
               borderRadius: BorderRadius.circular(5),
               border: Border.all(
-                color: _hovered
-                    ? AppColors.critical
-                    : AppColors.border,
+                color: _hovered ? AppColors.critical : AppColors.border,
                 width: 1,
               ),
             ),
             child: Icon(
               Icons.close_rounded,
               size: widget.compact ? 13 : 15,
-              color: _hovered
-                  ? AppColors.critical
-                  : AppColors.textSecondary,
+              color: _hovered ? AppColors.critical : AppColors.textSecondary,
             ),
           ),
         ),
@@ -638,18 +630,14 @@ class _ExpandButtonState extends State<_ExpandButton> {
             width: widget.compact ? 22 : 24,
             height: widget.compact ? 22 : 24,
             decoration: BoxDecoration(
-              color: _hovered
-                  ? AppColors.border
-                  : AppColors.bg3,
+              color: _hovered ? AppColors.border : AppColors.bg3,
               borderRadius: BorderRadius.circular(5),
               border: Border.all(color: AppColors.border, width: 1),
             ),
             child: Icon(
               Icons.open_in_full_rounded,
               size: widget.compact ? 12 : 14,
-              color: _hovered
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
+              color: _hovered ? AppColors.textPrimary : AppColors.textSecondary,
             ),
           ),
         ),

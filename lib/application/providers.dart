@@ -16,21 +16,14 @@ import 'monitoring/temperature_history_store.dart';
 import 'notifications/notification_service.dart';
 import 'settings/app_settings.dart';
 
-
-
-
 final incidentRepositoryProvider = Provider<IncidentRepository?>((ref) => null);
 
 final sessionIdProvider = Provider<String?>((ref) => null);
 
 final heartbeatServiceProvider = Provider<HeartbeatService>(
-  (ref) => throw UnimplementedError(
-    'heartbeatServiceProvider must be overridden',
-  ),
+  (ref) =>
+      throw UnimplementedError('heartbeatServiceProvider must be overridden'),
 );
-
-
-
 
 final startupIncidentProvider = Provider<ShutdownIncident?>((ref) => null);
 

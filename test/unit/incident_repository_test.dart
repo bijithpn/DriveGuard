@@ -14,53 +14,50 @@ void main() {
     repo = IncidentRepository(db);
   });
 
-  test(
-    'a diagnostic event with an error code and stack trace round-trips '
-    'through the database unchanged',
-    () async {
-      await repo.createSession(
-        MonitoringSession(
-          id: 's1',
-          startedAt: DateTime(2026, 9, 7),
-          operatingSystem: 'macos',
-          appVersion: '1.0.0',
-          pollingIntervalSeconds: 5,
-        ),
-      );
+  test('a diagnostic event with an error code and stack trace round-trips '
+      'through the database unchanged', () async {
+    await repo.createSession(
+      MonitoringSession(
+        id: 's1',
+        startedAt: DateTime(2026, 9, 7),
+        operatingSystem: 'macos',
+        appVersion: '1.0.0',
+        pollingIntervalSeconds: 5,
+      ),
+    );
 
-      final stackTrace = 'Exception: boom\n#0 main (main.dart:10)\n#1 zone';
-      await repo.recordDiagnosticEvents('s1', [
-        SystemDiagnosticEvent(
-          timestamp: DateTime(2026, 9, 7, 10, 6),
-          source: 'DriveGuard (Flutter error)',
-          category: 'app-crash',
-          summary: 'Exception: boom',
-          raw: stackTrace,
-          errorCode: 'RangeError',
-        ),
-      ]);
+    final stackTrace = 'Exception: boom\n#0 main (main.dart:10)\n#1 zone';
+    await repo.recordDiagnosticEvents('s1', [
+      SystemDiagnosticEvent(
+        timestamp: DateTime(2026, 9, 7, 10, 6),
+        source: 'DriveGuard (Flutter error)',
+        category: 'app-crash',
+        summary: 'Exception: boom',
+        raw: stackTrace,
+        errorCode: 'RangeError',
+      ),
+    ]);
 
-      final incident = ShutdownIncident(
-        id: 'i1',
-        sessionId: 's1',
-        detectedAt: DateTime(2026, 9, 7, 10, 8),
-        classification: ShutdownClassification.appSessionEndedUnexpectedly,
-        correlationLevel: CorrelationLevel.none,
-        summary: 'test',
-      );
-      final saved = await repo.saveIncidentIfNew(incident, const []);
-      expect(saved, isTrue);
+    final incident = ShutdownIncident(
+      id: 'i1',
+      sessionId: 's1',
+      detectedAt: DateTime(2026, 9, 7, 10, 8),
+      classification: ShutdownClassification.appSessionEndedUnexpectedly,
+      correlationLevel: CorrelationLevel.none,
+      summary: 'test',
+    );
+    final saved = await repo.saveIncidentIfNew(incident, const []);
+    expect(saved, isTrue);
 
-      final detail = await repo.incidentDetail('i1');
-      expect(detail, isNotNull);
-      expect(detail!.diagnosticEvents, hasLength(1));
-      final event = detail.diagnosticEvents.single;
-      expect(event.category, 'app-crash');
-      expect(event.errorCode, 'RangeError');
-      expect(event.raw, stackTrace);
-      expect(event.summary, 'Exception: boom');
-    },
-  );
+    final detail = await repo.incidentDetail('i1');
+    expect(detail, isNotNull);
+    expect(detail!.diagnosticEvents, hasLength(1));
+    final event = detail.diagnosticEvents.single;
+    expect(event.category, 'app-crash');
+    expect(event.errorCode, 'RangeError');
+    expect(event.raw, stackTrace);
+    expect(event.summary, 'Exception: boom');
+  });
 
   test('saveIncidentIfNew refuses a duplicate for the same session', () async {
     await repo.createSession(

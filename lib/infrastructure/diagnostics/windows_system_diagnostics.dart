@@ -4,21 +4,6 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import 'system_diagnostics.dart';
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class WindowsSystemDiagnostics implements SystemDiagnostics {
   static const _tag = 'WindowsSystemDiagnostics';
 
@@ -26,8 +11,7 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
   String get backendName => 'Windows Event Log (wevtutil)';
 
   @override
-  Future<bool> isAvailable() =>
-      SafeProcessRunner.instance.exists('wevtutil');
+  Future<bool> isAvailable() => SafeProcessRunner.instance.exists('wevtutil');
 
   @override
   Future<PreviousBootDiagnosis> diagnosePreviousBoot({
@@ -101,8 +85,7 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
     String providerHint,
     String category,
   ) async {
-    final query =
-        '*[System[(EventID=$eventId)]]';
+    final query = '*[System[(EventID=$eventId)]]';
     final result = await SafeProcessRunner.instance.run('wevtutil', [
       'qe',
       log,
@@ -131,13 +114,9 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
       }
       timestamp ??= DateTime.now();
       final firstLine = block.trim().split('\n').take(3).join(' ').trim();
-      
-      
-      
+
       final errorCode = category == 'kernel-panic'
-          ? RegExp(
-              r'0x[0-9A-Fa-f]{4,16}',
-            ).firstMatch(block)?.group(0)
+          ? RegExp(r'0x[0-9A-Fa-f]{4,16}').firstMatch(block)?.group(0)
           : null;
       events.add(
         SystemDiagnosticEvent(

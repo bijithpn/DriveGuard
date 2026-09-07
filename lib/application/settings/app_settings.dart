@@ -135,9 +135,6 @@ class AppSettings {
   final Duration healthPollingInterval;
   final bool healthAlertsEnabled;
 
-  
-  
-  
   final bool predictiveAlertsEnabled;
 
   final ThemeMode themeMode;
