@@ -913,14 +913,14 @@ class _TemperatureTab extends ConsumerWidget {
   }
 }
 
-/// Shown while fewer than two samples exist for the chart (right after
-/// startup, or right after a device reconnects). Rather than leaving the
-/// user waiting on the next automatic poll with no way to tell whether
-/// monitoring is actually working, a "Refresh now" button forces an
-/// immediate read - it shows the real reading that comes back, never a
-/// fabricated one, so the placeholder may still remain if a second sample
-/// hasn't accumulated yet, but the user now has a way to check "right now"
-/// instead of only being able to wait.
+
+
+
+
+
+
+
+
 class _CollectingHistoryPlaceholder extends ConsumerStatefulWidget {
   const _CollectingHistoryPlaceholder({
     required this.deviceId,
@@ -1242,12 +1242,12 @@ class _HistoryChartState extends State<_HistoryChart> {
     final endTime = sortedSamples.last.timestamp;
     final totalSpanSeconds = endTime.difference(startTime).inSeconds.toDouble();
     final effectiveMaxX = totalSpanSeconds < 30 ? 30.0 : totalSpanSeconds;
-    // The most recent reading is the most important point on the chart, but
-    // plotting it exactly at maxX puts its dot/label flush against the
-    // right edge of the plot area, where it visually clips against the
-    // card border. Give it a little breathing room by extending the plot's
-    // x-domain slightly past the last real sample - the line itself still
-    // ends at the real data, this just adds empty margin after it.
+    
+    
+    
+    
+    
+    
     final rightPadding = (effectiveMaxX * 0.05).clamp(8.0, 60.0);
     final plotMaxX = effectiveMaxX + rightPadding;
 

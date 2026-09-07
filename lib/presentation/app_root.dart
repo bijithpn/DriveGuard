@@ -154,11 +154,11 @@ class _AppRootState extends ConsumerState<AppRoot>
           }
           return s.copyWith(widget: w);
         });
-        // Closing the widget must never take the main app down with it —
-        // the widget and the main window are independent lifecycles. If
-        // there's no tray to fall back to and the main window is hidden,
-        // surface the main window instead of quitting so the app stays
-        // reachable.
+        
+        
+        
+        
+        
         final isMainVisible = await windowManager.isVisible();
         final settings = ref.read(settingsProvider);
         if (!isMainVisible && (!settings.showTrayIcon || _tray == null)) {
@@ -328,9 +328,9 @@ class _AppRootState extends ConsumerState<AppRoot>
   Future<void> _pushSnapshotToMiniWindowIfActive({bool force = false}) async {
     final snapshot = _buildSnapshot();
 
-    // The native OS widget (WidgetKit) is independent of the in-app mini
-    // window's lifecycle - it's pushed on every data change regardless of
-    // whether the floating mini window is open.
+    
+    
+    
     unawaited(NativeWidgetBridge.pushSnapshot(snapshot));
 
     if (!ref.read(widgetModeActiveProvider)) return;

@@ -1,10 +1,10 @@
-/// A single run of the application, from startup to (ideally) a clean close.
-///
-/// Persisted immediately on startup and updated with a heartbeat while
-/// running, so a session that never gets marked [closedCleanly] is evidence
-/// that either the app or the OS ended abnormally — [endedCleanly] alone
-/// does not say which; that determination is made by combining this with
-/// platform [SystemDiagnosticEvent]s in the correlation engine.
+
+
+
+
+
+
+
 class MonitoringSession {
   const MonitoringSession({
     required this.id,
@@ -76,9 +76,9 @@ class MonitoringSession {
   }
 }
 
-/// A single pre-incident temperature sample persisted for a session, kept
-/// only around warning/critical events so the rolling in-memory buffer
-/// survives a sudden shutdown.
+
+
+
 class PreIncidentSample {
   const PreIncidentSample({
     required this.sessionId,
@@ -91,9 +91,9 @@ class PreIncidentSample {
   final String sessionId;
   final String deviceId;
 
-  /// Recorded alongside the sample (not looked up later) so a device that
-  /// has since been disconnected/removed still has a readable name in the
-  /// incident report.
+  
+  
+  
   final String deviceName;
   final DateTime timestamp;
   final double celsius;

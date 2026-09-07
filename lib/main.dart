@@ -24,19 +24,19 @@ import 'infrastructure/tray/desktop_window_controller.dart';
 import 'presentation/app_root.dart';
 import 'presentation/widget/mini_widget_app.dart';
 
-/// Set once `_bootstrap` has opened the database and started a session, so
-/// a crash handler below has somewhere to persist to. `null` until then -
-/// a crash before the database exists can't be recorded to it, which is an
-/// unavoidable limitation, not a bug.
+
+
+
+
 IncidentRepository? _crashRepository;
 String? _crashSessionId;
 
-/// Persists an application-level error (Flutter framework error, uncaught
-/// platform error, or an error escaping the root zone) as a diagnostic
-/// event tied to the current session, full stack trace included, so it
-/// survives to be shown in that session's incident report even if the app
-/// terminates right after. Best-effort and silent on failure - a crash
-/// handler must never itself throw.
+
+
+
+
+
+
 void _recordCrash(String source, Object error, StackTrace? stack) {
   final repo = _crashRepository;
   final sessionId = _crashSessionId;
@@ -55,7 +55,7 @@ void _recordCrash(String source, Object error, StackTrace? stack) {
       ]),
     );
   } catch (_) {
-    // Never let crash reporting itself throw.
+    
   }
 }
 
@@ -190,16 +190,16 @@ Future<void> _bootstrap() async {
   }
 }
 
-/// Catches termination signals sent to the process itself — `kill`/`kill
-/// -TERM`, a systemd/session-manager stop, Ctrl+C in a terminal, a logout
-/// that asks running apps to quit — which bypass the Flutter window
-/// entirely and would otherwise never run `AppRoot`'s clean-quit path.
-/// `SIGKILL` (`kill -9`) can never be caught by any process on any OS; that
-/// case is unavoidably left to the next-launch heartbeat-gap detection.
-///
-/// `ProcessSignal.sigterm` is not supported on Windows (the Dart docs say
-/// so explicitly) so `watch()` is wrapped per-signal rather than failing
-/// the whole app if one isn't available on this platform.
+
+
+
+
+
+
+
+
+
+
 void _armTerminationSignalHandlers(ProviderContainer container) {
   var handled = false;
   Future<void> onSignal(ProcessSignal signal) async {

@@ -6,20 +6,20 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import 'system_diagnostics.dart';
 
-/// Reads macOS diagnostics for the previous boot/shutdown from two sources:
-///
-///  - Kernel panic reports under `/Library/Logs/DiagnosticReports` and
-///    `~/Library/Logs/DiagnosticReports` (`.panic`/`.ips` files with a panic
-///    payload) — the strongest available signal on macOS, written by the
-///    kernel itself before/at the panic.
-///  - The unified log (`log show`), searched for shutdown-cause and restart
-///    reason strings logged by `powerd`/`loginwindow` around the relevant
-///    time window.
-///
-/// `log`/file access require no special entitlement for the app's own
-/// readable log store on a normal user account; if `log` is missing or a
-/// query fails, this degrades to [ShutdownClassification.unknown] rather
-/// than guessing.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class MacOSSystemDiagnostics implements SystemDiagnostics {
   static const _tag = 'MacOSSystemDiagnostics';
 

@@ -16,9 +16,9 @@ import 'monitoring/temperature_history_store.dart';
 import 'notifications/notification_service.dart';
 import 'settings/app_settings.dart';
 
-/// `null` in contexts that never opened the database (unit/widget tests) —
-/// `MonitoringService` treats a missing repository as "pre-incident
-/// persistence disabled" rather than crashing.
+
+
+
 final incidentRepositoryProvider = Provider<IncidentRepository?>((ref) => null);
 
 final sessionIdProvider = Provider<String?>((ref) => null);
@@ -29,9 +29,9 @@ final heartbeatServiceProvider = Provider<HeartbeatService>(
   ),
 );
 
-/// The incident (if any) detected for the previous run, resolved once during
-/// bootstrap before the UI starts — overridden with the actual value (or
-/// `null`) in `main.dart`.
+
+
+
 final startupIncidentProvider = Provider<ShutdownIncident?>((ref) => null);
 
 final storageMonitorProvider = Provider<StorageMonitor>(

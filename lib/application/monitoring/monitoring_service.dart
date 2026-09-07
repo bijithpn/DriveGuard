@@ -24,9 +24,9 @@ import '../settings/app_settings.dart';
 import 'metric_history_store.dart';
 import 'temperature_history_store.dart';
 
-/// How far back to persist samples once a device crosses warning/critical,
-/// so a sudden shutdown can't erase the run-up to it. Matches the spec's
-/// "keep ~10 minutes of pre-incident buffer" requirement.
+
+
+
 const Duration _preIncidentWindow = Duration(minutes: 10);
 
 class MonitoringService {
@@ -198,13 +198,13 @@ class MonitoringService {
 
   Future<void> rescan() => _discoverDevices();
 
-  /// Forces an immediate temperature read for one device (or, with
-  /// [deviceId] omitted, every currently-connected device) instead of
-  /// waiting for the next timer tick. Runs even while paused - a manual
-  /// refresh is an explicit user action, not the background schedule - so
-  /// a UI stuck showing "collecting data" (e.g. right after a device
-  /// reconnects, before enough samples exist for a chart) has a way to
-  /// force a fresh reading rather than only waiting it out.
+  
+  
+  
+  
+  
+  
+  
   Future<void> refreshNow({String? deviceId}) async {
     final ids = deviceId != null
         ? [
@@ -955,14 +955,14 @@ class MonitoringService {
     );
   }
 
-  /// Best-effort, synchronous-as-possible flush for an abnormal shutdown
-  /// path (a termination signal, a forced close): persists the full
-  /// temperature history plus a fresh pre-incident snapshot for every
-  /// device that is currently at warning/critical, and stamps one final
-  /// heartbeat — so if this really is the last chance to write anything,
-  /// the next launch has the freshest possible picture instead of relying
-  /// on the last periodic write (up to ~20s old for pre-incident data, or
-  /// up to 10 polls old for history).
+  
+  
+  
+  
+  
+  
+  
+  
   Future<void> flushForShutdown() async {
     AppLogger.instance.warning(_tag, 'Flushing telemetry before shutdown');
     try {

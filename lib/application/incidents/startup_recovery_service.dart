@@ -11,10 +11,10 @@ import '../../infrastructure/diagnostics/system_diagnostics_factory.dart';
 import '../../infrastructure/persistence/incident_repository.dart';
 import 'incident_correlation_engine.dart';
 
-/// Orchestrates the startup sequence described in the spec:
-/// create the new session, inspect the previous one, gather platform
-/// diagnostics, recover the pre-incident buffer, run correlation, persist
-/// (deduplicated) and hand back the result for the UI to show.
+
+
+
+
 class StartupRecoveryService {
   StartupRecoveryService({
     required IncidentRepository repository,
@@ -33,9 +33,9 @@ class StartupRecoveryService {
   final IncidentCorrelationEngine _engine;
   final Uuid _uuid;
 
-  /// Step 1 of startup: create and persist the new session immediately, so
-  /// even if the app dies right after this, the next launch has a session
-  /// row to compare against.
+  
+  
+  
   Future<MonitoringSession> startNewSession({
     required String appVersion,
     required Duration pollingInterval,
@@ -51,11 +51,11 @@ class StartupRecoveryService {
     return session;
   }
 
-  /// Inspects the previous session (if any) and, if it didn't close
-  /// cleanly, runs platform diagnostics + correlation and persists a
-  /// [ShutdownIncident]. Returns the incident to show at startup, or `null`
-  /// if there's nothing to report (previous session closed cleanly, no
-  /// previous session, or an incident for it was already recorded).
+  
+  
+  
+  
+  
   Future<ShutdownIncident?> recoverPreviousSession({
     required String currentSessionId,
     required double Function(String deviceId) warningCelsiusFor,

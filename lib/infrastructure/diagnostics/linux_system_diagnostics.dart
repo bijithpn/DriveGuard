@@ -4,17 +4,17 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import 'system_diagnostics.dart';
 
-/// Reads the systemd journal for evidence about the previous boot via
-/// `journalctl` (present on essentially every systemd-based distro; detected
-/// first, never assumed). Looks at boot `-1` (the boot before this one):
-///
-///  - Whether it ends with a clean shutdown/reboot target being reached.
-///  - Kernel panic / OOM-killer / watchdog messages.
-///  - Storage-related errors (NVMe/ATA/I-O errors, controller resets).
-///
-/// On non-systemd distros (no `journalctl`), this reports
-/// [ShutdownClassification.unknown] with a diagnostic explaining the tool is
-/// unavailable, per the "detect utilities first, never assume" rule.
+
+
+
+
+
+
+
+
+
+
+
 class LinuxSystemDiagnostics implements SystemDiagnostics {
   static const _tag = 'LinuxSystemDiagnostics';
 

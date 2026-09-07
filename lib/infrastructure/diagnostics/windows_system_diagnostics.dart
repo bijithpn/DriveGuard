@@ -4,21 +4,21 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import 'system_diagnostics.dart';
 
-/// Reads the Windows Event Log for evidence about the previous shutdown via
-/// `wevtutil` (a built-in, documented Windows diagnostic utility — chosen
-/// over a raw `EvtQuery`/`EvtNext` Win32 FFI binding to keep this class
-/// dependency-free; it is isolated entirely behind [SystemDiagnostics] so the
-/// rest of the app never depends on it directly, matching the "CLI fallback
-/// isolated behind a backend" rule).
-///
-/// Looks for:
-///  - Kernel-Power Event ID 41 ("The system has rebooted without cleanly
-///    shutting down first") — unexpected shutdown/power loss indicator.
-///  - EventLog Event ID 6008 — "previous system shutdown was unexpected".
-///  - User32 Event ID 1074 — a clean, user/process-initiated shutdown or
-///    restart, with the requested reason.
-///  - BugCheck Event ID 1001 (source "Microsoft-Windows-WER-SystemErrorReporting")
-///    — a bugcheck (BSOD) report with code/parameters.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class WindowsSystemDiagnostics implements SystemDiagnostics {
   static const _tag = 'WindowsSystemDiagnostics';
 
@@ -131,9 +131,9 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
       }
       timestamp ??= DateTime.now();
       final firstLine = block.trim().split('\n').take(3).join(' ').trim();
-      // For a bugcheck/WER event, wevtutil's text output includes the
-      // bugcheck code as a hex value (e.g. "0x0000009f") somewhere in the
-      // event data - surfaced as-is, never reformatted or guessed at.
+      
+      
+      
       final errorCode = category == 'kernel-panic'
           ? RegExp(
               r'0x[0-9A-Fa-f]{4,16}',

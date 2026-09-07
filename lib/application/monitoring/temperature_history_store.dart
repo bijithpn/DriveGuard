@@ -80,10 +80,10 @@ class TemperatureHistoryStore {
     await _persistence.saveDevicePoints(deviceId, toSave);
   }
 
-  /// Flushes every device's history to disk right now, regardless of the
-  /// normal "every 10 writes" batching. Used when the app is being torn
-  /// down abnormally (a termination signal, an irregular close) so the
-  /// last few readings aren't lost along with the in-memory buffer.
+  
+  
+  
+  
   Future<void> persistAll() async {
     final ids = {..._raw.keys, ..._aggregated.keys};
     for (final id in ids) {

@@ -264,9 +264,9 @@ class _TimelineChart extends StatelessWidget {
         )
         .toList();
     final dataMaxX = spots.last.x;
-    // Keep the last point/marker off the plot's right edge so it doesn't
-    // clip against the card border - same treatment as the device details
-    // temperature chart.
+    
+    
+    
     final maxX = dataMaxX == 0
         ? 1.0
         : dataMaxX + (dataMaxX * 0.05).clamp(8.0, 60.0);
@@ -552,9 +552,9 @@ class _DiagnosticEventRowState extends State<_DiagnosticEventRow> {
   Widget build(BuildContext context) {
     final event = widget.event;
     final isDark = widget.isDark;
-    // Only offer to expand when there's actually more to see than the
-    // one-line summary already shown (a full stack trace, a raw log
-    // block, ...).
+    
+    
+    
     final hasDetail = event.raw != null && event.raw != event.summary;
 
     return Container(

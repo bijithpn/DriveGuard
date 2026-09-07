@@ -4,26 +4,26 @@ import '../../domain/entities/system_diagnostic_event.dart';
 import '../../domain/enums/incident_enums.dart';
 import '../../infrastructure/diagnostics/system_diagnostics.dart';
 
-/// Determines, from a previous session's own telemetry plus whatever the
-/// platform's diagnostics could establish, whether an unexpected shutdown
-/// occurred and how strongly storage temperature correlates with it.
-///
-/// Deliberately conservative: `CorrelationLevel.high` is only ever returned
-/// when there is corroborating platform diagnostic evidence in addition to
-/// the temperature data itself — see the module-level rule in the project
-/// spec ("never say the SSD caused the shutdown unless evidence genuinely
-/// establishes this").
+
+
+
+
+
+
+
+
+
 class IncidentCorrelationEngine {
   const IncidentCorrelationEngine();
 
-  /// [warningCelsiusFor]/[criticalCelsiusFor] resolve the *current*
-  /// configured thresholds for a device id (the same ones used live) —
-  /// there is no historical threshold log, so a threshold changed after the
-  /// incident will be applied retroactively; this is a documented, accepted
-  /// simplification.
-  ///
-  /// Returns `null` when the previous session ended cleanly and there is
-  /// nothing to report.
+  
+  
+  
+  
+  
+  
+  
+  
   ShutdownIncident? analyze({
     required MonitoringSession previousSession,
     required PreviousBootDiagnosis diagnosis,
@@ -37,8 +37,8 @@ class IncidentCorrelationEngine {
 
     final classification = _classify(previousSession, diagnosis);
 
-    // An app crash independent of the OS is never reported as a system
-    // shutdown, and carries no thermal correlation claim.
+    
+    
     if (classification == ShutdownClassification.appSessionEndedUnexpectedly) {
       return ShutdownIncident(
         id: newIncidentId,
@@ -100,7 +100,7 @@ class IncidentCorrelationEngine {
       );
     }
 
-    // Pick the primary device: worst offender by max temperature.
+    
     DeviceIncidentStat? primary;
     for (final s in stats) {
       if (s.maxCelsius == null) continue;
@@ -151,8 +151,8 @@ class IncidentCorrelationEngine {
     switch (diagnosis.classification) {
       case ShutdownClassification.osShutdownClean:
       case ShutdownClassification.osRebootClean:
-        // The OS itself says everything ended normally — the app must have
-        // crashed or been killed independently.
+        
+        
         return ShutdownClassification.appSessionEndedUnexpectedly;
       case ShutdownClassification.kernelPanic:
       case ShutdownClassification.bsod:
@@ -162,9 +162,9 @@ class IncidentCorrelationEngine {
       case ShutdownClassification.unknown:
       case ShutdownClassification.cleanAppExit:
       case ShutdownClassification.appSessionEndedUnexpectedly:
-        // No platform evidence either way; the session itself didn't close
-        // cleanly, so treat it as an unexplained stop rather than assume a
-        // crash or a system fault.
+        
+        
+        
         return ShutdownClassification.unknown;
     }
   }

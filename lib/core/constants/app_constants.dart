@@ -1,8 +1,8 @@
 class AppConstants {
   const AppConstants._();
 
-  /// Kept in sync with the `version:` line in pubspec.yaml manually — there
-  /// is no runtime package-info dependency in this project.
+  
+  
   static const String appVersion = '1.0.0';
 
   static const Duration defaultPollingInterval = Duration(seconds: 5);

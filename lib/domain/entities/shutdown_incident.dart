@@ -1,8 +1,8 @@
 import '../enums/incident_enums.dart';
 import 'system_diagnostic_event.dart';
 
-/// Per-device temperature statistics gathered for an incident, from the
-/// session's persisted pre-incident buffer / history around the shutdown.
+
+
 class DeviceIncidentStat {
   const DeviceIncidentStat({
     required this.deviceId,
@@ -51,9 +51,9 @@ class DeviceIncidentStat {
   }
 }
 
-/// A detected unexpected-shutdown/reboot event, with the best correlation the
-/// app could establish between storage temperature and the shutdown. This is
-/// a diagnostic aid, not a proven root-cause report.
+
+
+
 class ShutdownIncident {
   const ShutdownIncident({
     required this.id,
@@ -73,8 +73,8 @@ class ShutdownIncident {
 
   final String id;
 
-  /// The session this incident was detected for (the one that never closed
-  /// cleanly) — used as the dedup fingerprint.
+  
+  
   final String sessionId;
 
   final DateTime detectedAt;
@@ -83,14 +83,14 @@ class ShutdownIncident {
   final ShutdownClassification classification;
   final CorrelationLevel correlationLevel;
 
-  /// Evidence-based, non-accusatory human-readable explanation.
+  
   final String summary;
 
   final String? primaryDeviceId;
   final List<DeviceIncidentStat> deviceStats;
 
-  /// Recovered pre-incident temperature samples for the primary device,
-  /// oldest first.
+  
+  
   final List<TimelineSample> timeline;
   final List<SystemDiagnosticEvent> diagnosticEvents;
   final bool notificationShown;
@@ -151,7 +151,7 @@ class ShutdownIncident {
   }
 }
 
-/// A single labeled point on the incident temperature timeline UI.
+
 class TimelineSample {
   const TimelineSample({
     required this.timestamp,
@@ -162,6 +162,6 @@ class TimelineSample {
   final DateTime timestamp;
   final double celsius;
 
-  /// e.g. "Normal", "Warning", "Critical", "Last reading", "Shutdown".
+  
   final String? label;
 }

@@ -4,10 +4,10 @@ import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/enums/incident_enums.dart';
 import '../theme/app_theme.dart';
 
-/// Shows the "Unexpected Shutdown Detected" dialog described in the spec,
-/// once, right after startup, if a new incident was recovered. Never
-/// asserts a proven cause — only what [ShutdownIncident.summary] actually
-/// says.
+
+
+
+
 Future<void> showStartupIncidentDialog(
   BuildContext context,
   ShutdownIncident incident, {

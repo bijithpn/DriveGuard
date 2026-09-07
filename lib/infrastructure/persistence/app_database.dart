@@ -6,10 +6,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../core/logging/app_logger.dart';
 
-/// Opens and migrates the single local SQLite database that backs monitoring
-/// sessions, heartbeats, the persisted pre-incident buffer, incidents and
-/// diagnostic events. Desktop-only (Windows/macOS/Linux) via
-/// `sqflite_common_ffi`; no network access, works fully offline.
+
+
+
+
 class AppDatabase {
   AppDatabase._(this._db);
 
@@ -43,10 +43,10 @@ class AppDatabase {
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) {
-            // Adds a machine-readable error/bugcheck code alongside the
-            // existing human-readable summary/raw text, so a Windows
-            // bugcheck code or similar can be shown and filtered on
-            // without re-parsing `raw` every time.
+            
+            
+            
+            
             await db.execute(
               'ALTER TABLE diagnostic_events ADD COLUMN error_code TEXT',
             );
@@ -132,12 +132,12 @@ class AppDatabase {
     );
   }
 
-  /// Builds an isolated in-memory database with the current schema, for
-  /// tests only - never touches the real on-disk database or the
-  /// singleton `_instance`. `singleInstance: false` is required here: sqflite
-  /// otherwise dedupes open calls by path, and every call uses the same
-  /// `inMemoryDatabasePath` literal, which would hand back the previous
-  /// test's still-open (and populated) database instead of a fresh one.
+  
+  
+  
+  
+  
+  
   static Future<AppDatabase> openInMemoryForTesting() async {
     sqfliteFfiInit();
     final db = await databaseFactoryFfi.openDatabase(
@@ -151,8 +151,8 @@ class AppDatabase {
     return AppDatabase._(db);
   }
 
-  /// Deletes pre-incident samples older than [before] for sessions that
-  /// already produced an incident (or none), to keep the table bounded.
+  
+  
   Future<void> pruneOldSamples(DateTime before) async {
     await _db.delete(
       'pre_incident_samples',

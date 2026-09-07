@@ -4,10 +4,10 @@ import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/entities/system_diagnostic_event.dart';
 import 'app_database.dart';
 
-/// Local persistence for monitoring sessions, heartbeats, the pre-incident
-/// temperature buffer, diagnostic events and shutdown incidents. Every write
-/// here is best-effort and swallows its own errors (logged, not thrown) so a
-/// disk/DB problem never takes down monitoring itself.
+
+
+
+
 class IncidentRepository {
   IncidentRepository(this._appDb);
 
@@ -48,8 +48,8 @@ class IncidentRepository {
     }
   }
 
-  /// The most recently started session that isn't [excludeId], if any —
-  /// i.e. "the previous run".
+  
+  
   Future<MonitoringSession?> previousSession({String? excludeId}) async {
     try {
       final rows = await _appDb.db.query(
@@ -120,9 +120,9 @@ class IncidentRepository {
     }
   }
 
-  /// Persists an incident and its device stats. Returns false (does not
-  /// insert) if an incident for this `sessionId` already exists — the
-  /// session id is the dedup fingerprint.
+  
+  
+  
   Future<bool> saveIncidentIfNew(
     ShutdownIncident incident,
     List<SystemDiagnosticEvent> diagnosticEvents,
