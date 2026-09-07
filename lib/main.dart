@@ -7,6 +7,7 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'application/incidents/heartbeat_service.dart';
 import 'application/incidents/startup_recovery_service.dart';
@@ -90,7 +91,42 @@ Future<void> _run() async {
   await _bootstrap();
 }
 
+const _singleInstancePort = 51477;
+
+Future<bool> _acquireSingleInstanceLock() async {
+  try {
+    final server = await ServerSocket.bind(
+      InternetAddress.loopbackIPv4,
+      _singleInstancePort,
+    );
+    server.listen((socket) {
+      socket.destroy();
+      unawaited(windowManager.show());
+      unawaited(windowManager.focus());
+    });
+    return true;
+  } on SocketException {
+    try {
+      final socket = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        _singleInstancePort,
+        timeout: const Duration(seconds: 2),
+      );
+      await socket.close();
+    } catch (_) {}
+    return false;
+  }
+}
+
 Future<void> _bootstrap() async {
+  if (!await _acquireSingleInstanceLock()) {
+    AppLogger.instance.info(
+      'main',
+      'DriveGuard is already running - activating that instance instead of starting a second one',
+    );
+    exit(0);
+  }
+
   try {
     final settingsRepository = SettingsRepository();
     final settings = await settingsRepository.load();
