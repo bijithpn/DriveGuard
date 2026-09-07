@@ -282,8 +282,8 @@ final class IOKitStorageBackend {
     return (ioProperty(service, "Size") as? NSNumber)?.int64Value
   }
 
-  /// BSD names of the non-whole `IOMedia` children directly below the whole
-  /// disk's own `IOMedia` node - i.e. its partitions.
+  /// BSD names of the non-whole `IOMedia` descendants of the whole disk's
+  /// own `IOMedia` node - i.e. its partitions.
   private func partitionBsdNames(ofWhole wholeBsdName: String) -> [String] {
     guard let matchDict = IOBSDNameMatching(kIOMasterPortDefault, 0, wholeBsdName) else { return [] }
     let service = IOServiceGetMatchingService(kIOMasterPortDefault, matchDict)
@@ -291,9 +291,31 @@ final class IOKitStorageBackend {
     defer { IOObjectRelease(service) }
 
     var names: [String] = []
+    collectPartitionBsdNames(of: service, maxDepth: 4, into: &names)
+    return names
+  }
+
+  /// Recursively collects BSD names of non-whole `IOMedia` descendants
+  /// below [entry]. Partition `IOMedia` nodes are not always *direct*
+  /// children of the whole disk's `IOMedia` - a partition-scheme service
+  /// (`IOGUIDPartitionScheme` on a GPT disk, `IOApplePartitionScheme` on an
+  /// older APM one) commonly sits in between, so this descends through any
+  /// intermediate non-whole, non-BSD-named node in search of the actual
+  /// partitions - fixing a real gap where a whole physical disk's own
+  /// partitions/volumes were reported as empty because only its direct
+  /// IOService-plane children were checked. Does not descend into a found
+  /// partition (no further partitions of *this* disk live below it) or
+  /// into another `Whole = true` node (a different/synthesized disk
+  /// reachable from the same provider chain, e.g. an APFS container's
+  /// logical volumes - out of scope here, see the capacity/volume
+  /// "documented limitation" note above).
+  private func collectPartitionBsdNames(
+    of entry: io_registry_entry_t, maxDepth: Int, into names: inout [String]
+  ) {
+    guard maxDepth > 0 else { return }
     var iterator: io_iterator_t = 0
-    guard IORegistryEntryGetChildIterator(service, kIOServicePlane, &iterator) == KERN_SUCCESS else {
-      return []
+    guard IORegistryEntryGetChildIterator(entry, kIOServicePlane, &iterator) == KERN_SUCCESS else {
+      return
     }
     defer { IOObjectRelease(iterator) }
 
@@ -302,11 +324,12 @@ final class IOKitStorageBackend {
       let isWhole = (ioProperty(child, "Whole") as? NSNumber)?.boolValue ?? false
       if !isWhole, let bsd = ioProperty(child, "BSD Name") as? String {
         names.append(bsd)
+      } else if !isWhole {
+        collectPartitionBsdNames(of: child, maxDepth: maxDepth - 1, into: &names)
       }
       IOObjectRelease(child)
       child = IOIteratorNext(iterator)
     }
-    return names
   }
 
   private func describeVolume(bsdName: String, session: DASession) -> Volume? {

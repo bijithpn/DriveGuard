@@ -12,6 +12,7 @@ import '../components/device_presentation.dart';
 import '../components/drive_card.dart';
 
 import '../device_details/device_details_screen.dart';
+import '../incidents/incident_history_screen.dart';
 import '../settings/settings_screen.dart';
 import '../theme/app_theme.dart';
 
@@ -58,6 +59,9 @@ class DashboardScreen extends ConsumerWidget {
             onRescan: monitoringService.rescan,
             onOpenSettings: () =>
                 Navigator.of(context).push(_slideRoute(const SettingsScreen())),
+            onOpenIncidents: () => Navigator.of(
+              context,
+            ).push(_slideRoute(const IncidentHistoryScreen())),
           ),
 
           Expanded(
@@ -88,6 +92,7 @@ class _Sidebar extends StatelessWidget {
     required this.onToggleMonitoring,
     required this.onRescan,
     required this.onOpenSettings,
+    required this.onOpenIncidents,
   });
 
   final List<StorageDevice> devices;
@@ -97,6 +102,7 @@ class _Sidebar extends StatelessWidget {
   final VoidCallback onToggleMonitoring;
   final VoidCallback onRescan;
   final VoidCallback onOpenSettings;
+  final VoidCallback onOpenIncidents;
 
   TemperatureSeverity _overallSeverity() {
     if (devices.isEmpty) return TemperatureSeverity.unavailable;
@@ -300,6 +306,13 @@ class _Sidebar extends StatelessWidget {
                   tooltip: 'Rescan drives',
                   isDark: isDark,
                   onPressed: onRescan,
+                ),
+                const SizedBox(width: AppSpacing.xxs),
+                _SidebarIconButton(
+                  icon: Icons.history_rounded,
+                  tooltip: 'Incident history',
+                  isDark: isDark,
+                  onPressed: onOpenIncidents,
                 ),
                 const SizedBox(width: AppSpacing.xxs),
                 _SidebarIconButton(

@@ -14,6 +14,8 @@ import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/storage_volume.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
+import '../../domain/entities/monitoring_session.dart';
+import '../../infrastructure/persistence/incident_repository.dart';
 import '../alerts/alert_engine.dart';
 import '../alerts/predictive_engine.dart';
 import '../notifications/notification_service.dart';
@@ -21,6 +23,11 @@ import '../prediction/trend_analyzer.dart';
 import '../settings/app_settings.dart';
 import 'metric_history_store.dart';
 import 'temperature_history_store.dart';
+
+/// How far back to persist samples once a device crosses warning/critical,
+/// so a sudden shutdown can't erase the run-up to it. Matches the spec's
+/// "keep ~10 minutes of pre-incident buffer" requirement.
+const Duration _preIncidentWindow = Duration(minutes: 10);
 
 class MonitoringService {
   MonitoringService({
@@ -30,9 +37,13 @@ class MonitoringService {
     MetricHistoryStore? capacityHistoryStore,
     MetricHistoryStore? healthHistoryStore,
     PredictiveEngine predictiveEngine = const PredictiveEngine(),
+    IncidentRepository? incidentRepository,
+    String? sessionId,
   }) : _backend = backend,
        _notifications = notifications,
        _historyStore = historyStore,
+       _incidentRepository = incidentRepository,
+       _sessionId = sessionId,
        _capacityHistoryStore =
            capacityHistoryStore ??
            MetricHistoryStore(
@@ -55,6 +66,8 @@ class MonitoringService {
   final MetricHistoryStore _capacityHistoryStore;
   final MetricHistoryStore _healthHistoryStore;
   final PredictiveEngine _predictiveEngine;
+  final IncidentRepository? _incidentRepository;
+  final String? _sessionId;
 
   
   
@@ -771,12 +784,17 @@ class MonitoringService {
       cooldown: _settings.notificationCooldown,
       recoveryNotificationsEnabled: _settings.recoveryNotificationsEnabled,
     );
+    if (result.severity == TemperatureSeverity.warning ||
+        result.severity == TemperatureSeverity.critical) {
+      unawaited(_persistPreIncidentBuffer(id, device.displayName));
+    }
+
     if (!result.shouldNotify || !_settings.notificationsEnabled) return;
 
     if (!result.isRecoveryNotification &&
         _lastPredictiveTempSeverity[id] == result.severity &&
         _recentlyPredicted(_lastPredictiveTempAt[id])) {
-      
+
       return;
     }
 
@@ -869,6 +887,89 @@ class MonitoringService {
       }
     } else if (delta < threshold / 2) {
       _rapidRiseArmed[id] = false;
+    }
+  }
+
+  final Map<String, DateTime> _lastPreIncidentPersistAt = {};
+
+  Future<void> _persistPreIncidentBuffer(
+    String deviceId,
+    String deviceName, {
+    bool force = false,
+  }) async {
+    final repo = _incidentRepository;
+    final sessionId = _sessionId;
+    if (repo == null || sessionId == null) return;
+
+    if (!force) {
+      final lastAt = _lastPreIncidentPersistAt[deviceId];
+      if (lastAt != null &&
+          DateTime.now().difference(lastAt) < const Duration(seconds: 20)) {
+        return;
+      }
+    }
+    _lastPreIncidentPersistAt[deviceId] = DateTime.now();
+
+    final points = _historyStore.pointsFor(deviceId, _preIncidentWindow);
+    if (points.isEmpty) return;
+    await repo.recordPreIncidentSamples(
+      points
+          .map(
+            (p) => PreIncidentSample(
+              sessionId: sessionId,
+              deviceId: deviceId,
+              deviceName: deviceName,
+              timestamp: p.timestamp,
+              celsius: p.celsius,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  /// Best-effort, synchronous-as-possible flush for an abnormal shutdown
+  /// path (a termination signal, a forced close): persists the full
+  /// temperature history plus a fresh pre-incident snapshot for every
+  /// device that is currently at warning/critical, and stamps one final
+  /// heartbeat — so if this really is the last chance to write anything,
+  /// the next launch has the freshest possible picture instead of relying
+  /// on the last periodic write (up to ~20s old for pre-incident data, or
+  /// up to 10 polls old for history).
+  Future<void> flushForShutdown() async {
+    AppLogger.instance.warning(_tag, 'Flushing telemetry before shutdown');
+    try {
+      await _historyStore.persistAll();
+    } catch (e) {
+      AppLogger.instance.error(_tag, 'History flush failed', e);
+    }
+
+    for (final device in _devices.values) {
+      if (severityFor(device.id) == TemperatureSeverity.warning ||
+          severityFor(device.id) == TemperatureSeverity.critical) {
+        try {
+          await _persistPreIncidentBuffer(
+            device.id,
+            device.displayName,
+            force: true,
+          );
+        } catch (e) {
+          AppLogger.instance.error(
+            _tag,
+            'Pre-incident flush failed for ${device.id}',
+            e,
+          );
+        }
+      }
+    }
+
+    final repo = _incidentRepository;
+    final sessionId = _sessionId;
+    if (repo != null && sessionId != null) {
+      try {
+        await repo.heartbeat(sessionId, DateTime.now());
+      } catch (e) {
+        AppLogger.instance.debug(_tag, 'Final heartbeat write failed: $e');
+      }
     }
   }
 

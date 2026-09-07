@@ -159,7 +159,7 @@ class NativeStorageMonitor extends StorageMonitor {
     } on MissingPluginException {
       AppLogger.instance.debug(
         _tag,
-        'Native channel missing plugin Implmentaion',
+        'Native channel missing plugin implementation for getSensors',
       );
     } catch (e) {
       AppLogger.instance.debug(

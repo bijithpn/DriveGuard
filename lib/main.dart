@@ -8,10 +8,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
+import 'application/incidents/heartbeat_service.dart';
+import 'application/incidents/startup_recovery_service.dart';
 import 'application/monitoring/temperature_history_store.dart';
 import 'application/providers.dart';
+import 'core/constants/app_constants.dart';
 import 'core/logging/app_logger.dart';
 import 'infrastructure/notifications/local_notifier_service.dart';
+import 'infrastructure/persistence/app_database.dart';
+import 'infrastructure/persistence/incident_repository.dart';
 import 'infrastructure/persistence/settings_repository.dart';
 import 'infrastructure/storage/storage_monitor_factory.dart';
 import 'infrastructure/tray/desktop_window_controller.dart';
@@ -77,6 +82,33 @@ Future<void> _bootstrap() async {
     final historyStore = TemperatureHistoryStore();
     await historyStore.initialize();
 
+    final appDb = await AppDatabase.open();
+    unawaited(
+      appDb
+          .pruneOldSamples(DateTime.now().subtract(const Duration(days: 30)))
+          .catchError(
+            (Object e) =>
+                AppLogger.instance.debug('main', 'pruneOldSamples failed: $e'),
+          ),
+    );
+    final incidentRepository = IncidentRepository(appDb);
+    final recoveryService = StartupRecoveryService(
+      repository: incidentRepository,
+    );
+    final session = await recoveryService.startNewSession(
+      appVersion: AppConstants.appVersion,
+      pollingInterval: settings.pollingInterval,
+    );
+    final startupIncident = await recoveryService.recoverPreviousSession(
+      currentSessionId: session.id,
+      warningCelsiusFor: (id) => settings.thresholdsFor(id).warningCelsius,
+      criticalCelsiusFor: (id) => settings.thresholdsFor(id).criticalCelsius,
+    );
+    final heartbeat = HeartbeatService(
+      repository: incidentRepository,
+      sessionId: session.id,
+    )..start();
+
     try {
       launchAtStartup.setup(
         appName: 'DriveGuard',
@@ -91,20 +123,71 @@ Future<void> _bootstrap() async {
       AppLogger.instance.warning('main', 'launch-at-startup setup skipped: $e');
     }
 
+    final container = ProviderContainer(
+      overrides: [
+        storageMonitorProvider.overrideWithValue(backend),
+        notificationServiceProvider.overrideWithValue(notificationService),
+        historyStoreProvider.overrideWithValue(historyStore),
+        settingsProvider.overrideWith(() => SettingsNotifier(settings)),
+        incidentRepositoryProvider.overrideWithValue(incidentRepository),
+        sessionIdProvider.overrideWithValue(session.id),
+        heartbeatServiceProvider.overrideWithValue(heartbeat),
+        startupIncidentProvider.overrideWithValue(startupIncident),
+      ],
+    );
+    _armTerminationSignalHandlers(container);
+
     runApp(
-      ProviderScope(
-        overrides: [
-          storageMonitorProvider.overrideWithValue(backend),
-          notificationServiceProvider.overrideWithValue(notificationService),
-          historyStoreProvider.overrideWithValue(historyStore),
-          settingsProvider.overrideWith(() => SettingsNotifier(settings)),
-        ],
+      UncontrolledProviderScope(
+        container: container,
         child: _Bootstrapper(windowController: windowController),
       ),
     );
   } catch (error, stack) {
     AppLogger.instance.error('main', 'Bootstrap failed', error);
     runApp(_BootstrapFailureApp(error: error, stack: stack));
+  }
+}
+
+/// Catches termination signals sent to the process itself — `kill`/`kill
+/// -TERM`, a systemd/session-manager stop, Ctrl+C in a terminal, a logout
+/// that asks running apps to quit — which bypass the Flutter window
+/// entirely and would otherwise never run `AppRoot`'s clean-quit path.
+/// `SIGKILL` (`kill -9`) can never be caught by any process on any OS; that
+/// case is unavoidably left to the next-launch heartbeat-gap detection.
+///
+/// `ProcessSignal.sigterm` is not supported on Windows (the Dart docs say
+/// so explicitly) so `watch()` is wrapped per-signal rather than failing
+/// the whole app if one isn't available on this platform.
+void _armTerminationSignalHandlers(ProviderContainer container) {
+  var handled = false;
+  Future<void> onSignal(ProcessSignal signal) async {
+    if (handled) return;
+    handled = true;
+    AppLogger.instance.warning(
+      'main',
+      'Received ${signal.name} — flushing telemetry before exit',
+    );
+    try {
+      await container
+          .read(monitoringServiceProvider)
+          .flushForShutdown()
+          .timeout(const Duration(seconds: 3));
+    } catch (e) {
+      AppLogger.instance.error('main', 'Shutdown flush failed', e);
+    }
+    exit(0);
+  }
+
+  for (final signal in [ProcessSignal.sigterm, ProcessSignal.sigint]) {
+    try {
+      signal.watch().listen(onSignal);
+    } catch (e) {
+      AppLogger.instance.debug(
+        'main',
+        '${signal.name} not supported on this platform: $e',
+      );
+    }
   }
 }
 

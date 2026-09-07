@@ -3,15 +3,36 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/app_constants.dart';
+import '../domain/entities/shutdown_incident.dart';
 import '../domain/entities/storage_activity.dart';
 import '../domain/entities/storage_device.dart';
 import '../domain/repositories/storage_monitor.dart';
+import '../infrastructure/persistence/incident_repository.dart';
 import '../infrastructure/persistence/settings_repository.dart';
+import 'incidents/heartbeat_service.dart';
 import 'monitoring/metric_history_store.dart';
 import 'monitoring/monitoring_service.dart';
 import 'monitoring/temperature_history_store.dart';
 import 'notifications/notification_service.dart';
 import 'settings/app_settings.dart';
+
+/// `null` in contexts that never opened the database (unit/widget tests) —
+/// `MonitoringService` treats a missing repository as "pre-incident
+/// persistence disabled" rather than crashing.
+final incidentRepositoryProvider = Provider<IncidentRepository?>((ref) => null);
+
+final sessionIdProvider = Provider<String?>((ref) => null);
+
+final heartbeatServiceProvider = Provider<HeartbeatService>(
+  (ref) => throw UnimplementedError(
+    'heartbeatServiceProvider must be overridden',
+  ),
+);
+
+/// The incident (if any) detected for the previous run, resolved once during
+/// bootstrap before the UI starts — overridden with the actual value (or
+/// `null`) in `main.dart`.
+final startupIncidentProvider = Provider<ShutdownIncident?>((ref) => null);
 
 final storageMonitorProvider = Provider<StorageMonitor>(
   (ref) =>
@@ -53,6 +74,8 @@ final monitoringServiceProvider = Provider<MonitoringService>((ref) {
     historyStore: ref.watch(historyStoreProvider),
     capacityHistoryStore: ref.watch(capacityHistoryStoreProvider),
     healthHistoryStore: ref.watch(healthHistoryStoreProvider),
+    incidentRepository: ref.watch(incidentRepositoryProvider),
+    sessionId: ref.watch(sessionIdProvider),
   );
   ref.onDispose(service.dispose);
   return service;
@@ -114,3 +137,14 @@ final activityProvider =
     NotifierProvider<ActivityNotifier, Map<String, StorageActivity>>(
       ActivityNotifier.new,
     );
+
+final incidentListProvider = FutureProvider.autoDispose((ref) {
+  final repo = ref.watch(incidentRepositoryProvider);
+  return repo?.listIncidents() ?? Future.value(const []);
+});
+
+final incidentDetailProvider = FutureProvider.autoDispose
+    .family<ShutdownIncident?, String>((ref, incidentId) {
+      final repo = ref.watch(incidentRepositoryProvider);
+      return repo?.incidentDetail(incidentId) ?? Future.value(null);
+    });

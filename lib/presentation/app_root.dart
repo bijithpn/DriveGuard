@@ -19,6 +19,8 @@ import '../infrastructure/tray/desktop_window_controller.dart'
 import 'components/device_presentation.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'device_details/device_details_screen.dart';
+import 'incidents/incident_report_screen.dart';
+import 'incidents/startup_incident_dialog.dart';
 import 'settings/settings_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -58,6 +60,42 @@ class _AppRootState extends ConsumerState<AppRoot>
         .read(notificationServiceProvider)
         .deviceClicks
         .listen(_onNotificationClicked);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowStartupIncident());
+  }
+
+  Future<void> _maybeShowStartupIncident() async {
+    final incident = ref.read(startupIncidentProvider);
+    if (incident == null || !mounted) return;
+    unawaited(
+      ref
+          .read(incidentRepositoryProvider)
+          ?.markIncidentNotificationShown(incident.id),
+    );
+    await showStartupIncidentDialog(
+      rootNavigatorKey.currentContext ?? context,
+      incident,
+      onViewReport: () {
+        rootNavigatorKey.currentState?.push(
+          MaterialPageRoute<void>(
+            builder: (_) => IncidentReportScreen(incidentId: incident.id),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _quitApp() async {
+    try {
+      await ref.read(monitoringServiceProvider).flushForShutdown();
+    } catch (_) {}
+    try {
+      await ref.read(heartbeatServiceProvider).stop();
+    } catch (_) {}
+    try {
+      await _tray?.destroy();
+    } catch (_) {}
+    exit(0);
   }
 
   Future<void> _onNotificationClicked(String deviceId) async {
@@ -118,7 +156,7 @@ class _AppRootState extends ConsumerState<AppRoot>
         final isMainVisible = await windowManager.isVisible();
         final settings = ref.read(settingsProvider);
         if (!isMainVisible && (!settings.showTrayIcon || _tray == null)) {
-          exit(0);
+          await _quitApp();
         }
       case 'ready':
         await widget.windowController.showMiniWindow();
@@ -157,12 +195,7 @@ class _AppRootState extends ConsumerState<AppRoot>
         );
       },
       onRescan: () => ref.read(monitoringServiceProvider).rescan(),
-      onQuit: () async {
-        try {
-          await _tray?.destroy();
-        } catch (_) {}
-        exit(0);
-      },
+      onQuit: _quitApp,
     );
     try {
       await tray.initialize();
@@ -317,10 +350,7 @@ class _AppRootState extends ConsumerState<AppRoot>
     if (isWidgetActive || (settings.closeToTray && settings.showTrayIcon)) {
       await windowManager.hide();
     } else {
-      try {
-        await _tray?.destroy();
-      } catch (_) {}
-      exit(0);
+      await _quitApp();
     }
   }
 
