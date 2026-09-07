@@ -7,5 +7,13 @@
 	     which is possible for a sandboxed macOS app. See docs/permissions.md. -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
+	<!-- Shared with DriveGuardWidget so the widget extension can read the
+	     latest drive snapshot even when the main app isn't running.
+	     Signed with the PUA3NSL244 (Jithin Wails) team - see
+	     ../NATIVE_WIDGETS.md. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>PUA3NSL244.driveguard.widget</string>
+	</array>
 </dict>
 </plist>

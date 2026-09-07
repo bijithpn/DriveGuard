@@ -14,6 +14,9 @@ class MainFlutterWindow: NSWindow {
     StorageNativeChannel.register(
       with: flutterViewController.registrar(forPlugin: "StorageNativeChannel")
     )
+    NativeWidgetChannel.register(
+      with: flutterViewController.registrar(forPlugin: "NativeWidgetChannel")
+    )
 
     // The mini-widget window (see DesktopWindowController/MiniWidgetApp in
     // Dart) is a genuinely separate FlutterViewController/engine created

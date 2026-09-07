@@ -1,0 +1,8 @@
+{
+  "uuid": "driveguard-widget@intersmart.in",
+  "name": "DriveGuard Widget",
+  "description": "Live drive temperature and health in the top panel. Reads the snapshot DriveGuard writes to disk - the app doesn't need to be running for the last known values to show.",
+  "shell-version": ["45", "46", "47", "48"],
+  "url": "https://github.com/intersmart/driveguard",
+  "version-name": "1.0.0"
+}

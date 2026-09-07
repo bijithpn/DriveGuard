@@ -13,6 +13,7 @@ import '../core/logging/app_logger.dart';
 import '../domain/entities/storage_device.dart';
 import '../domain/entities/storage_thresholds.dart';
 import '../domain/enums/storage_enums.dart';
+import '../infrastructure/native/native_widget_bridge.dart';
 import '../infrastructure/tray/app_tray_service.dart';
 import '../infrastructure/tray/desktop_window_controller.dart'
     show kWidgetChannel;
@@ -153,10 +154,16 @@ class _AppRootState extends ConsumerState<AppRoot>
           }
           return s.copyWith(widget: w);
         });
+        // Closing the widget must never take the main app down with it —
+        // the widget and the main window are independent lifecycles. If
+        // there's no tray to fall back to and the main window is hidden,
+        // surface the main window instead of quitting so the app stays
+        // reachable.
         final isMainVisible = await windowManager.isVisible();
         final settings = ref.read(settingsProvider);
         if (!isMainVisible && (!settings.showTrayIcon || _tray == null)) {
-          await _quitApp();
+          await windowManager.show();
+          await windowManager.focus();
         }
       case 'ready':
         await widget.windowController.showMiniWindow();
@@ -319,8 +326,14 @@ class _AppRootState extends ConsumerState<AppRoot>
   }
 
   Future<void> _pushSnapshotToMiniWindowIfActive({bool force = false}) async {
-    if (!ref.read(widgetModeActiveProvider)) return;
     final snapshot = _buildSnapshot();
+
+    // The native OS widget (WidgetKit) is independent of the in-app mini
+    // window's lifecycle - it's pushed on every data change regardless of
+    // whether the floating mini window is open.
+    unawaited(NativeWidgetBridge.pushSnapshot(snapshot));
+
+    if (!ref.read(widgetModeActiveProvider)) return;
     if (!force && _lastPushedSnapshot == snapshot) return;
     _lastPushedSnapshot = snapshot;
 

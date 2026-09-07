@@ -21,6 +21,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		0CE2B69B6DCC60A87612CA2A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 047554F7F4162058E5255FB8 /* SwiftUI.framework */; };
 		2088744288858B007A9AD88E /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1CF9D5D9BBEA6D66960D3E74 /* Pods_RunnerTests.framework */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
@@ -28,9 +29,15 @@
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
+		5B10906BDD1AFF234DF5E799 /* NativeWidgetChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D4B4FA38F713B178732EF2 /* NativeWidgetChannel.swift */; };
+		80984E61134804D858AB389D /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 556F211E61522081A3ABF24E /* WidgetKit.framework */; };
 		9181F92FA225D8D5501955E1 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4490C883BBDF38FB4C82CBBF /* Pods_Runner.framework */; };
+		A99D07FCB01FE749EBA7C4BE /* DriveGuardWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CA342D8ECD363AAAF679C8B /* DriveGuardWidget.swift */; };
 		AA1100000000000000000002 /* IOKitStorageBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1100000000000000000001 /* IOKitStorageBackend.swift */; };
 		AA1100000000000000000004 /* StorageNativeChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1100000000000000000003 /* StorageNativeChannel.swift */; };
+		DF1012B00D9B4E0EBE384AA2 /* DriveGuardWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25E50020F68B25134A85396D /* DriveGuardWidgetBundle.swift */; };
+		F60977609132F81127BA2937 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB89879D58FDA9D8E18CA342 /* Cocoa.framework */; };
+		FD322F7C583D436323FDB770 /* DriveGuardWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E0D5CC889F52EC7FFA6A410E /* DriveGuardWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,6 +55,13 @@
 			remoteGlobalIDString = 33CC111A2044C6BA0003C045;
 			remoteInfo = FLX;
 		};
+		CD8FF5DB6EB4B667030916B5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 33CC10E52044A3C60003C045 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B3D002D25AA872D30BADE83;
+			remoteInfo = DriveGuardWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -61,10 +75,25 @@
 			name = "Bundle Framework";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		91203ABB3DEBD7CA7C152396 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				FD322F7C583D436323FDB770 /* DriveGuardWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		03CDE73C01E19F3F8BE99378 /* DriveGuardWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = DriveGuardWidget.entitlements; sourceTree = "<group>"; };
+		047554F7F4162058E5255FB8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		1CF9D5D9BBEA6D66960D3E74 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		25E50020F68B25134A85396D /* DriveGuardWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriveGuardWidgetBundle.swift; sourceTree = "<group>"; };
+		2CA342D8ECD363AAAF679C8B /* DriveGuardWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DriveGuardWidget.swift; sourceTree = "<group>"; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D7294CF71000263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		333000ED22D3DE5D00554162 /* Warnings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Warnings.xcconfig; sourceTree = "<group>"; };
@@ -75,8 +104,6 @@
 		33CC10F52044A3C60003C045 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		33CC10F72044A3C60003C045 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = Runner/Info.plist; sourceTree = "<group>"; };
 		33CC11122044BFA00003C045 /* MainFlutterWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainFlutterWindow.swift; sourceTree = "<group>"; };
-		AA1100000000000000000001 /* IOKitStorageBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOKitStorageBackend.swift; sourceTree = "<group>"; };
-		AA1100000000000000000003 /* StorageNativeChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageNativeChannel.swift; sourceTree = "<group>"; };
 		33CEB47222A05771004F2AC0 /* Flutter-Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Debug.xcconfig"; sourceTree = "<group>"; };
 		33CEB47422A05771004F2AC0 /* Flutter-Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Flutter-Release.xcconfig"; sourceTree = "<group>"; };
 		33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "Flutter-Generated.xcconfig"; path = "ephemeral/Flutter-Generated.xcconfig"; sourceTree = "<group>"; };
@@ -85,11 +112,18 @@
 		33E5194F232828860026EE4D /* AppInfo.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppInfo.xcconfig; sourceTree = "<group>"; };
 		4490C883BBDF38FB4C82CBBF /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E2B52A6985F16591C41A429 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
+		556F211E61522081A3ABF24E /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		56690A205C6F53A62EFECE4D /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
+		5B6DE9BA5C02AEBDB8DAD657 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		82D4B4FA38F713B178732EF2 /* NativeWidgetChannel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeWidgetChannel.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A2A142B0BD9DA1A939F5C1E2 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		AA1100000000000000000001 /* IOKitStorageBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOKitStorageBackend.swift; sourceTree = "<group>"; };
+		AA1100000000000000000003 /* StorageNativeChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageNativeChannel.swift; sourceTree = "<group>"; };
 		B584100DFA06FB52EAA0C6FF /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
+		BB89879D58FDA9D8E18CA342 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		E0D5CC889F52EC7FFA6A410E /* DriveGuardWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DriveGuardWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9278A555057A1CD218ACDF1 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		FC43CC1909580C50831FC855 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -108,6 +142,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				9181F92FA225D8D5501955E1 /* Pods_Runner.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8106E4F8F0D6D7433E4714A9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F60977609132F81127BA2937 /* Cocoa.framework in Frameworks */,
+				80984E61134804D858AB389D /* WidgetKit.framework in Frameworks */,
+				0CE2B69B6DCC60A87612CA2A /* SwiftUI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,6 +186,7 @@
 				33CC10EE2044A3C60003C045 /* Products */,
 				D73912EC22F37F3D000D13A0 /* Frameworks */,
 				84AB939C36938064EE063B87 /* Pods */,
+				880BC1DF6E60936E999E28F5 /* DriveGuardWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -150,6 +195,7 @@
 			children = (
 				33CC10ED2044A3C60003C045 /* driveguard.app */,
 				331C80D5294CF71000263BE5 /* RunnerTests.xctest */,
+				E0D5CC889F52EC7FFA6A410E /* DriveGuardWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -174,15 +220,6 @@
 				33CEB47722A0578A004F2AC0 /* Flutter-Generated.xcconfig */,
 			);
 			path = Flutter;
-			sourceTree = "<group>";
-		};
-		AA1100000000000000000005 /* StorageMonitor */ = {
-			isa = PBXGroup;
-			children = (
-				AA1100000000000000000001 /* IOKitStorageBackend.swift */,
-				AA1100000000000000000003 /* StorageNativeChannel.swift */,
-			);
-			path = StorageMonitor;
 			sourceTree = "<group>";
 		};
 		33FAB671232836740065AC1E /* Runner */ = {
@@ -213,13 +250,46 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
+		880BC1DF6E60936E999E28F5 /* DriveGuardWidget */ = {
+			isa = PBXGroup;
+			children = (
+				25E50020F68B25134A85396D /* DriveGuardWidgetBundle.swift */,
+				2CA342D8ECD363AAAF679C8B /* DriveGuardWidget.swift */,
+				5B6DE9BA5C02AEBDB8DAD657 /* Info.plist */,
+				03CDE73C01E19F3F8BE99378 /* DriveGuardWidget.entitlements */,
+			);
+			name = DriveGuardWidget;
+			path = DriveGuardWidget;
+			sourceTree = "<group>";
+		};
+		AA1100000000000000000005 /* StorageMonitor */ = {
+			isa = PBXGroup;
+			children = (
+				AA1100000000000000000001 /* IOKitStorageBackend.swift */,
+				AA1100000000000000000003 /* StorageNativeChannel.swift */,
+				82D4B4FA38F713B178732EF2 /* NativeWidgetChannel.swift */,
+			);
+			path = StorageMonitor;
+			sourceTree = "<group>";
+		};
 		D73912EC22F37F3D000D13A0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				4490C883BBDF38FB4C82CBBF /* Pods_Runner.framework */,
 				1CF9D5D9BBEA6D66960D3E74 /* Pods_RunnerTests.framework */,
+				ED8EF6C4CEBD186D84538838 /* OS X */,
+				556F211E61522081A3ABF24E /* WidgetKit.framework */,
+				047554F7F4162058E5255FB8 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		ED8EF6C4CEBD186D84538838 /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				BB89879D58FDA9D8E18CA342 /* Cocoa.framework */,
+			);
+			name = "OS X";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -255,16 +325,35 @@
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
 				69F9628BF7292E1045641340 /* [CP] Embed Pods Frameworks */,
+				91203ABB3DEBD7CA7C152396 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				33CC11202044C79F0003C045 /* PBXTargetDependency */,
+				5BD6227289E568B4B2778CF3 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
 			productReference = 33CC10ED2044A3C60003C045 /* driveguard.app */;
 			productType = "com.apple.product-type.application";
+		};
+		5B3D002D25AA872D30BADE83 /* DriveGuardWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BCE9A48A3D539A626BDCA835 /* Build configuration list for PBXNativeTarget "DriveGuardWidgetExtension" */;
+			buildPhases = (
+				2B986F13E33015DA982DF45C /* Sources */,
+				8106E4F8F0D6D7433E4714A9 /* Frameworks */,
+				330BC5CCD88652265AD28735 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DriveGuardWidgetExtension;
+			productName = DriveGuardWidgetExtension;
+			productReference = E0D5CC889F52EC7FFA6A410E /* DriveGuardWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -313,11 +402,19 @@
 				33CC10EC2044A3C60003C045 /* Runner */,
 				331C80D4294CF70F00263BE5 /* RunnerTests */,
 				33CC111A2044C6BA0003C045 /* Flutter Assemble */,
+				5B3D002D25AA872D30BADE83 /* DriveGuardWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		330BC5CCD88652265AD28735 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		331C80D3294CF70F00263BE5 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -439,6 +536,15 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		2B986F13E33015DA982DF45C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DF1012B00D9B4E0EBE384AA2 /* DriveGuardWidgetBundle.swift in Sources */,
+				A99D07FCB01FE749EBA7C4BE /* DriveGuardWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		331C80D1294CF70F00263BE5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -456,6 +562,7 @@
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 				AA1100000000000000000002 /* IOKitStorageBackend.swift in Sources */,
 				AA1100000000000000000004 /* StorageNativeChannel.swift in Sources */,
+				5B10906BDD1AFF234DF5E799 /* NativeWidgetChannel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -471,6 +578,12 @@
 			isa = PBXTargetDependency;
 			target = 33CC111A2044C6BA0003C045 /* Flutter Assemble */;
 			targetProxy = 33CC111F2044C79F0003C045 /* PBXContainerItemProxy */;
+		};
+		5BD6227289E568B4B2778CF3 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = DriveGuardWidgetExtension;
+			target = 5B3D002D25AA872D30BADE83 /* DriveGuardWidgetExtension */;
+			targetProxy = CD8FF5DB6EB4B667030916B5 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -588,8 +701,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/DebugProfile.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = PUA3NSL244;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -720,8 +835,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/DebugProfile.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = PUA3NSL244;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -740,8 +857,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Release.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = PUA3NSL244;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -765,6 +884,81 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		65AAD881C9E693573A127028 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DriveGuardWidget/DriveGuardWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PUA3NSL244;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DriveGuardWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.driveguard.DriveGuardWidget;
+				PRODUCT_NAME = DriveGuardWidgetExtension;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Profile;
+		};
+		97040386BDDC85154053387F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DriveGuardWidget/DriveGuardWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PUA3NSL244;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DriveGuardWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.driveguard.DriveGuardWidget;
+				PRODUCT_NAME = DriveGuardWidgetExtension;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FCE4FB43B856FD76A27F1C52 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DriveGuardWidget/DriveGuardWidget.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PUA3NSL244;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = DriveGuardWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.driveguard.DriveGuardWidget;
+				PRODUCT_NAME = DriveGuardWidgetExtension;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -807,6 +1001,16 @@
 				33CC111C2044C6BA0003C045 /* Debug */,
 				33CC111D2044C6BA0003C045 /* Release */,
 				338D0CEB231458BD00FA5F75 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BCE9A48A3D539A626BDCA835 /* Build configuration list for PBXNativeTarget "DriveGuardWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FCE4FB43B856FD76A27F1C52 /* Release */,
+				97040386BDDC85154053387F /* Debug */,
+				65AAD881C9E693573A127028 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
