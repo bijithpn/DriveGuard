@@ -14,6 +14,7 @@ import 'application/monitoring/temperature_history_store.dart';
 import 'application/providers.dart';
 import 'core/constants/app_constants.dart';
 import 'core/logging/app_logger.dart';
+import 'domain/entities/system_diagnostic_event.dart';
 import 'infrastructure/notifications/local_notifier_service.dart';
 import 'infrastructure/persistence/app_database.dart';
 import 'infrastructure/persistence/incident_repository.dart';
@@ -23,6 +24,41 @@ import 'infrastructure/tray/desktop_window_controller.dart';
 import 'presentation/app_root.dart';
 import 'presentation/widget/mini_widget_app.dart';
 
+/// Set once `_bootstrap` has opened the database and started a session, so
+/// a crash handler below has somewhere to persist to. `null` until then -
+/// a crash before the database exists can't be recorded to it, which is an
+/// unavoidable limitation, not a bug.
+IncidentRepository? _crashRepository;
+String? _crashSessionId;
+
+/// Persists an application-level error (Flutter framework error, uncaught
+/// platform error, or an error escaping the root zone) as a diagnostic
+/// event tied to the current session, full stack trace included, so it
+/// survives to be shown in that session's incident report even if the app
+/// terminates right after. Best-effort and silent on failure - a crash
+/// handler must never itself throw.
+void _recordCrash(String source, Object error, StackTrace? stack) {
+  final repo = _crashRepository;
+  final sessionId = _crashSessionId;
+  if (repo == null || sessionId == null) return;
+  try {
+    unawaited(
+      repo.recordDiagnosticEvents(sessionId, [
+        SystemDiagnosticEvent(
+          timestamp: DateTime.now(),
+          source: 'DriveGuard ($source)',
+          category: 'app-crash',
+          summary: error.toString().split('\n').first,
+          raw: stack != null ? '$error\n\n$stack' : error.toString(),
+          errorCode: error.runtimeType.toString(),
+        ),
+      ]),
+    );
+  } catch (_) {
+    // Never let crash reporting itself throw.
+  }
+}
+
 void main() {
   FlutterError.onError = (FlutterErrorDetails details) {
     AppLogger.instance.error(
@@ -30,11 +66,13 @@ void main() {
       details.exceptionAsString(),
       details.exception,
     );
+    _recordCrash('Flutter error', details.exception, details.stack);
     FlutterError.presentError(details);
   };
 
   PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
     AppLogger.instance.error('PlatformDispatcher', 'Uncaught error', error);
+    _recordCrash('platform error', error, stack);
     return true;
   };
 
@@ -44,6 +82,7 @@ void main() {
       'Uncaught zone error during bootstrap',
       error,
     );
+    _recordCrash('zone error', error, stack);
   });
 }
 
@@ -99,6 +138,8 @@ Future<void> _bootstrap() async {
       appVersion: AppConstants.appVersion,
       pollingInterval: settings.pollingInterval,
     );
+    _crashRepository = incidentRepository;
+    _crashSessionId = session.id;
     final startupIncident = await recoveryService.recoverPreviousSession(
       currentSessionId: session.id,
       warningCelsiusFor: (id) => settings.thresholdsFor(id).warningCelsius,

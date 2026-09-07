@@ -131,6 +131,14 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
       }
       timestamp ??= DateTime.now();
       final firstLine = block.trim().split('\n').take(3).join(' ').trim();
+      // For a bugcheck/WER event, wevtutil's text output includes the
+      // bugcheck code as a hex value (e.g. "0x0000009f") somewhere in the
+      // event data - surfaced as-is, never reformatted or guessed at.
+      final errorCode = category == 'kernel-panic'
+          ? RegExp(
+              r'0x[0-9A-Fa-f]{4,16}',
+            ).firstMatch(block)?.group(0)
+          : null;
       events.add(
         SystemDiagnosticEvent(
           timestamp: timestamp,
@@ -140,6 +148,7 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
               ? '${firstLine.substring(0, 160)}…'
               : firstLine,
           raw: block.trim(),
+          errorCode: errorCode,
         ),
       );
     }

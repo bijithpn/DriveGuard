@@ -880,51 +880,9 @@ class _TemperatureTab extends ConsumerWidget {
             ),
             padding: const EdgeInsets.all(AppSpacing.md),
             child: samples.length < 2
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.xl,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.accent.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                            ),
-                            child: const Icon(
-                              Icons.show_chart_rounded,
-                              size: 24,
-                              color: AppColors.accent,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            'Collecting temperature history…',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.textPrimary
-                                  : AppColors.lightText,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Readings will appear here as the drive is monitored',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: isDark
-                                  ? AppColors.textMuted
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                ? _CollectingHistoryPlaceholder(
+                    deviceId: device.id,
+                    isDark: isDark,
                   )
                 : _HistoryChart(
                     samples: samples,
@@ -950,6 +908,115 @@ class _TemperatureTab extends ConsumerWidget {
                 device.type == StorageDeviceType.hdd || device.isRemovable,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Shown while fewer than two samples exist for the chart (right after
+/// startup, or right after a device reconnects). Rather than leaving the
+/// user waiting on the next automatic poll with no way to tell whether
+/// monitoring is actually working, a "Refresh now" button forces an
+/// immediate read - it shows the real reading that comes back, never a
+/// fabricated one, so the placeholder may still remain if a second sample
+/// hasn't accumulated yet, but the user now has a way to check "right now"
+/// instead of only being able to wait.
+class _CollectingHistoryPlaceholder extends ConsumerStatefulWidget {
+  const _CollectingHistoryPlaceholder({
+    required this.deviceId,
+    required this.isDark,
+  });
+
+  final String deviceId;
+  final bool isDark;
+
+  @override
+  ConsumerState<_CollectingHistoryPlaceholder> createState() =>
+      _CollectingHistoryPlaceholderState();
+}
+
+class _CollectingHistoryPlaceholderState
+    extends ConsumerState<_CollectingHistoryPlaceholder> {
+  bool _refreshing = false;
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
+    try {
+      await ref
+          .read(monitoringServiceProvider)
+          .refreshNow(deviceId: widget.deviceId);
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: const Icon(
+                Icons.show_chart_rounded,
+                size: 24,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Collecting temperature history…',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppColors.textPrimary : AppColors.lightText,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Readings will appear here as the drive is monitored',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: isDark
+                    ? AppColors.textMuted
+                    : AppColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            OutlinedButton.icon(
+              onPressed: _refreshing ? null : _refresh,
+              icon: _refreshing
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(_refreshing ? 'Refreshing…' : 'Refresh now'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                side: const BorderSide(color: AppColors.accent),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs + 2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

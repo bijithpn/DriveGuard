@@ -457,4 +457,99 @@ void main() {
       await service.dispose();
     },
   );
+
+  test(
+    'refreshNow polls a single device immediately without waiting for the '
+    'next timer tick',
+    () async {
+      final device = _device('nvme-1');
+      final backend = _ScriptedMonitor([device]);
+      backend.nextReadingOrError['nvme-1'] = 40.0;
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+        // A polling interval long enough that nothing would happen from
+        // the timer within this test's lifetime.
+      );
+
+      await service.start(
+        const AppSettings(pollingInterval: Duration(minutes: 5)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(backend.readTemperatureCallCount['nvme-1'], 1);
+
+      backend.nextReadingOrError['nvme-1'] = 41.0;
+      await service.refreshNow(deviceId: 'nvme-1');
+      expect(backend.readTemperatureCallCount['nvme-1'], 2);
+      expect(
+        service.currentDevices
+            .firstWhere((d) => d.id == 'nvme-1')
+            .primaryTemperature
+            ?.celsius,
+        41.0,
+      );
+
+      await service.dispose();
+    },
+  );
+
+  test('refreshNow works even while monitoring is paused', () async {
+    final device = _device('nvme-1');
+    final backend = _ScriptedMonitor([device]);
+    backend.nextReadingOrError['nvme-1'] = 40.0;
+
+    final service = MonitoringService(
+      backend: backend,
+      notifications: FakeNotificationService(),
+      historyStore: TemperatureHistoryStore(),
+    );
+
+    await service.start(const AppSettings());
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    service.pause();
+
+    backend.nextReadingOrError['nvme-1'] = 55.0;
+    await service.refreshNow(deviceId: 'nvme-1');
+    expect(
+      service.currentDevices
+          .firstWhere((d) => d.id == 'nvme-1')
+          .primaryTemperature
+          ?.celsius,
+      55.0,
+    );
+
+    await service.dispose();
+  });
+
+  test(
+    'refreshNow with no deviceId refreshes every connected device',
+    () async {
+      final a = _device('a');
+      final b = _device('b');
+      final backend = _ScriptedMonitor([a, b]);
+      backend.nextReadingOrError['a'] = 30.0;
+      backend.nextReadingOrError['b'] = 31.0;
+
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+
+      await service.start(
+        const AppSettings(pollingInterval: Duration(minutes: 5)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(backend.readTemperatureCallCount['a'], 1);
+      expect(backend.readTemperatureCallCount['b'], 1);
+
+      await service.refreshNow();
+      expect(backend.readTemperatureCallCount['a'], 2);
+      expect(backend.readTemperatureCallCount['b'], 2);
+
+      await service.dispose();
+    },
+  );
 }

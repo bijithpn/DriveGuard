@@ -15,7 +15,7 @@ class AppDatabase {
 
   static const _tag = 'AppDatabase';
   static const _fileName = 'driveguard.db';
-  static const _schemaVersion = 1;
+  static const _schemaVersion = 2;
 
   final Database _db;
   Database get db => _db;
@@ -40,6 +40,17 @@ class AppDatabase {
         version: _schemaVersion,
         onCreate: (db, version) async {
           await _createSchema(db);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            // Adds a machine-readable error/bugcheck code alongside the
+            // existing human-readable summary/raw text, so a Windows
+            // bugcheck code or similar can be shown and filtered on
+            // without re-parsing `raw` every time.
+            await db.execute(
+              'ALTER TABLE diagnostic_events ADD COLUMN error_code TEXT',
+            );
+          }
         },
       ),
     );
@@ -112,12 +123,32 @@ class AppDatabase {
         source TEXT NOT NULL,
         category TEXT NOT NULL,
         summary TEXT NOT NULL,
-        raw TEXT
+        raw TEXT,
+        error_code TEXT
       )
     ''');
     await db.execute(
       'CREATE INDEX idx_diag_session ON diagnostic_events(session_id)',
     );
+  }
+
+  /// Builds an isolated in-memory database with the current schema, for
+  /// tests only - never touches the real on-disk database or the
+  /// singleton `_instance`. `singleInstance: false` is required here: sqflite
+  /// otherwise dedupes open calls by path, and every call uses the same
+  /// `inMemoryDatabasePath` literal, which would hand back the previous
+  /// test's still-open (and populated) database instead of a fresh one.
+  static Future<AppDatabase> openInMemoryForTesting() async {
+    sqfliteFfiInit();
+    final db = await databaseFactoryFfi.openDatabase(
+      inMemoryDatabasePath,
+      options: OpenDatabaseOptions(
+        version: _schemaVersion,
+        singleInstance: false,
+        onCreate: (db, version) async => _createSchema(db),
+      ),
+    );
+    return AppDatabase._(db);
   }
 
   /// Deletes pre-incident samples older than [before] for sessions that

@@ -198,6 +198,34 @@ class MonitoringService {
 
   Future<void> rescan() => _discoverDevices();
 
+  /// Forces an immediate temperature read for one device (or, with
+  /// [deviceId] omitted, every currently-connected device) instead of
+  /// waiting for the next timer tick. Runs even while paused - a manual
+  /// refresh is an explicit user action, not the background schedule - so
+  /// a UI stuck showing "collecting data" (e.g. right after a device
+  /// reconnects, before enough samples exist for a chart) has a way to
+  /// force a fresh reading rather than only waiting it out.
+  Future<void> refreshNow({String? deviceId}) async {
+    final ids = deviceId != null
+        ? [
+            if (_devices.containsKey(deviceId) &&
+                _devices[deviceId]!.monitoringStatus !=
+                    MonitoringStatus.disconnected)
+              deviceId,
+          ]
+        : _devices.keys
+              .where(
+                (id) =>
+                    _devices[id]!.monitoringStatus !=
+                    MonitoringStatus.disconnected,
+              )
+              .toList();
+    if (ids.isEmpty) return;
+    AppLogger.instance.info(_tag, 'Manual refresh requested for $ids');
+    await Future.wait(ids.map(_pollOne));
+    _emit();
+  }
+
   Future<void> reinitializeAfterResume() async {
     AppLogger.instance.info(_tag, 'Reinitializing after system resume');
     await _discoverDevices();
