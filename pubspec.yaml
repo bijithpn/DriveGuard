@@ -28,9 +28,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
   fonts:
     - family: Manrope
       fonts:
@@ -44,3 +47,16 @@ flutter:
           weight: 700
         - asset: assets/fonts/Manrope-Variable.ttf
           weight: 800
+
+flutter_launcher_icons:
+  image_path: "assets/images/app_logo.png"
+  windows:
+    generate: true
+    image_path: "assets/images/app_logo.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/images/app_logo.png"
+  linux:
+    generate: true
+    image_path: "assets/images/app_logo.png"
