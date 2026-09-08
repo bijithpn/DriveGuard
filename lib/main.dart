@@ -234,9 +234,24 @@ void _armTerminationSignalHandlers(ProviderContainer container) {
     exit(0);
   }
 
-  for (final signal in [ProcessSignal.sigterm, ProcessSignal.sigint]) {
+  // Windows does not support SIGTERM; watching it throws an async
+  // SignalException that a synchronous try/catch around watch().listen()
+  // cannot catch (it surfaces later as a zone error), so skip it entirely.
+  final signals = Platform.isWindows
+      ? [ProcessSignal.sigint]
+      : [ProcessSignal.sigterm, ProcessSignal.sigint];
+
+  for (final signal in signals) {
     try {
-      signal.watch().listen(onSignal);
+      signal.watch().listen(
+        onSignal,
+        onError: (Object e) {
+          AppLogger.instance.debug(
+            'main',
+            '${signal.name} not supported on this platform: $e',
+          );
+        },
+      );
     } catch (e) {
       AppLogger.instance.debug(
         'main',
