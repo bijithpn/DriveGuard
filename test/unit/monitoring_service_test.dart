@@ -398,6 +398,48 @@ void main() {
     },
   );
 
+  test('a new reallocated sector triggers a health alert even without a status '
+      'change', () async {
+    final backend = _ScriptedMonitor([_device('sata-hdd')]);
+    backend.nextReadingOrError['sata-hdd'] = 30.0;
+    backend.nextHealth['sata-hdd'] = const DeviceHealth(
+      status: DeviceHealthStatus.healthy,
+      reallocatedSectorCount: 0,
+    );
+    final notifications = FakeNotificationService();
+
+    final service = MonitoringService(
+      backend: backend,
+      notifications: notifications,
+      historyStore: TemperatureHistoryStore(),
+    );
+
+    await service.start(
+      const AppSettings(
+        healthPollingInterval: Duration(milliseconds: 20),
+        notificationCooldown: Duration(seconds: 30),
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    backend.nextHealth['sata-hdd'] = const DeviceHealth(
+      status: DeviceHealthStatus.healthy,
+      reallocatedSectorCount: 3,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+
+    expect(
+      notifications.shown.any(
+        (s) =>
+            s.startsWith('health-critical:') &&
+            s.contains('reallocated sector'),
+      ),
+      isTrue,
+    );
+
+    await service.dispose();
+  });
+
   test('a spinning HDD is never re-polled faster than the spin-down safety '
       'floor, even when reinitialized repeatedly', () async {
     final hdd = StorageDevice(

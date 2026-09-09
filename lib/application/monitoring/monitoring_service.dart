@@ -547,6 +547,12 @@ class MonitoringService {
       message =
           '$newErrors new media/data error${newErrors == 1 ? '' : 's'} '
           'detected since the last check.';
+    } else {
+      final ataAlert = _ataAttributeAlert(previous, health);
+      if (ataAlert != null) {
+        message = ataAlert.message;
+        critical = ataAlert.critical;
+      }
     }
 
     if (message == null) return;
@@ -558,6 +564,75 @@ class MonitoringService {
       message: message,
       detailsText: _detailsFor(device),
     );
+  }
+
+  /// Flags a new or growing ATA SMART sector/error count — the classic
+  /// early-warning signs of imminent drive failure that aren't captured by
+  /// the status/wear/media-error checks above. Reallocated/pending sectors
+  /// are treated as critical (data is or was at risk); reallocated events
+  /// and offline-uncorrectable growth are treated as a warning.
+  ({String message, bool critical})? _ataAttributeAlert(
+    DeviceHealth previous,
+    DeviceHealth health,
+  ) {
+    int grown(int? before, int? after) {
+      if (after == null) return 0;
+      return after - (before ?? 0);
+    }
+
+    final newReallocated = grown(
+      previous.reallocatedSectorCount,
+      health.reallocatedSectorCount,
+    );
+    if (newReallocated > 0) {
+      return (
+        message:
+            '$newReallocated new reallocated sector${newReallocated == 1 ? '' : 's'} '
+            'detected since the last check.',
+        critical: true,
+      );
+    }
+
+    final newPending = grown(
+      previous.currentPendingSectorCount,
+      health.currentPendingSectorCount,
+    );
+    if (newPending > 0) {
+      return (
+        message:
+            '$newPending new pending sector${newPending == 1 ? '' : 's'} '
+            'detected since the last check.',
+        critical: true,
+      );
+    }
+
+    final newUncorrectable = grown(
+      previous.offlineUncorrectableCount,
+      health.offlineUncorrectableCount,
+    );
+    if (newUncorrectable > 0) {
+      return (
+        message:
+            '$newUncorrectable new offline uncorrectable error'
+            '${newUncorrectable == 1 ? '' : 's'} detected since the last check.',
+        critical: false,
+      );
+    }
+
+    final newReallocatedEvents = grown(
+      previous.reallocatedEventCount,
+      health.reallocatedEventCount,
+    );
+    if (newReallocatedEvents > 0) {
+      return (
+        message:
+            '$newReallocatedEvents new reallocation event'
+            '${newReallocatedEvents == 1 ? '' : 's'} detected since the last check.',
+        critical: false,
+      );
+    }
+
+    return null;
   }
 
   int _healthRank(DeviceHealthStatus status) {

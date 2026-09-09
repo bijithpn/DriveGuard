@@ -31,6 +31,11 @@ spec ("do not fake cross-platform support").
 - Windows and Linux backends are correctness-reviewed against documented APIs but have not
   been executed. **Build and run them on real hardware before relying on this for actual
   thermal safety monitoring.**
+- Windows ATA SMART attributes (reallocated/pending sectors, wear) are read from the
+  legacy `root\wmi` `MSStorageDriver_FailurePredictData` class via a `PNPDeviceID`-based
+  match to the target disk — a pure/offline binary parser for the returned byte block is
+  unit-tested, but the WMI query and disk-matching logic are unverified on real Windows
+  hardware, same caveat as the rest of the Windows backend.
 - The mini "widget" is the main window switched into a compact/borderless/always-on-top
   mode, not a second native OS-level widget/gadget — no such uniform API exists across all
   three OSes (see section 21 of the spec, and docs/architecture.md).

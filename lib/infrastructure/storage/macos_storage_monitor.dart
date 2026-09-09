@@ -9,6 +9,7 @@ import '../../domain/entities/storage_device.dart';
 import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
+import 'ata_smart_attributes.dart';
 
 class MacOSStorageMonitor extends StorageMonitor {
   static const _tag = 'MacOSStorageMonitor';
@@ -348,6 +349,7 @@ class MacOSStorageMonitor extends StorageMonitor {
 
     final powerOnTime = json['power_on_time'] as Map<String, dynamic>?;
     final powerCycleCount = json['power_cycle_count'];
+    final ata = AtaSmartExtras.fromSmartctlJson(json);
     return DeviceHealth(
       status: passed == null
           ? DeviceHealthStatus.unknown
@@ -355,6 +357,11 @@ class MacOSStorageMonitor extends StorageMonitor {
       powerOnHours: (powerOnTime?['hours'] as num?)?.toInt(),
       powerCycles: (powerCycleCount as num?)?.toInt(),
       smartPassed: passed,
+      reallocatedSectorCount: ata.reallocatedSectorCount,
+      reallocatedEventCount: ata.reallocatedEventCount,
+      currentPendingSectorCount: ata.currentPendingSectorCount,
+      offlineUncorrectableCount: ata.offlineUncorrectableCount,
+      ssdLifeLeftPercent: ata.ssdLifeLeftPercent,
     );
   }
 }

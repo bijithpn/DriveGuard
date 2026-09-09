@@ -152,6 +152,21 @@ class MockStorageMonitor extends StorageMonitor {
   @override
   Future<DeviceHealth?> getHealth(String deviceId) async {
     if (deviceId == 'mock-usb-hdd-1') return DeviceHealth.unavailable;
+    // The simulated HDD carries a few early-warning ATA SMART signs so the
+    // new "ATA SMART Attributes" UI section and health-diff alert are both
+    // exercisable in demo mode without real hardware.
+    if (deviceId == _hdd.id) {
+      return const DeviceHealth(
+        status: DeviceHealthStatus.warning,
+        powerCycles: 340,
+        powerOnHours: 6200,
+        smartPassed: true,
+        reallocatedSectorCount: 3,
+        reallocatedEventCount: 3,
+        currentPendingSectorCount: 1,
+        offlineUncorrectableCount: 0,
+      );
+    }
     return const DeviceHealth(
       status: DeviceHealthStatus.healthy,
       percentageUsed: 4,
@@ -165,6 +180,11 @@ class MockStorageMonitor extends StorageMonitor {
       dataUnitsRead: 45000000,
       dataUnitsWritten: 30000000,
       smartPassed: true,
+      reallocatedSectorCount: 0,
+      reallocatedEventCount: 0,
+      currentPendingSectorCount: 0,
+      offlineUncorrectableCount: 0,
+      ssdLifeLeftPercent: 96,
     );
   }
 }

@@ -2330,6 +2330,67 @@ class _HealthTab extends StatelessWidget {
           ),
 
           const SizedBox(height: AppSpacing.lg),
+          _SectionLabel(title: 'ATA SMART Attributes', isDark: isDark),
+          const SizedBox(height: AppSpacing.sm),
+
+          _HealthGrid(
+            entries: [
+              _HealthEntry(
+                label: 'Reallocated Sectors',
+                value: _na(health.reallocatedSectorCount),
+                icon: Icons.grid_off_rounded,
+                statusColor: (health.reallocatedSectorCount ?? 0) > 0
+                    ? AppColors.critical
+                    : null,
+                available: health.reallocatedSectorCount != null,
+              ),
+              _HealthEntry(
+                label: 'Reallocated Events',
+                value: _na(health.reallocatedEventCount),
+                icon: Icons.history_toggle_off_rounded,
+                statusColor: (health.reallocatedEventCount ?? 0) > 0
+                    ? AppColors.warning
+                    : null,
+                available: health.reallocatedEventCount != null,
+              ),
+              _HealthEntry(
+                label: 'Pending Sectors',
+                value: _na(health.currentPendingSectorCount),
+                icon: Icons.pending_outlined,
+                statusColor: (health.currentPendingSectorCount ?? 0) > 0
+                    ? AppColors.critical
+                    : null,
+                available: health.currentPendingSectorCount != null,
+              ),
+              _HealthEntry(
+                label: 'Offline Uncorrectable',
+                value: _na(health.offlineUncorrectableCount),
+                icon: Icons.report_gmailerrorred_rounded,
+                statusColor: (health.offlineUncorrectableCount ?? 0) > 0
+                    ? AppColors.critical
+                    : null,
+                available: health.offlineUncorrectableCount != null,
+              ),
+              _HealthEntry(
+                label: 'SSD Life Left',
+                value: health.ssdLifeLeftPercent != null
+                    ? '${health.ssdLifeLeftPercent}%'
+                    : '--',
+                icon: Icons.battery_charging_full_rounded,
+                statusColor: health.ssdLifeLeftPercent != null
+                    ? (health.ssdLifeLeftPercent! < 10
+                          ? AppColors.critical
+                          : health.ssdLifeLeftPercent! < 25
+                          ? AppColors.warning
+                          : AppColors.normal)
+                    : null,
+                available: health.ssdLifeLeftPercent != null,
+              ),
+            ],
+            isDark: isDark,
+          ),
+
+          const SizedBox(height: AppSpacing.lg),
           _SectionLabel(title: 'TBW & Lifespan Estimation', isDark: isDark),
           const SizedBox(height: AppSpacing.sm),
 

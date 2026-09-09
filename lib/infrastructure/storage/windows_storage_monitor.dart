@@ -14,6 +14,7 @@ import '../../domain/entities/storage_volume.dart';
 import '../../domain/entities/temperature_reading.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
+import 'ata_smart_attributes.dart';
 
 class WindowsStorageMonitor extends StorageMonitor {
   static const _tag = 'WindowsStorageMonitor';
@@ -50,6 +51,47 @@ if (\$null -eq \$disk) { exit 2 }
   PowerOnHours = \$counter.PowerOnHours
 } | ConvertTo-Json -Compress
 ''';
+
+  // Raw ATA SMART attribute table (reallocated sectors, pending sectors,
+  // etc.) isn't exposed by MSFT_PhysicalDisk/Get-StorageReliabilityCounter -
+  // it lives in the legacy root\wmi MSStorageDriver_FailurePredictData
+  // class, keyed by PNPDeviceID rather than disk index. Matched via Win32_
+  // DiskDrive as the join key, same $rawId-as-Index pattern used by the
+  // Win32_DiskDrive fallback below. See
+  // docs/superpowers/specs/2026-09-09-smart-attributes-design.md - this
+  // path is unverified on real Windows hardware.
+  static String _ataAttributesScript(String deviceId) =>
+      '''
+try {
+  \$disk = Get-CimInstance -ClassName Win32_DiskDrive | Where-Object { \$_.Index -eq $deviceId }
+  if (\$null -eq \$disk) { exit 2 }
+  \$pnpEscaped = (\$disk.PNPDeviceID -replace '\\\\', '\\\\\\\\')
+  \$predict = Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictData |
+    Where-Object { \$_.InstanceName -like "*\$pnpEscaped*" } |
+    Select-Object -First 1
+  if (\$null -eq \$predict) { exit 2 }
+  [PSCustomObject]@{ VendorSpecific = \$predict.VendorSpecific } | ConvertTo-Json -Compress
+} catch {
+  exit 2
+}
+''';
+
+  Future<AtaSmartExtras> _readAtaExtras(String rawId) async {
+    try {
+      final raw = await _runPowerShellJson(_ataAttributesScript(rawId));
+      if (raw is! Map<String, dynamic>) return AtaSmartExtras.empty;
+      final vendorSpecific = raw['VendorSpecific'];
+      if (vendorSpecific is! List) return AtaSmartExtras.empty;
+      final bytes = vendorSpecific
+          .whereType<num>()
+          .map((n) => n.toInt())
+          .toList();
+      return AtaSmartExtras.fromRawAttributeBlock(bytes);
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'ATA SMART attribute read failed: $e');
+      return AtaSmartExtras.empty;
+    }
+  }
 
   Future<Object?> _runPowerShellJson(
     String script, {
@@ -224,6 +266,7 @@ if (\$null -eq \$disk) { exit 2 }
   Future<DeviceHealth?> getHealth(String deviceId) async {
     final rawId = _rawId(deviceId);
     if (!_validDeviceId.hasMatch(rawId)) return DeviceHealth.unavailable;
+    final ata = await _readAtaExtras(rawId);
     try {
       final raw = await _runPowerShellJson(
         _reliabilityScript(rawId),
@@ -240,6 +283,11 @@ if (\$null -eq \$disk) { exit 2 }
           mediaErrors: readErrors,
           powerOnHours: (raw['PowerOnHours'] as num?)?.toInt(),
           smartPassed: (readErrors == null || readErrors == 0),
+          reallocatedSectorCount: ata.reallocatedSectorCount,
+          reallocatedEventCount: ata.reallocatedEventCount,
+          currentPendingSectorCount: ata.currentPendingSectorCount,
+          offlineUncorrectableCount: ata.offlineUncorrectableCount,
+          ssdLifeLeftPercent: ata.ssdLifeLeftPercent,
         );
       }
     } catch (e) {
@@ -261,6 +309,11 @@ if (\$null -eq \$disk) { exit 2 }
               ? DeviceHealthStatus.critical
               : DeviceHealthStatus.warning,
           smartPassed: statusStr == 'OK',
+          reallocatedSectorCount: ata.reallocatedSectorCount,
+          reallocatedEventCount: ata.reallocatedEventCount,
+          currentPendingSectorCount: ata.currentPendingSectorCount,
+          offlineUncorrectableCount: ata.offlineUncorrectableCount,
+          ssdLifeLeftPercent: ata.ssdLifeLeftPercent,
         );
       }
     } catch (e) {
