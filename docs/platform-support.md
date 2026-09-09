@@ -39,3 +39,8 @@ spec ("do not fake cross-platform support").
   troubleshooting.md.
 - True OS sleep/resume detection uses Flutter's `AppLifecycleState.resumed` as a
   best-effort proxy, not a native power-notification API — see troubleshooting.md.
+- Linux notifications show no icon: `local_notifier`'s Linux plugin calls libnotify's
+  `notify_notification_new()` without an icon, and there's no `.desktop` file shipped yet
+  for a notification daemon to resolve one by app name. This is deferred until DriveGuard
+  ships real Linux packaging (`.deb`/AppImage) with a proper desktop entry — see
+  troubleshooting.md.
