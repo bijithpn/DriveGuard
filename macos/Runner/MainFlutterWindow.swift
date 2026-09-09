@@ -26,6 +26,17 @@ class MainFlutterWindow: NSWindow {
     // of the main dashboard window - which only happens via this callback.
     FlutterMultiWindowPlugin.setOnWindowCreatedCallback { controller in
       RegisterGeneratedPlugins(registry: controller)
+
+      // By default AppKit only delivers mouseMoved: events to the *key*
+      // window, so hover-driven UI (the edge dock's MouseRegion-based
+      // expand/detail-card behavior) silently did nothing until the user
+      // clicked the dock once to make it key - after which hover worked,
+      // since the window stayed key. The dock is an always-on-top overlay
+      // that's meant to react to hover without ever stealing focus, so it
+      // needs mouse-moved events regardless of key status.
+      if let window = controller.view.window {
+        window.acceptsMouseMovedEvents = true
+      }
     }
 
     super.awakeFromNib()

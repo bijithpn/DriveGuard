@@ -3,6 +3,7 @@ import 'package:driveguard/application/settings/app_settings.dart'
 import 'package:driveguard/application/widget/mini_widget_snapshot.dart';
 import 'package:driveguard/domain/enums/storage_enums.dart';
 import 'package:driveguard/domain/enums/ui_enums.dart';
+import 'package:driveguard/infrastructure/tray/edge_dock_geometry.dart';
 import 'package:driveguard/presentation/widget/edge_dock_popover_bubble.dart';
 import 'package:driveguard/presentation/widget/edge_dock_view.dart';
 import 'package:flutter/material.dart';
@@ -54,7 +55,16 @@ void main() {
               pinnedIndex: pinnedIndex,
               onHover: (_) {},
               railLocalRect: const Rect.fromLTWH(400, 50, 64, 200),
-              panelLocalRect: const Rect.fromLTWH(140, 50, 240, 240),
+              // sampleDevice populates all 7 possible detail rows - size the
+              // panel the same way production does (EdgeDockGeometry) rather
+              // than a hardcoded guess, so this doesn't silently drift stale
+              // whenever the real layout's padding/type scale changes.
+              panelLocalRect: Rect.fromLTWH(
+                140,
+                50,
+                EdgeDockGeometry.panelWidth,
+                EdgeDockGeometry.panelHeightFor(7),
+              ),
               theme: theme,
               visibleMetrics: visibleMetrics,
             ),

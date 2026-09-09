@@ -1287,9 +1287,9 @@ class _EdgeDockOpacitySliderState extends State<_EdgeDockOpacitySlider> {
   Widget build(BuildContext context) {
     return Slider(
       value: _value,
-      min: 0.4,
+      min: 0.85,
       max: 1.0,
-      divisions: 12,
+      divisions: 3,
       label: '${(_value * 100).round()}%',
       onChanged: (v) => setState(() => _value = v),
       onChangeEnd: widget.onChangeEnd,

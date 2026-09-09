@@ -185,24 +185,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
       if (!Platform.isLinux) {
         await windowManager.setHasShadow(false);
       }
-      if (Platform.isMacOS) {
-        // Otherwise the dock disappears the moment any app (including
-        // DriveGuard's own main window) goes native fullscreen, since
-        // fullscreen apps get their own Space by default. window_manager
-        // already wraps the NSWindow collectionBehavior flags needed for
-        // this - no native Swift code required.
-        try {
-          await windowManager.setVisibleOnAllWorkspaces(
-            true,
-            visibleOnFullScreen: true,
-          );
-        } catch (e) {
-          AppLogger.instance.debug(
-            _tag,
-            'setVisibleOnAllWorkspaces failed: $e',
-          );
-        }
-      }
+      if (Platform.isMacOS) await _applyFullScreenAuxiliary();
 
       final primary = await screenRetriever.getPrimaryDisplay();
       var display = primary;
@@ -227,6 +210,30 @@ class _EdgeDockAppState extends State<EdgeDockApp>
       try {
         await widget.controller.show();
       } catch (_) {}
+      // Some macOS versions drop the fullscreen-auxiliary collection
+      // behavior applied earlier once `makeKeyAndOrderFront` runs (both
+      // `windowManager.show()` and `controller.show()` above call it) -
+      // reapplying once more after the window is actually on screen is
+      // what makes it stick, matching reports from other window_manager
+      // users hitting the same "dock disappears over fullscreen apps"
+      // symptom.
+      if (Platform.isMacOS) await _applyFullScreenAuxiliary();
+    }
+  }
+
+  // Otherwise the dock disappears the moment any app (including
+  // DriveGuard's own main window) goes native fullscreen, since fullscreen
+  // apps get their own Space by default. window_manager already wraps the
+  // NSWindow collectionBehavior flags needed for this - no native Swift
+  // code required.
+  Future<void> _applyFullScreenAuxiliary() async {
+    try {
+      await windowManager.setVisibleOnAllWorkspaces(
+        true,
+        visibleOnFullScreen: true,
+      );
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'setVisibleOnAllWorkspaces failed: $e');
     }
   }
 

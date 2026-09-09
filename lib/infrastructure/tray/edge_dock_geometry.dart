@@ -14,15 +14,15 @@ class EdgeDockGeometry {
 
   static const double ringDiameter = 40;
   static const double itemBlockLength = 58; // ring (40) + spacing (4) + value label (14)
-  static const double itemSpacing = 10;
+  static const double itemSpacing = 14;
   static const double filletRadius = 18;
   static const double railPadding = 18;
   static const double podDiameter = 36;
-  static const double podSpacing = 10;
+  static const double podSpacing = 12;
   static const double railThickness = 68;
   static const double collapsedThickness = 14;
 
-  static const double panelWidth = 240;
+  static const double panelWidth = 264;
   static const double panelGap = 8;
 
   // Kept as the fallback used when a caller doesn't pass an explicit
@@ -35,10 +35,10 @@ class EdgeDockGeometry {
   // avoid overflow: header padding+text, the content column's vertical
   // padding, and one row's height (padding + single-line text), each with
   // a small margin for font-metric variance across platforms.
-  static const double panelHeaderHeight = 44;
-  static const double panelContentVerticalPadding = 20;
-  static const double panelRowHeight = 23;
-  static const double panelMinHeight = 92;
+  static const double panelHeaderHeight = 48;
+  static const double panelContentVerticalPadding = 28;
+  static const double panelRowHeight = 26;
+  static const double panelMinHeight = 100;
 
   /// The detail panel's height for a card that will render [rowCount] rows
   /// (always >= 1 - temperature is always shown). Content-driven instead of

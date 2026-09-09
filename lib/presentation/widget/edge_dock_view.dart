@@ -413,9 +413,9 @@ class _Rail extends StatelessWidget {
     final content = CustomPaint(
       painter: EdgeDockOrganicPainter(
         edge: edge,
-        backgroundColor: theme.background.withValues(alpha: 0.96),
-        borderColor: const Color(0xFF1E1E26),
-        borderWidth: 1.0,
+        backgroundColor: theme.background,
+        borderColor: Colors.transparent,
+        borderWidth: 0.0,
         mainRailLength: mainRailLength,
         podDiameter: EdgeDockGeometry.podDiameter,
         podSpacing: EdgeDockGeometry.podSpacing,
@@ -813,12 +813,12 @@ class _DetailCard extends StatelessWidget {
           edge: edge,
           targetArrowPosition: targetArrowPosition,
           backgroundColor: theme.background,
-          borderColor: const Color(0xFF1E1E26),
-          borderRadius: 16.0,
-          borderWidth: 1.0,
+          borderColor: Colors.transparent,
+          borderRadius: 20.0,
+          borderWidth: 0.0,
           arrowWidth: 8.0,
-          arrowHeight: 14.0,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          arrowHeight: 16.0,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -832,10 +832,10 @@ class _DetailCard extends StatelessWidget {
                         : device.type == StorageDeviceType.ssd
                         ? Icons.storage_rounded
                         : Icons.album_rounded,
-                    size: 14,
+                    size: 16,
                     color: color,
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       device.name,
@@ -843,20 +843,20 @@ class _DetailCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: theme.text,
-                        fontSize: 11.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1.5,
+                      horizontal: 7,
+                      vertical: 3,
                     ),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(5),
                       border: Border.all(
                         color: color.withValues(alpha: 0.28),
                         width: 0.8,
@@ -868,7 +868,7 @@ class _DetailCard extends StatelessWidget {
                           : 'OK',
                       style: TextStyle(
                         color: color,
-                        fontSize: 9.0,
+                        fontSize: 10.0,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.3,
                       ),
@@ -876,7 +876,7 @@ class _DetailCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               // Linear Progress Bar
               ClipRRect(
                 borderRadius: BorderRadius.circular(3),
@@ -887,23 +887,23 @@ class _DetailCard extends StatelessWidget {
                   minHeight: 5,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               // Breakdown Label
               Text(
                 '$usedPercent% Used · $leftPercent% left',
                 style: TextStyle(
                   color: theme.mutedText,
-                  fontSize: 9.5,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 7),
               Container(
                 height: 1,
-                color: const Color(0xFF1E1E26),
+                color: theme.mutedText.withValues(alpha: 0.14),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               // Metrics List
               for (final (label, value) in rows)
                 _DetailRow(label: label, value: value, theme: theme),
@@ -929,14 +929,14 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           Text(
             label,
             style: TextStyle(
               color: theme.mutedText,
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -945,7 +945,7 @@ class _DetailRow extends StatelessWidget {
             value,
             style: TextStyle(
               color: theme.text,
-              fontSize: 11,
+              fontSize: 12.5,
               fontWeight: FontWeight.w700,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
