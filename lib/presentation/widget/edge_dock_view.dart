@@ -13,6 +13,7 @@ import '../../infrastructure/tray/edge_dock_geometry.dart'
     show EdgeDockGeometry;
 import '../theme/app_theme.dart';
 import 'edge_dock_organic_painter.dart';
+import 'edge_dock_popover_bubble.dart';
 
 /// Resolved colors for the edge dock's own surfaces (panel background, body
 /// text) plus severity overrides, kept in one place instead of scattering
@@ -232,6 +233,20 @@ class EdgeDockContent extends StatelessWidget {
                 rect: panelRect,
                 child: _DetailCard(
                   device: devices[displayed],
+                  edge: edge,
+                  targetArrowPosition: isVerticalEdge(edge)
+                      ? (EdgeDockGeometry.ringCenter(
+                              railLocalRect,
+                              edge,
+                              displayed,
+                            ).dy -
+                            panelRect.top)
+                      : (EdgeDockGeometry.ringCenter(
+                              railLocalRect,
+                              edge,
+                              displayed,
+                            ).dx -
+                            panelRect.left),
                   accentOverride: accentOverride,
                   theme: theme,
                   visibleMetrics: visibleMetrics,
@@ -654,13 +669,17 @@ List<(String, String)> edgeDockDetailRows(
 class _DetailCard extends StatelessWidget {
   const _DetailCard({
     required this.device,
-    required this.accentOverride,
-    required this.theme,
+    this.edge = ScreenEdge.left,
+    this.targetArrowPosition = 60.0,
+    this.accentOverride,
+    this.theme = EdgeDockTheme.defaults,
     this.visibleMetrics = kAllEdgeDockMetrics,
     this.reducedMotion = false,
   });
 
   final MiniWidgetDeviceSnapshot device;
+  final ScreenEdge edge;
+  final double targetArrowPosition;
   final Color? accentOverride;
   final EdgeDockTheme theme;
   final Set<EdgeDockMetric> visibleMetrics;
@@ -670,6 +689,8 @@ class _DetailCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = accentOverride ?? severityColor(device.severity, theme);
     final rows = edgeDockDetailRows(device, visibleMetrics);
+    final usedPercent = (device.fraction * 100).round();
+    final leftPercent = (100 - usedPercent).clamp(0, 100);
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -680,81 +701,112 @@ class _DetailCard extends StatelessWidget {
       builder: (context, t, child) => Opacity(
         opacity: t,
         child: Transform.scale(
-          scale: 0.96 + 0.04 * t,
+          scale: 0.94 + 0.06 * t,
           alignment: Alignment.center,
           child: child,
         ),
       ),
       child: Material(
         color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.background,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.bg3, width: 1),
-            boxShadow: const [
-              BoxShadow(
-                color: AppColors.shadowDark,
-                blurRadius: 24,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.08),
-                    border: Border(
-                      bottom: BorderSide(color: color.withValues(alpha: 0.18)),
+        child: EdgeDockPopoverBubble(
+          edge: edge,
+          targetArrowPosition: targetArrowPosition,
+          backgroundColor: theme.background,
+          borderColor: const Color(0xFF1E1E26),
+          borderRadius: 16.0,
+          borderWidth: 1.0,
+          arrowWidth: 8.0,
+          arrowHeight: 14.0,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header Section: Device icon + Bold name + Status badge
+              Row(
+                children: [
+                  Icon(
+                    device.type == StorageDeviceType.nvme
+                        ? Icons.memory_rounded
+                        : device.type == StorageDeviceType.ssd
+                        ? Icons.storage_rounded
+                        : Icons.album_rounded,
+                    size: 14,
+                    color: color,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      device.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.text,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                        ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.28),
+                        width: 0.8,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          device.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: theme.text,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                    ),
+                    child: Text(
+                      device.healthStatus.isNotEmpty
+                          ? device.healthStatus
+                          : 'OK',
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 9.0,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
                       ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Linear Progress Bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: device.fraction.clamp(0.0, 1.0),
+                  backgroundColor: const Color(0xFF1E1E28),
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                  minHeight: 5,
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final (label, value) in rows)
-                        _DetailRow(label: label, value: value, theme: theme),
-                    ],
-                  ),
+              ),
+              const SizedBox(height: 3),
+              // Breakdown Label
+              Text(
+                '$usedPercent% Used · $leftPercent% left',
+                style: TextStyle(
+                  color: theme.mutedText,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w500,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 5),
+              Container(
+                height: 1,
+                color: const Color(0xFF1E1E26),
+              ),
+              const SizedBox(height: 3),
+              // Metrics List
+              for (final (label, value) in rows)
+                _DetailRow(label: label, value: value, theme: theme),
+            ],
           ),
         ),
       ),
@@ -776,14 +828,14 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
       child: Row(
         children: [
           Text(
             label,
             style: TextStyle(
               color: theme.mutedText,
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -792,7 +844,7 @@ class _DetailRow extends StatelessWidget {
             value,
             style: TextStyle(
               color: theme.text,
-              fontSize: 11.5,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
