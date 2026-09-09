@@ -13,7 +13,7 @@ void main() {
       expect(EdgeDockGeometry.railThickness, 68.0);
       expect(EdgeDockGeometry.collapsedThickness, 14.0);
       expect(EdgeDockGeometry.ringDiameter, 40.0);
-      expect(EdgeDockGeometry.itemBlockLength, 60.0);
+      expect(EdgeDockGeometry.itemBlockLength, 58.0);
     });
   });
 

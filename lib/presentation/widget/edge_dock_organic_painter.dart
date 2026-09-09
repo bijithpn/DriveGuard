@@ -52,6 +52,10 @@ class EdgeDockOrganicPainter extends CustomPainter {
 
   /// Builds and returns the calculated [Path] for the given [size].
   Path computePath(Size size) {
+    return _transformPathForEdge(_computeCanonicalFillPath(), size);
+  }
+
+  Path _computeCanonicalStrokePath() {
     final clamped = expansionProgress.clamp(0.0, 1.0);
     final d = collapsedDepth + (dockDepth - collapsedDepth) * clamped;
     final rTop = math.min(filletRadius, 24.0);
@@ -144,11 +148,14 @@ class EdgeDockOrganicPainter extends CustomPainter {
       yTotal,
     );
 
-    // 4. Close path flush along the screen edge
+    return path;
+  }
+
+  Path _computeCanonicalFillPath() {
+    final path = _computeCanonicalStrokePath();
     path.lineTo(0, 0);
     path.close();
-
-    return _transformPathForEdge(path, size);
+    return path;
   }
 
   Path _transformPathForEdge(Path canonicalPath, Size size) {
@@ -185,13 +192,14 @@ class EdgeDockOrganicPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
-    final path = computePath(size);
+    final fillPath = _transformPathForEdge(_computeCanonicalFillPath(), size);
+    final strokePath = _transformPathForEdge(_computeCanonicalStrokePath(), size);
 
     // 1. Drop shadows
     if (shadows != null && shadows!.isNotEmpty) {
       for (final shadow in shadows!) {
         final shadowPaint = shadow.toPaint();
-        final shadowPath = path.shift(shadow.offset);
+        final shadowPath = fillPath.shift(shadow.offset);
         canvas.drawPath(shadowPath, shadowPaint);
       }
     }
@@ -200,9 +208,9 @@ class EdgeDockOrganicPainter extends CustomPainter {
     final bgPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.fill;
-    canvas.drawPath(path, bgPaint);
+    canvas.drawPath(fillPath, bgPaint);
 
-    // 3. Crisp outline border
+    // 3. Crisp outline border on curved screen-facing contours only
     if (borderWidth > 0 && borderColor.a > 0) {
       final borderPaint = Paint()
         ..color = borderColor
@@ -210,7 +218,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
         ..strokeWidth = borderWidth
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round;
-      canvas.drawPath(path, borderPaint);
+      canvas.drawPath(strokePath, borderPaint);
     }
   }
 

@@ -13,9 +13,12 @@ class EdgeDockGeometry {
   const EdgeDockGeometry._();
 
   static const double ringDiameter = 40;
-  static const double itemBlockLength = 60; // ring + value label, stacked
+  static const double itemBlockLength = 58; // ring (40) + spacing (4) + value label (14)
   static const double itemSpacing = 10;
-  static const double railPadding = 12;
+  static const double filletRadius = 18;
+  static const double railPadding = 18;
+  static const double podDiameter = 36;
+  static const double podSpacing = 10;
   static const double railThickness = 68;
   static const double collapsedThickness = 14;
 
@@ -48,11 +51,12 @@ class EdgeDockGeometry {
     return height < panelMinHeight ? panelMinHeight : height;
   }
 
-  static double railLength(int deviceCount) {
+  static double railLength(int deviceCount, {bool showPod = true}) {
     final count = deviceCount < 1 ? 1 : deviceCount;
-    return railPadding * 2 +
+    return filletRadius * 2 +
         count * itemBlockLength +
-        (count - 1) * itemSpacing;
+        (count - 1) * itemSpacing +
+        (showPod ? podSpacing + podDiameter : 0);
   }
 
   /// The rail's rect (the always-visible expanded state), in screen
@@ -190,8 +194,8 @@ class EdgeDockGeometry {
   /// The screen-space center of the [index]th device's ring within [rail].
   static Offset ringCenter(Rect rail, ScreenEdge edge, int index) {
     final along =
-        railPadding +
-        itemBlockLength / 2 +
+        filletRadius +
+        ringDiameter / 2 +
         index * (itemBlockLength + itemSpacing);
     if (edge == ScreenEdge.left || edge == ScreenEdge.right) {
       return Offset(rail.center.dx, rail.top + along);

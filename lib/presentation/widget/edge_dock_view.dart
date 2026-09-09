@@ -417,41 +417,51 @@ class _Rail extends StatelessWidget {
         borderColor: const Color(0xFF1E1E26),
         borderWidth: 1.0,
         mainRailLength: mainRailLength,
-        podDiameter: 36.0,
-        podSpacing: 10.0,
+        podDiameter: EdgeDockGeometry.podDiameter,
+        podSpacing: EdgeDockGeometry.podSpacing,
+        filletRadius: EdgeDockGeometry.filletRadius,
         showPod: true,
         dockDepth: EdgeDockGeometry.railThickness,
         collapsedDepth: EdgeDockGeometry.collapsedThickness,
         expansionProgress: expansionProgress,
       ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
+      child: ClipRect(
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isVerticalEdge(edge) ? 12 : EdgeDockGeometry.filletRadius,
+            vertical: isVerticalEdge(edge) ? EdgeDockGeometry.filletRadius : 12,
+          ),
+          child: vertical
+              ? SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _withSpacing(animatedItems, vertical: true),
+                      ),
+                      const SizedBox(height: EdgeDockGeometry.podSpacing),
+                      animatedPod,
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _withSpacing(animatedItems, vertical: false),
+                      ),
+                      const SizedBox(width: EdgeDockGeometry.podSpacing),
+                      animatedPod,
+                    ],
+                  ),
+                ),
         ),
-        child: vertical
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _withSpacing(animatedItems, vertical: true),
-                  ),
-                  const SizedBox(height: 10),
-                  animatedPod,
-                ],
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _withSpacing(animatedItems, vertical: false),
-                  ),
-                  const SizedBox(width: 10),
-                  animatedPod,
-                ],
-              ),
       ),
     );
 
