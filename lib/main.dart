@@ -23,6 +23,7 @@ import 'infrastructure/persistence/settings_repository.dart';
 import 'infrastructure/storage/storage_monitor_factory.dart';
 import 'infrastructure/tray/desktop_window_controller.dart';
 import 'presentation/app_root.dart';
+import 'presentation/widget/edge_dock_app.dart';
 import 'presentation/widget/mini_widget_app.dart';
 
 IncidentRepository? _crashRepository;
@@ -82,9 +83,15 @@ Future<void> _run() async {
   if (windowController.arguments.isNotEmpty) {
     final initialArgs =
         jsonDecode(windowController.arguments) as Map<String, dynamic>;
-    runApp(
-      MiniWidgetApp(controller: windowController, initialArgs: initialArgs),
-    );
+    if (initialArgs['mode'] == 'edgeDock') {
+      runApp(
+        EdgeDockApp(controller: windowController, initialArgs: initialArgs),
+      );
+    } else {
+      runApp(
+        MiniWidgetApp(controller: windowController, initialArgs: initialArgs),
+      );
+    }
     return;
   }
 

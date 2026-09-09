@@ -4,6 +4,7 @@ import '../../core/constants/app_constants.dart';
 import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
+import '../../domain/enums/ui_enums.dart';
 
 class WidgetSettings {
   const WidgetSettings({
@@ -77,6 +78,34 @@ class WidgetSettings {
   );
 }
 
+/// A slim, always-on-top strip docked flush to a screen edge that expands
+/// into a compact panel on hover. Independent of [WidgetSettings]'s mini
+/// monitor window. See
+/// docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
+class EdgeDockSettings {
+  const EdgeDockSettings({this.enabled = false, this.edge = ScreenEdge.right});
+
+  final bool enabled;
+  final ScreenEdge edge;
+
+  EdgeDockSettings copyWith({bool? enabled, ScreenEdge? edge}) =>
+      EdgeDockSettings(
+        enabled: enabled ?? this.enabled,
+        edge: edge ?? this.edge,
+      );
+
+  Map<String, dynamic> toJson() => {'enabled': enabled, 'edge': edge.name};
+
+  factory EdgeDockSettings.fromJson(Map<String, dynamic> json) =>
+      EdgeDockSettings(
+        enabled: json['enabled'] as bool? ?? false,
+        edge: ScreenEdge.values.firstWhere(
+          (e) => e.name == json['edge'],
+          orElse: () => ScreenEdge.right,
+        ),
+      );
+}
+
 class AppSettings {
   const AppSettings({
     this.pollingInterval = AppConstants.defaultPollingInterval,
@@ -107,6 +136,7 @@ class AppSettings {
     this.closeToTray = true,
     this.diagnosticLoggingEnabled = false,
     this.widget = const WidgetSettings(),
+    this.edgeDock = const EdgeDockSettings(),
     this.mockBackendForced = false,
     this.dashboardCompactView = false,
   });
@@ -148,6 +178,7 @@ class AppSettings {
 
   final bool diagnosticLoggingEnabled;
   final WidgetSettings widget;
+  final EdgeDockSettings edgeDock;
 
   final bool mockBackendForced;
 
@@ -191,6 +222,7 @@ class AppSettings {
     bool? closeToTray,
     bool? diagnosticLoggingEnabled,
     WidgetSettings? widget,
+    EdgeDockSettings? edgeDock,
     bool? mockBackendForced,
     bool? dashboardCompactView,
   }) {
@@ -232,6 +264,7 @@ class AppSettings {
       diagnosticLoggingEnabled:
           diagnosticLoggingEnabled ?? this.diagnosticLoggingEnabled,
       widget: widget ?? this.widget,
+      edgeDock: edgeDock ?? this.edgeDock,
       mockBackendForced: mockBackendForced ?? this.mockBackendForced,
       dashboardCompactView: dashboardCompactView ?? this.dashboardCompactView,
     );
@@ -270,6 +303,7 @@ class AppSettings {
     'closeToTray': closeToTray,
     'diagnosticLoggingEnabled': diagnosticLoggingEnabled,
     'widget': widget.toJson(),
+    'edgeDock': edgeDock.toJson(),
     'mockBackendForced': mockBackendForced,
     'dashboardCompactView': dashboardCompactView,
   };
@@ -374,6 +408,9 @@ class AppSettings {
       widget: json['widget'] != null
           ? WidgetSettings.fromJson(json['widget'] as Map<String, dynamic>)
           : const WidgetSettings(),
+      edgeDock: json['edgeDock'] != null
+          ? EdgeDockSettings.fromJson(json['edgeDock'] as Map<String, dynamic>)
+          : const EdgeDockSettings(),
       mockBackendForced: json['mockBackendForced'] as bool? ?? false,
       dashboardCompactView: json['dashboardCompactView'] as bool? ?? false,
     );

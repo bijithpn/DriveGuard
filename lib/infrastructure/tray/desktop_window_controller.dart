@@ -9,6 +9,7 @@ import '../../application/widget/mini_widget_snapshot.dart';
 import '../../core/logging/app_logger.dart';
 
 const kWidgetChannel = WindowMethodChannel('driveguard.widget');
+const kEdgeDockChannel = WindowMethodChannel('driveguard.edgedock');
 
 const kWidgetMinimumSize = Size(260, 220);
 
@@ -18,10 +19,12 @@ class DesktopWindowController with WindowListener {
   static const Size _dashboardMinimumSize = Size(720, 480);
 
   WindowController? _miniWindow;
+  WindowController? _edgeDockWindow;
   Future<void> Function()? onCloseHandler;
   Future<void> Function()? onMinimizeHandler;
 
   bool get isMiniWindowOpen => _miniWindow != null;
+  bool get isEdgeDockOpen => _edgeDockWindow != null;
 
   void clearMiniWindow() {
     _miniWindow = null;
@@ -143,6 +146,76 @@ class DesktopWindowController with WindowListener {
       AppLogger.instance.warning(
         _tag,
         'Failed pushing snapshot to mini widget: $e',
+      );
+    }
+  }
+
+  Future<void> enterEdgeDockMode(
+    String edgeName, {
+    MiniWidgetSnapshot? initialSnapshot,
+  }) async {
+    if (_edgeDockWindow != null) {
+      try {
+        final windows = await WindowController.getAll();
+        if (!windows.any((w) => w.windowId == _edgeDockWindow!.windowId)) {
+          _edgeDockWindow = null;
+        }
+      } catch (_) {
+        _edgeDockWindow = null;
+      }
+    }
+    if (_edgeDockWindow != null) {
+      try {
+        await _edgeDockWindow!.show();
+      } catch (_) {}
+      return;
+    }
+    try {
+      final args = <String, dynamic>{'mode': 'edgeDock', 'edge': edgeName};
+      if (initialSnapshot != null) {
+        args['snapshot'] = initialSnapshot.toJson();
+      }
+      _edgeDockWindow = await WindowController.create(
+        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: false),
+      );
+    } catch (e) {
+      AppLogger.instance.error(_tag, 'Failed opening edge dock window', e);
+      _edgeDockWindow = null;
+    }
+  }
+
+  Future<void> exitEdgeDockMode() async {
+    if (_edgeDockWindow != null) {
+      try {
+        await kEdgeDockChannel.invokeMethod('close');
+      } catch (e) {
+        AppLogger.instance.warning(
+          _tag,
+          'Failed asking edge dock to close: $e',
+        );
+      }
+      try {
+        await _edgeDockWindow?.hide();
+      } catch (_) {}
+    }
+    _edgeDockWindow = null;
+  }
+
+  void clearEdgeDockWindow() {
+    _edgeDockWindow = null;
+  }
+
+  Future<void> updateEdgeDockSnapshot(MiniWidgetSnapshot snapshot) async {
+    if (_edgeDockWindow == null) return;
+    try {
+      await kEdgeDockChannel.invokeMethod(
+        'snapshot',
+        jsonEncode(snapshot.toJson()),
+      );
+    } catch (e) {
+      AppLogger.instance.warning(
+        _tag,
+        'Failed pushing snapshot to edge dock: $e',
       );
     }
   }

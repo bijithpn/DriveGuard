@@ -9,7 +9,8 @@ import '../../domain/entities/device_capabilities.dart';
 import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
-import '../app_root.dart' show widgetModeActiveProvider;
+import '../../domain/enums/ui_enums.dart';
+import '../app_root.dart' show edgeDockActiveProvider, widgetModeActiveProvider;
 import '../theme/app_theme.dart';
 
 enum _Section {
@@ -1025,7 +1026,49 @@ class _WidgetSection extends ConsumerWidget {
       ),
     ];
 
-    return _SectionGroup(isDark: isDark, children: rows);
+    final edgeDockActive = ref.watch(edgeDockActiveProvider);
+    final edgeDockRows = [
+      _SettingRow(
+        label: 'Enable edge dock',
+        subtitle: 'A slim hover strip docked to a screen edge',
+        isDark: isDark,
+        trailing: Switch(
+          value: edgeDockActive,
+          onChanged: (v) => notifier.updateWith(
+            (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(enabled: v)),
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Edge dock position',
+        isDark: isDark,
+        isLast: true,
+        trailing: _SegmentedControl<ScreenEdge>(
+          isDark: isDark,
+          selected: settings.edgeDock.edge,
+          options: const [
+            (ScreenEdge.left, 'Left'),
+            (ScreenEdge.right, 'Right'),
+            (ScreenEdge.top, 'Top'),
+            (ScreenEdge.bottom, 'Bottom'),
+          ],
+          onChanged: (edge) => notifier.updateWith(
+            (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(edge: edge)),
+          ),
+        ),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionGroup(isDark: isDark, children: rows),
+        const SizedBox(height: AppSpacing.lg),
+        _SectionLabel(title: 'Edge Dock', isDark: isDark),
+        const SizedBox(height: AppSpacing.sm),
+        _SectionGroup(isDark: isDark, children: edgeDockRows),
+      ],
+    );
   }
 }
 

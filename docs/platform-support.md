@@ -42,6 +42,12 @@ spec ("do not fake cross-platform support").
 - System tray icon artwork is not bundled (no image-generation tooling in this session);
   `AppTrayService` is fully wired but ships without real `.ico`/`.png` assets — see
   troubleshooting.md.
+- The edge-docked hover panel (Settings → Widget → Edge Dock) polls global cursor
+  position via `screen_retriever` and repositions a frameless always-on-top window via
+  `window_manager.setBounds`. Built and verified opening/closing on macOS only; DPI
+  scaling, multi-monitor edge cases (it targets the primary display only), and
+  always-on-top z-order behavior on Windows/Linux are unverified — see
+  docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
 - True OS sleep/resume detection uses Flutter's `AppLifecycleState.resumed` as a
   best-effort proxy, not a native power-notification API — see troubleshooting.md.
 - Linux notifications show no icon: `local_notifier`'s Linux plugin calls libnotify's

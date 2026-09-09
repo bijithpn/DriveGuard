@@ -13,10 +13,11 @@ import '../core/logging/app_logger.dart';
 import '../domain/entities/storage_device.dart';
 import '../domain/entities/storage_thresholds.dart';
 import '../domain/enums/storage_enums.dart';
+import '../domain/enums/ui_enums.dart';
 import '../infrastructure/native/native_widget_bridge.dart';
 import '../infrastructure/tray/app_tray_service.dart';
 import '../infrastructure/tray/desktop_window_controller.dart'
-    show kWidgetChannel;
+    show kEdgeDockChannel, kWidgetChannel;
 import 'components/device_presentation.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'device_details/device_details_screen.dart';
@@ -26,6 +27,7 @@ import 'settings/settings_screen.dart';
 import 'theme/app_theme.dart';
 
 final widgetModeActiveProvider = StateProvider<bool>((ref) => false);
+final edgeDockActiveProvider = StateProvider<bool>((ref) => false);
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -43,8 +45,10 @@ class _AppRootState extends ConsumerState<AppRoot>
 
   AppTrayService? _tray;
   bool _widgetModeSyncInFlight = false;
+  bool _edgeDockSyncInFlight = false;
   StreamSubscription<String>? _notificationClickSub;
   MiniWidgetSnapshot? _lastPushedSnapshot;
+  MiniWidgetSnapshot? _lastPushedEdgeDockSnapshot;
   MiniWidgetSnapshot? _lastNativeWidgetSnapshot;
   DateTime? _lastNativeWidgetPushAt;
 
@@ -59,6 +63,7 @@ class _AppRootState extends ConsumerState<AppRoot>
     widget.windowController.onMinimizeHandler = () async => onWindowMinimize();
 
     kWidgetChannel.setMethodCallHandler(_handleWidgetChannelCall);
+    kEdgeDockChannel.setMethodCallHandler(_handleEdgeDockChannelCall);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initTray());
 
     _notificationClickSub = ref
@@ -174,10 +179,21 @@ class _AppRootState extends ConsumerState<AppRoot>
     return null;
   }
 
+  Future<dynamic> _handleEdgeDockChannelCall(MethodCall call) async {
+    if (call.method == 'ready') {
+      await _pushSnapshotToEdgeDockIfActive(force: true);
+    }
+    return null;
+  }
+
   Future<void> _initTray() async {
     final settings = ref.read(settingsProvider);
     if (!settings.showTrayIcon) {
       await _syncWidgetMode(settings.widget.enabled);
+      await _syncEdgeDockMode(
+        settings.edgeDock.enabled,
+        settings.edgeDock.edge,
+      );
       return;
     }
 
@@ -217,6 +233,7 @@ class _AppRootState extends ConsumerState<AppRoot>
     }
 
     await _syncWidgetMode(settings.widget.enabled);
+    await _syncEdgeDockMode(settings.edgeDock.enabled, settings.edgeDock.edge);
   }
 
   TemperatureSeverity _combinedSeverity(
@@ -356,6 +373,39 @@ class _AppRootState extends ConsumerState<AppRoot>
     await widget.windowController.updateMiniWindowSnapshot(snapshot);
   }
 
+  Future<void> _pushSnapshotToEdgeDockIfActive({bool force = false}) async {
+    if (!ref.read(edgeDockActiveProvider)) return;
+    final snapshot = _buildSnapshot();
+    if (!force && _lastPushedEdgeDockSnapshot == snapshot) return;
+    _lastPushedEdgeDockSnapshot = snapshot;
+
+    await widget.windowController.updateEdgeDockSnapshot(snapshot);
+  }
+
+  Future<void> _syncEdgeDockMode(bool shouldBeActive, ScreenEdge edge) async {
+    if (_edgeDockSyncInFlight) return;
+    final alreadyActive = ref.read(edgeDockActiveProvider);
+    if (shouldBeActive == alreadyActive) return;
+    _edgeDockSyncInFlight = true;
+    try {
+      if (shouldBeActive) {
+        final initialSnapshot = _buildSnapshot();
+        await widget.windowController.enterEdgeDockMode(
+          edge.name,
+          initialSnapshot: initialSnapshot,
+        );
+        ref.read(edgeDockActiveProvider.notifier).state = true;
+        _lastPushedEdgeDockSnapshot = initialSnapshot;
+      } else {
+        _lastPushedEdgeDockSnapshot = null;
+        await widget.windowController.exitEdgeDockMode();
+        ref.read(edgeDockActiveProvider.notifier).state = false;
+      }
+    } finally {
+      _edgeDockSyncInFlight = false;
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -436,6 +486,17 @@ class _AppRootState extends ConsumerState<AppRoot>
       settingsProvider.select((s) => s.widget.enabled),
       (previous, enabled) => _syncWidgetMode(enabled),
     );
+    ref.listen<(bool, ScreenEdge)>(
+      settingsProvider.select((s) => (s.edgeDock.enabled, s.edgeDock.edge)),
+      (previous, next) async {
+        final (enabled, edge) = next;
+        if (previous != null && previous.$1 && enabled && previous.$2 != edge) {
+          // Edge changed while already docked - re-dock at the new edge.
+          await _syncEdgeDockMode(false, previous.$2);
+        }
+        await _syncEdgeDockMode(enabled, edge);
+      },
+    );
     ref.listen(settingsProvider, (previous, next) {
       if (previous?.showTrayIcon != next.showTrayIcon) {
         if (!next.showTrayIcon) {
@@ -447,15 +508,18 @@ class _AppRootState extends ConsumerState<AppRoot>
       }
       _tray?.setPaused(!next.monitoringEnabled);
       _pushSnapshotToMiniWindowIfActive();
+      _pushSnapshotToEdgeDockIfActive();
     });
     ref.listen<List<StorageDevice>>(devicesProvider, (previous, deviceList) {
       final tray = _tray;
       if (tray != null) _pushDeviceSummaryToTray(tray);
       _pushSnapshotToMiniWindowIfActive();
+      _pushSnapshotToEdgeDockIfActive();
     });
 
     ref.listen(activityProvider, (previous, next) {
       _pushSnapshotToMiniWindowIfActive();
+      _pushSnapshotToEdgeDockIfActive();
     });
 
     return MaterialApp(
