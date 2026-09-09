@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../application/settings/app_settings.dart' show kAllEdgeDockMetrics;
 import '../../application/widget/mini_widget_snapshot.dart';
 import '../../core/logging/app_logger.dart';
 import '../../domain/enums/ui_enums.dart';
@@ -45,7 +46,20 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
   late ScreenEdge _edge;
   late Color? _accentOverride;
   late double _opacity;
+  late String? _displayId;
+  late EdgeDockTheme _theme;
+  late Set<EdgeDockMetric> _visibleMetrics;
+  late double _alongOffset;
   int? _hoveredIndex;
+
+  // Set by clicking a ring (or pressing Enter/Space while it's keyboard-
+  // focused) - keeps the detail panel open without the pointer needing to
+  // stay over the dock, which is both the "click to pin" convenience and
+  // the non-hover accessibility fallback (see settings-screen tooltip).
+  // `pinnedIndex ?? hoveredIndex` is what's actually shown.
+  int? _pinnedIndex;
+
+  double _dragStartOffset = 0;
 
   // The current window rect's top-left, in screen coordinates - needed to
   // translate screen-space geometry into window-local Positioned rects.
@@ -64,6 +78,23 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
     );
     _accentOverride = resolveAccent(accent);
     _opacity = (widget.initialArgs['opacity'] as num?)?.toDouble() ?? 1.0;
+    _displayId = widget.initialArgs['displayId'] as String?;
+    _alongOffset =
+        (widget.initialArgs['positionOffset'] as num?)?.toDouble() ?? 0;
+    _theme = EdgeDockTheme.resolve(
+      backgroundColor: (widget.initialArgs['backgroundColor'] as num?)?.toInt(),
+      textColor: (widget.initialArgs['textColor'] as num?)?.toInt(),
+      warningColor: (widget.initialArgs['warningColor'] as num?)?.toInt(),
+      criticalColor: (widget.initialArgs['criticalColor'] as num?)?.toInt(),
+    );
+    final metricNames = widget.initialArgs['visibleMetrics'];
+    _visibleMetrics = metricNames is List && metricNames.isNotEmpty
+        ? metricNames
+              .whereType<String>()
+              .map((n) => EdgeDockMetric.values.where((m) => m.name == n))
+              .expand((matches) => matches)
+              .toSet()
+        : kAllEdgeDockMetrics;
     final snapJson = widget.initialArgs['snapshot'];
     if (snapJson is Map<String, dynamic>) {
       try {
@@ -154,7 +185,16 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
         }
       }
 
-      final display = await screenRetriever.getPrimaryDisplay();
+      final primary = await screenRetriever.getPrimaryDisplay();
+      var display = primary;
+      if (_displayId != null) {
+        try {
+          final all = await screenRetriever.getAllDisplays();
+          display = EdgeDockGeometry.pickDisplay(all, primary, _displayId);
+        } catch (e) {
+          AppLogger.instance.debug(_tag, 'getAllDisplays failed: $e');
+        }
+      }
       _displayPosition = display.visiblePosition ?? Offset.zero;
       _displaySize = display.visibleSize ?? display.size;
 
@@ -176,18 +216,27 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
     _displaySize,
     _edge,
     _snapshot.devices.length,
+    alongOffset: _alongOffset,
   );
 
+  /// Which device's ring is shown expanded: pinned (click/keyboard) wins
+  /// over merely hovered.
+  int? get _displayedIndex => _pinnedIndex ?? _hoveredIndex;
+
   Rect? get _panelRect {
-    final index = _hoveredIndex;
+    final index = _displayedIndex;
     if (index == null) return null;
+    final devices = _snapshot.devices;
+    if (index >= devices.length) return null;
     final center = EdgeDockGeometry.ringCenter(_railRect, _edge, index);
+    final rowCount = edgeDockDetailRows(devices[index], _visibleMetrics).length;
     return EdgeDockGeometry.panelRectFor(
       _railRect,
       _edge,
       center,
       _displayPosition,
       _displaySize,
+      panelHeight: EdgeDockGeometry.panelHeightFor(rowCount),
     );
   }
 
@@ -195,13 +244,22 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
     final rail = _railRect;
     final panel = _panelRect;
     final windowRect = EdgeDockGeometry.windowRectFor(rail, panel);
+    // Update the origin - and rebuild - before awaiting the native resize,
+    // not after. With an animated native resize, the OS window kept
+    // growing for ~200-300ms while Flutter had already redrawn assuming
+    // the *new* origin from a stale `await`, so the panel briefly rendered
+    // outside the window's actual (still mid-animation) bounds - visible
+    // as the hover panel flickering/disappearing. Resizing instantly
+    // (`animate: false`) and updating local state synchronously first
+    // keeps Flutter's assumed window geometry and the OS window's actual
+    // geometry from ever disagreeing across frames.
     _windowOrigin = windowRect.topLeft;
+    if (mounted) setState(() {});
     try {
-      await windowManager.setBounds(windowRect, animate: true);
+      await windowManager.setBounds(windowRect, animate: false);
     } catch (e) {
       AppLogger.instance.debug(_tag, 'setBounds failed: $e');
     }
-    if (mounted) setState(() {});
   }
 
   void _onHover(int? index) {
@@ -212,6 +270,14 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
       unawaited(_applyWindowBounds());
       return;
     }
+    // A pinned panel stays open when the pointer leaves - that's the whole
+    // point of pinning (click-to-pin doubles as the non-hover accessibility
+    // fallback: the panel doesn't require the pointer to keep hovering).
+    if (_pinnedIndex != null) {
+      if (_hoveredIndex == null) return;
+      setState(() => _hoveredIndex = null);
+      return;
+    }
     // Debounced: a fast cursor movement across the rail/panel boundary can
     // report a same-frame exit+re-enter, and collapsing instantly would
     // flicker. Cancelled above if hover resumes before the grace elapses.
@@ -220,6 +286,51 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
       setState(() => _hoveredIndex = null);
       unawaited(_applyWindowBounds());
     });
+  }
+
+  /// Toggles the pin on [index]: clicking (or pressing Enter/Space) an
+  /// already-pinned ring unpins it; clicking a different one re-pins there.
+  /// `null` always unpins (used by Escape).
+  void _onTapRing(int? index) {
+    final next = (index == null || _pinnedIndex == index) ? null : index;
+    if (next == _pinnedIndex) return;
+    setState(() => _pinnedIndex = next);
+    unawaited(_applyWindowBounds());
+  }
+
+  /// Arrow-key rail navigation, reusing the same hover mechanism the mouse
+  /// uses. Only reachable once the dock's own content has keyboard focus
+  /// (a deliberate click on it - never grabbed automatically, so this
+  /// doesn't count as focus-stealing from the main app window).
+  void _onArrowKey({required bool forward}) {
+    final count = _snapshot.devices.length;
+    if (count == 0) return;
+    final current = _displayedIndex ?? -1;
+    final next = forward
+        ? (current + 1) % count
+        : (current - 1 + count) % count;
+    _onHover(next);
+  }
+
+  void _onDragStart() {
+    _dragStartOffset = _alongOffset;
+  }
+
+  void _onDragUpdate(double delta) {
+    setState(() => _alongOffset += delta);
+    unawaited(_applyWindowBounds());
+  }
+
+  void _onDragEnd() {
+    if (_alongOffset == _dragStartOffset) return;
+    unawaited(
+      kEdgeDockChannel
+          .invokeMethod(
+            'position_changed',
+            jsonEncode({'offset': _alongOffset}),
+          )
+          .catchError((_) {}),
+    );
   }
 
   @override
@@ -236,9 +347,17 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
           edge: _edge,
           accentOverride: _accentOverride,
           hoveredIndex: _hoveredIndex,
+          pinnedIndex: _pinnedIndex,
           onHover: _onHover,
+          onTapRing: _onTapRing,
+          onArrowKey: _onArrowKey,
+          onDragStart: _onDragStart,
+          onDragUpdate: _onDragUpdate,
+          onDragEnd: _onDragEnd,
           railLocalRect: rail.shift(-_windowOrigin),
           panelLocalRect: panel?.shift(-_windowOrigin),
+          theme: _theme,
+          visibleMetrics: _visibleMetrics,
         ),
       ),
     );

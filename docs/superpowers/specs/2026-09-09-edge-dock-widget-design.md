@@ -224,13 +224,185 @@ opacity, not a separate background-only alpha channel, kept simple.
 
 ### Explicitly not built (scope discipline given the size of the request)
 
-- Multi-monitor picker - still primary-display only.
-- A fully generic arbitrary-color picker - still a fixed accent palette.
-- Per-metric visibility toggles, keyboard navigation, reduced-motion
-  preference - not implemented; the existing fixed field set and
-  mouse-only interaction cover the core ask without an open-ended settings
-  surface.
-- A separate `MonitorWidgetTheme` class with independently configurable
-  success/warning/danger colors - reuses the app's existing `AppColors`
-  severity palette instead, consistent with how every other screen in the
-  app already sources its severity colors.
+- A fully generic arbitrary-color picker - still fixed swatch grids per
+  slot (see below), not free-form RGB/hex.
+- Keyboard navigation, reduced-motion preference - not implemented; the
+  existing mouse-only interaction covers the core ask without an
+  open-ended settings surface.
+
+## Third follow-up revision (2026-09-09, same day): multi-monitor, fuller colors, metric toggles
+
+Requested after the rewrite above: attach the dock to a specific display
+rather than always the primary one, customize more than just the accent
+color, and let the user hide detail-panel rows they don't care about.
+
+### Multi-monitor
+
+`EdgeDockSettings.displayId` (nullable `String`, the `Display.id` from
+`screen_retriever`) - `null` means "follow the primary display", which is
+also the fallback if the saved display is no longer connected. A pure
+`EdgeDockGeometry.pickDisplay(displays, primary, displayId)` resolves this
+(unit-tested without a real platform channel). `EdgeDockApp` calls
+`screenRetriever.getAllDisplays()` once at startup (only when a specific
+`displayId` was requested) instead of always `getPrimaryDisplay()`. The
+Settings UI adds a dropdown (`_EdgeDockDisplayPicker`, reusing the existing
+`_NativeDropdown<T>`) populated from `getAllDisplays()`, showing each
+display's name and resolution; it collapses to a plain "Primary display"
+label when only one display is connected.
+
+### Fuller color customization
+
+New `EdgeDockTheme` value class (`edge_dock_view.dart`) resolves
+`EdgeDockSettings.backgroundColor`/`textColor`/`warningColor`/
+`criticalColor` (nullable ARGB ints, `null` = app default) into concrete
+colors, replacing scattered `AppColors.bg1`/`textPrimary`/`textMuted`/
+`warning`/`critical` references in the rail, ring, and detail card with
+`theme.*`. Settings gets three more swatch pickers (`_ColorSwatchPicker`,
+generalized from the existing `_EdgeDockAccentPicker` pattern) for panel
+background, panel text, warning, and critical - still curated fixed
+palettes, not a full color picker, for the same reason the accent color
+already is. "Normal" severity color and the ring track color stay on the
+fixed `AppColors` palette (not requested, and needed as a stable reference
+point next to a customizable warning/critical).
+
+### Per-metric visibility toggles
+
+`EdgeDockSettings.visibleMetrics` (`Set<EdgeDockMetric>`, default: all)
+controls which optional rows (`health`, `smart`, `powerOnHours`,
+`transferSpeed` for read+write together, `freeCapacity`) render in the
+hover detail panel - temperature is always shown, it's the rail's primary
+metric and has no toggle. Settings gets a `_EdgeDockMetricToggles` row of
+small checkbox-style chips. This only affects the panel; the collapsed
+rail still always shows temperature per device, per the earlier decision
+to keep the collapsed state compact.
+
+## Fourth revision (2026-09-09, same day): fixed the real detail-panel overflow
+
+The user reported (with real screenshots of the running app) a `BOTTOM
+OVERFLOWED BY 26 PIXELS` render error in the hover detail panel, plus a
+visual gap making the rail and panel look like two disconnected pieces.
+Investigating against the actual screenshots (not the ASCII mockups in the
+original request, which described a different, incorrect architecture that
+didn't match what was actually running) showed the core architecture was
+already correct - the panel opens on the correct side toward the screen
+center, the collapsed rail is a compact single badge - so this was a
+targeted fix, not a rewrite.
+
+**Root cause**: `EdgeDockGeometry.panelRectFor` used a fixed `panelHeight`
+constant (168px), but the detail panel's row count varies with how many of
+`Temperature`/`Health`/`SMART`/`Power on`/`Read`/`Write`/`Free` are present
+on a device and enabled via `EdgeDockSettings.visibleMetrics` - up to 7
+rows. `_DetailCard` is rendered inside a `Positioned.fromRect` sized to
+that fixed rect, so its `Column` (sized to its actual content) overflowed
+the box whenever more than ~4-5 rows were shown.
+
+**Fix**: `EdgeDockGeometry.panelHeightFor(rowCount)` computes the panel's
+height from its actual row count (header + content padding + rows,
+clamped to a minimum), instead of a constant. `panelRectFor` gained an
+optional `panelHeight` parameter (defaulting to the old constant, renamed
+`panelHeightDefault`, so existing tests that don't care about a specific
+height keep compiling). The row-building logic itself was factored out of
+`_DetailCard.build()` into a shared top-level function,
+`edgeDockDetailRows(device, visibleMetrics)`, so both the widget (to
+render the rows) and `EdgeDockApp._panelRect` (to size the window via
+`panelHeightFor(rows.length)`) use exactly the same row set - no risk of
+the two drifting out of sync again.
+
+## Fifth revision (2026-09-09, same day): fixed a real lag/flicker root cause
+
+The user reported the whole app lagging while editing Settings, and the
+hover panel randomly disappearing/reappearing instead of staying stable.
+Two concrete, verifiable causes in the code, both fixed:
+
+1. **Settings edits re-docked the window on every drag tick.** The edge
+   dock opacity `Slider.onChanged` wrote straight into `AppSettings` on
+   every intermediate value while dragging; `AppRoot`'s `ref.listen` on the
+   edge dock settings tuple re-docks (closes + reopens) the window whenever
+   any watched field changes while already docked. Dragging the slider
+   therefore closed/reopened the OS window dozens of times per second.
+   Fixed with `_EdgeDockOpacitySlider`: local widget state drives the
+   dragged value live, and the settings write (and the resulting re-dock)
+   only happens once, on `onChangeEnd`.
+2. **The hover-triggered native window resize was animated and awaited
+   after the fact.** `_applyWindowBounds` computed `_windowOrigin` from the
+   new `windowRect`, then `await`ed an *animated* `windowManager.setBounds`
+   before finally calling `setState`. Flutter's own rebuild (triggered by
+   `_onHover`'s `setState` immediately on hover) happened before that
+   await resolved, so panel content was drawn assuming an origin the OS
+   window hadn't actually reached yet - for the ~200-300ms the native
+   resize animation was still running, Flutter's assumed geometry and the
+   real window bounds disagreed, which read as the panel flickering/
+   disappearing. Fixed by setting `_windowOrigin` and calling `setState`
+   *before* the `setBounds` call, and switching to `animate: false` (an
+   instant native resize) so there's no multi-frame window during which
+   the two can diverge - the only visible animation is now Flutter's own
+   panel fade/scale (`TweenAnimationBuilder`, 180ms `easeOutCubic`),
+   which also reads as the panel growing attached to the rail instead of
+   a separately-animated window snapping into place.
+
+## Sixth revision (2026-09-09, same day): the remaining deferred items
+
+Closes out the five items previously listed as deliberately not built:
+reduced motion, a non-hover accessibility fallback, keyboard navigation, a
+full free-form color picker, and draggable position.
+
+- **Reduced motion**: no new setting - matches the existing app-wide
+  pattern (`animated_entrance.dart`'s `MediaQuery.maybeOf(context)?.
+  disableAnimations`), computed once in `EdgeDockContent.build()` and
+  threaded down to zero out the ring-scale and detail-card fade/scale
+  durations.
+- **Click-to-pin, doing double duty as the accessibility fallback**:
+  clicking a ring (`onTapRing`) pins its detail panel open independent of
+  the pointer - `EdgeDockApp._pinnedIndex`, shown via `pinnedIndex ??
+  hoveredIndex`. This directly satisfies "hover must not be the only way
+  to access important information" without a separate UI surface. A thin
+  outer ring drawn by `_RingPainter` (`pinned: bool`) distinguishes a
+  pinned ring from a merely-hovered one. `Semantics(button: true, ...)` on
+  each ring describes both states for screen readers.
+- **Keyboard navigation**: `EdgeDockContent` wraps its content in a
+  `Focus` (`canRequestFocus: true`, never autofocused - only reachable by
+  a deliberate click on a ring, which is not "stealing" focus from the
+  main app window). Arrow keys move the displayed ring (reusing the same
+  `onHover` callback the mouse uses - one code path, not a parallel
+  keyboard-state machine); Enter/Space pins the current ring; Escape
+  unpins and clears hover.
+- **Full free-form color picker**: `_CustomColorPickerDialog` in
+  `settings_screen.dart` - a small self-contained RGB/hex picker (three
+  synced sliders + a hex text field + live preview), no new package
+  dependency. Reachable via a "Custom…" entry appended to every
+  `_ColorSwatchPicker` (background/text/warning/critical); if the current
+  value doesn't match any curated swatch, that entry itself shows the
+  active custom color instead of the curated palette being silently
+  wrong. The curated swatches stay as the fast path; this is the escape
+  hatch, matching how the original ask distinguished "at minimum" from a
+  full picker.
+- **Draggable position**: `EdgeDockSettings.positionOffset` (pixels along
+  the docked edge from centered, clamped in `EdgeDockGeometry.railRect`
+  so it can never drag the rail off-screen). Deliberately *not* a handle
+  that adds its own space to the rail's `Column`/`Row` - an earlier
+  version of this change did that and immediately reproduced the same
+  class of bug as the detail-panel overflow (the widget's rendered size
+  silently drifting out of sync with `EdgeDockGeometry`'s pure-math
+  length/center calculations). Instead, a small decorative grip icon is
+  painted *over* the rail via `Stack`/`Positioned` (no layout footprint),
+  and the drag gesture itself listens on the rail's own background/
+  padding area beneath it - the rail's measured size is exactly what it
+  was before this feature, by construction. Dragging updates the window
+  position live (`EdgeDockApp._onDragUpdate` → `_applyWindowBounds()`);
+  the final offset is persisted only on release, via a new
+  `position_changed` method-channel message to `AppRoot` (deliberately
+  outside the edge-dock settings reactivity tuple, so persisting it
+  doesn't itself trigger a re-dock right after the drag completes).
+
+### Wiring
+
+All three settings flow through the same path the existing accent/opacity
+settings already used: `EdgeDockSettings` → `DesktopWindowController.
+enterEdgeDockMode(...)` args → `EdgeDockApp.initialArgs` (parsed once at
+window creation, same as before - no live-push channel for config, only
+for snapshot data). `AppRoot`'s `ref.listen` on the edge dock settings
+tuple grew to include the new fields (Sets don't have a useful `==`, so
+`visibleMetrics` is watched via a sorted, comma-joined string key and the
+real `Set<EdgeDockMetric>` is re-read from settings when acting on a
+change) - changing any of them while already docked re-docks the window,
+same behavior as changing edge/accent/opacity already had.

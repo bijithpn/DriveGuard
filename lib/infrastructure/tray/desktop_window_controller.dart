@@ -154,6 +154,13 @@ class DesktopWindowController with WindowListener {
     String edgeName, {
     String accentName = 'auto',
     double opacity = 1.0,
+    String? displayId,
+    int? backgroundColor,
+    int? textColor,
+    int? warningColor,
+    int? criticalColor,
+    List<String> visibleMetrics = const [],
+    double positionOffset = 0,
     MiniWidgetSnapshot? initialSnapshot,
   }) async {
     if (_edgeDockWindow != null) {
@@ -178,6 +185,13 @@ class DesktopWindowController with WindowListener {
         'edge': edgeName,
         'accent': accentName,
         'opacity': opacity,
+        'displayId': displayId,
+        'backgroundColor': backgroundColor,
+        'textColor': textColor,
+        'warningColor': warningColor,
+        'criticalColor': criticalColor,
+        'visibleMetrics': visibleMetrics,
+        'positionOffset': positionOffset,
       };
       if (initialSnapshot != null) {
         args['snapshot'] = initialSnapshot.toJson();

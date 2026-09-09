@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:driveguard/domain/enums/ui_enums.dart';
 import 'package:driveguard/infrastructure/tray/edge_dock_geometry.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:screen_retriever/screen_retriever.dart' show Display;
 
 void main() {
   const displayPosition = Offset.zero;
@@ -96,6 +97,62 @@ void main() {
       );
       expect(rail.right, 1920 + displaySize.width);
     });
+  });
+
+  group('EdgeDockGeometry.railRect with alongOffset (drag-to-reposition)', () {
+    test('shifts the rail down/right by a positive offset', () {
+      final centered = EdgeDockGeometry.railRect(
+        displayPosition,
+        displaySize,
+        ScreenEdge.right,
+        1,
+      );
+      final shifted = EdgeDockGeometry.railRect(
+        displayPosition,
+        displaySize,
+        ScreenEdge.right,
+        1,
+        alongOffset: 50,
+      );
+      expect(shifted.top, centered.top + 50);
+      expect(shifted.left, centered.left); // cross-axis unaffected
+    });
+
+    test('clamps so the rail never moves above the display top', () {
+      final shifted = EdgeDockGeometry.railRect(
+        displayPosition,
+        displaySize,
+        ScreenEdge.right,
+        1,
+        alongOffset: -10000,
+      );
+      expect(shifted.top, greaterThanOrEqualTo(displayPosition.dy));
+    });
+
+    test('clamps so the rail never moves past the display bottom', () {
+      final shifted = EdgeDockGeometry.railRect(
+        displayPosition,
+        displaySize,
+        ScreenEdge.right,
+        1,
+        alongOffset: 10000,
+      );
+      expect(shifted.bottom, lessThanOrEqualTo(displaySize.height));
+    });
+
+    test(
+      'same clamping applies along the horizontal axis for a top/bottom dock',
+      () {
+        final shifted = EdgeDockGeometry.railRect(
+          displayPosition,
+          displaySize,
+          ScreenEdge.top,
+          1,
+          alongOffset: 10000,
+        );
+        expect(shifted.right, lessThanOrEqualTo(displaySize.width));
+      },
+    );
   });
 
   group('EdgeDockGeometry.ringCenter', () {
@@ -219,6 +276,86 @@ void main() {
       expect(union.left, panel.left);
       expect(union.right, rail.right);
       expect(union.top, panel.top);
+    });
+  });
+
+  group('EdgeDockGeometry.panelHeightFor', () {
+    test('grows with row count', () {
+      final one = EdgeDockGeometry.panelHeightFor(1);
+      final seven = EdgeDockGeometry.panelHeightFor(7);
+      expect(seven, greaterThan(one));
+    });
+
+    test('never renders shorter than panelMinHeight', () {
+      final zero = EdgeDockGeometry.panelHeightFor(0);
+      expect(zero, greaterThanOrEqualTo(EdgeDockGeometry.panelMinHeight));
+    });
+
+    test('fits the full 7-row panel within the height it returns', () {
+      // Regression test for the fixed-168px panel that overflowed once all
+      // optional detail rows (health/smart/powerOnHours/read/write/free,
+      // plus the always-shown temperature) were shown at once.
+      final height = EdgeDockGeometry.panelHeightFor(7);
+      final requiredContent =
+          EdgeDockGeometry.panelHeaderHeight +
+          EdgeDockGeometry.panelContentVerticalPadding +
+          7 * EdgeDockGeometry.panelRowHeight;
+      expect(height, greaterThanOrEqualTo(requiredContent));
+    });
+  });
+
+  group('EdgeDockGeometry.panelRectFor with an explicit panelHeight', () {
+    test('sizes the returned rect to the given height, not the default', () {
+      final rail = EdgeDockGeometry.railRect(
+        displayPosition,
+        displaySize,
+        ScreenEdge.right,
+        1,
+      );
+      final center = EdgeDockGeometry.ringCenter(rail, ScreenEdge.right, 0);
+      final tallHeight = EdgeDockGeometry.panelHeightFor(7);
+      final panel = EdgeDockGeometry.panelRectFor(
+        rail,
+        ScreenEdge.right,
+        center,
+        displayPosition,
+        displaySize,
+        panelHeight: tallHeight,
+      );
+      expect(panel.height, tallHeight);
+      expect(panel.height, isNot(EdgeDockGeometry.panelHeightDefault));
+    });
+  });
+
+  group('EdgeDockGeometry.pickDisplay', () {
+    const primary = Display(id: 'PRIMARY', size: Size(1920, 1080));
+    const secondary = Display(id: 'SECONDARY', size: Size(2560, 1440));
+
+    test('returns primary when displayId is null', () {
+      final picked = EdgeDockGeometry.pickDisplay(
+        [primary, secondary],
+        primary,
+        null,
+      );
+      expect(picked, primary);
+    });
+
+    test('returns the matching display when displayId is set', () {
+      final picked = EdgeDockGeometry.pickDisplay(
+        [primary, secondary],
+        primary,
+        'SECONDARY',
+      );
+      expect(picked, secondary);
+    });
+
+    test('falls back to primary when the saved display is disconnected', () {
+      final picked = EdgeDockGeometry.pickDisplay(
+        [primary],
+        primary,
+        'SECONDARY',
+      );
+      expect(picked, primary);
     });
   });
 

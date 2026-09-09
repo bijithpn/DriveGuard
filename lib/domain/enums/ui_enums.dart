@@ -9,3 +9,7 @@ enum ScreenEdge { left, right, top, bottom }
 /// palette rather than a full color picker, matching how the app already
 /// exposes a fixed set of design-system colors elsewhere.
 enum EdgeDockAccent { auto, blue, teal, purple, pink, orange, red }
+
+/// Optional rows shown in the edge dock's hover detail panel. Temperature is
+/// always shown (it's the rail's primary metric); these control the rest.
+enum EdgeDockMetric { health, smart, powerOnHours, transferSpeed, freeCapacity }

@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:screen_retriever/screen_retriever.dart' show Display;
+
 import '../../domain/enums/ui_enums.dart';
 
 /// Pure geometry for the edge-docked hover widget: a rail of per-device
@@ -17,8 +19,33 @@ class EdgeDockGeometry {
   static const double railThickness = 64;
 
   static const double panelWidth = 240;
-  static const double panelHeight = 168;
   static const double panelGap = 8;
+
+  // Kept as the fallback used when a caller doesn't pass an explicit
+  // content-derived height to panelRectFor (e.g. existing tests) - actual
+  // rendering always computes a real height via panelHeightFor so the
+  // window is sized to fit its content instead of overflowing it.
+  static const double panelHeightDefault = 168;
+
+  // Matches edge_dock_view.dart's _DetailCard layout closely enough to
+  // avoid overflow: header padding+text, the content column's vertical
+  // padding, and one row's height (padding + single-line text), each with
+  // a small margin for font-metric variance across platforms.
+  static const double panelHeaderHeight = 44;
+  static const double panelContentVerticalPadding = 20;
+  static const double panelRowHeight = 23;
+  static const double panelMinHeight = 92;
+
+  /// The detail panel's height for a card that will render [rowCount] rows
+  /// (always >= 1 - temperature is always shown). Content-driven instead of
+  /// a fixed constant, since the number of optional rows varies with which
+  /// data a device has and which [EdgeDockMetric]s are enabled.
+  static double panelHeightFor(int rowCount) {
+    final rows = rowCount < 1 ? 1 : rowCount;
+    final height =
+        panelHeaderHeight + panelContentVerticalPadding + rows * panelRowHeight;
+    return height < panelMinHeight ? panelMinHeight : height;
+  }
 
   static double railLength(int deviceCount) {
     final count = deviceCount < 1 ? 1 : deviceCount;
@@ -29,45 +56,73 @@ class EdgeDockGeometry {
 
   /// The rail's rect (the always-visible collapsed state), in screen
   /// coordinates, centered on [edge] of a display occupying
-  /// [visiblePosition]/[visibleSize].
+  /// [visiblePosition]/[visibleSize] and shifted along the edge by
+  /// [alongOffset] (positive = down for left/right, right for top/bottom) -
+  /// how the user-draggable position is applied. Clamped so the rail always
+  /// stays fully within the display's visible bounds, however far
+  /// [alongOffset] asks it to move.
   static Rect railRect(
     Offset visiblePosition,
     Size visibleSize,
     ScreenEdge edge,
-    int deviceCount,
-  ) {
+    int deviceCount, {
+    double alongOffset = 0,
+  }) {
     final length = railLength(deviceCount);
     switch (edge) {
       case ScreenEdge.left:
         return Rect.fromLTWH(
           visiblePosition.dx,
-          visiblePosition.dy + (visibleSize.height - length) / 2,
+          _clampAlong(
+            visiblePosition.dy +
+                (visibleSize.height - length) / 2 +
+                alongOffset,
+            visiblePosition.dy,
+            visiblePosition.dy + visibleSize.height - length,
+          ),
           railThickness,
           length,
         );
       case ScreenEdge.right:
         return Rect.fromLTWH(
           visiblePosition.dx + visibleSize.width - railThickness,
-          visiblePosition.dy + (visibleSize.height - length) / 2,
+          _clampAlong(
+            visiblePosition.dy +
+                (visibleSize.height - length) / 2 +
+                alongOffset,
+            visiblePosition.dy,
+            visiblePosition.dy + visibleSize.height - length,
+          ),
           railThickness,
           length,
         );
       case ScreenEdge.top:
         return Rect.fromLTWH(
-          visiblePosition.dx + (visibleSize.width - length) / 2,
+          _clampAlong(
+            visiblePosition.dx + (visibleSize.width - length) / 2 + alongOffset,
+            visiblePosition.dx,
+            visiblePosition.dx + visibleSize.width - length,
+          ),
           visiblePosition.dy,
           length,
           railThickness,
         );
       case ScreenEdge.bottom:
         return Rect.fromLTWH(
-          visiblePosition.dx + (visibleSize.width - length) / 2,
+          _clampAlong(
+            visiblePosition.dx + (visibleSize.width - length) / 2 + alongOffset,
+            visiblePosition.dx,
+            visiblePosition.dx + visibleSize.width - length,
+          ),
           visiblePosition.dy + visibleSize.height - railThickness,
           length,
           railThickness,
         );
     }
   }
+
+  static double _clampAlong(double value, double min, double max) =>
+      max < min ? min : value.clamp(min, max);
 
   /// The screen-space center of the [index]th device's ring within [rail].
   static Offset ringCenter(Rect rail, ScreenEdge edge, int index) {
@@ -84,13 +139,17 @@ class EdgeDockGeometry {
   /// The detail panel's rect for a ring centered at [ringCenter], placed
   /// beside the rail on the side that opens away from the screen edge, and
   /// clamped so it never renders outside the display's visible bounds.
+  /// [panelHeight] should come from [panelHeightFor] for the panel's actual
+  /// row count - the default only exists so existing callers/tests that
+  /// don't care about a specific height keep compiling.
   static Rect panelRectFor(
     Rect rail,
     ScreenEdge edge,
     Offset ringCenter,
     Offset visiblePosition,
-    Size visibleSize,
-  ) {
+    Size visibleSize, {
+    double panelHeight = panelHeightDefault,
+  }) {
     double left;
     double top;
     switch (edge) {
@@ -126,6 +185,22 @@ class EdgeDockGeometry {
   /// two are rendered as regions within this union.
   static Rect windowRectFor(Rect rail, Rect? panel) =>
       panel == null ? rail : rail.expandToInclude(panel);
+
+  /// Picks the display the dock should attach to: the one whose `id`
+  /// matches [displayId], or [primary] if [displayId] is `null` or no
+  /// longer among [displays] (e.g. that monitor was unplugged). Pure and
+  /// unit-testable without a real `screen_retriever` platform channel.
+  static Display pickDisplay(
+    List<Display> displays,
+    Display primary,
+    String? displayId,
+  ) {
+    if (displayId == null) return primary;
+    for (final d in displays) {
+      if (d.id == displayId) return d;
+    }
+    return primary;
+  }
 }
 
 /// Decides which ring (if any) is hovered from a periodically polled cursor

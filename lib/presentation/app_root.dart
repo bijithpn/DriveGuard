@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../application/providers.dart';
+import '../application/settings/app_settings.dart' show kAllEdgeDockMetrics;
 import '../application/widget/mini_widget_snapshot.dart';
 import '../core/logging/app_logger.dart';
 import '../domain/entities/storage_device.dart';
@@ -180,8 +181,28 @@ class _AppRootState extends ConsumerState<AppRoot>
   }
 
   Future<dynamic> _handleEdgeDockChannelCall(MethodCall call) async {
-    if (call.method == 'ready') {
-      await _pushSnapshotToEdgeDockIfActive(force: true);
+    switch (call.method) {
+      case 'ready':
+        await _pushSnapshotToEdgeDockIfActive(force: true);
+      case 'position_changed':
+        // The user finished dragging the dock along its edge - persist
+        // where it ended up so the next open restores it. The drag itself
+        // already moved the live window; this doesn't trigger a re-dock
+        // (positionOffset isn't in the edgeDock reactivity tuple above).
+        final raw = call.arguments;
+        final payload = raw is String && raw.isNotEmpty
+            ? jsonDecode(raw) as Map<String, dynamic>
+            : null;
+        final offset = (payload?['offset'] as num?)?.toDouble();
+        if (offset != null) {
+          ref
+              .read(settingsProvider.notifier)
+              .updateWith(
+                (s) => s.copyWith(
+                  edgeDock: s.edgeDock.copyWith(positionOffset: offset),
+                ),
+              );
+        }
     }
     return null;
   }
@@ -195,6 +216,13 @@ class _AppRootState extends ConsumerState<AppRoot>
         settings.edgeDock.edge,
         accent: settings.edgeDock.accent,
         opacity: settings.edgeDock.opacity,
+        displayId: settings.edgeDock.displayId,
+        backgroundColor: settings.edgeDock.backgroundColor,
+        textColor: settings.edgeDock.textColor,
+        warningColor: settings.edgeDock.warningColor,
+        criticalColor: settings.edgeDock.criticalColor,
+        visibleMetrics: settings.edgeDock.visibleMetrics,
+        positionOffset: settings.edgeDock.positionOffset,
       );
       return;
     }
@@ -240,6 +268,13 @@ class _AppRootState extends ConsumerState<AppRoot>
       settings.edgeDock.edge,
       accent: settings.edgeDock.accent,
       opacity: settings.edgeDock.opacity,
+      displayId: settings.edgeDock.displayId,
+      backgroundColor: settings.edgeDock.backgroundColor,
+      textColor: settings.edgeDock.textColor,
+      warningColor: settings.edgeDock.warningColor,
+      criticalColor: settings.edgeDock.criticalColor,
+      visibleMetrics: settings.edgeDock.visibleMetrics,
+      positionOffset: settings.edgeDock.positionOffset,
     );
   }
 
@@ -394,6 +429,13 @@ class _AppRootState extends ConsumerState<AppRoot>
     ScreenEdge edge, {
     EdgeDockAccent accent = EdgeDockAccent.auto,
     double opacity = 1.0,
+    String? displayId,
+    int? backgroundColor,
+    int? textColor,
+    int? warningColor,
+    int? criticalColor,
+    Set<EdgeDockMetric> visibleMetrics = kAllEdgeDockMetrics,
+    double positionOffset = 0,
   }) async {
     if (_edgeDockSyncInFlight) return;
     final alreadyActive = ref.read(edgeDockActiveProvider);
@@ -406,6 +448,13 @@ class _AppRootState extends ConsumerState<AppRoot>
           edge.name,
           accentName: accent.name,
           opacity: opacity,
+          displayId: displayId,
+          backgroundColor: backgroundColor,
+          textColor: textColor,
+          warningColor: warningColor,
+          criticalColor: criticalColor,
+          visibleMetrics: visibleMetrics.map((m) => m.name).toList(),
+          positionOffset: positionOffset,
           initialSnapshot: initialSnapshot,
         );
         ref.read(edgeDockActiveProvider.notifier).state = true;
@@ -500,27 +549,57 @@ class _AppRootState extends ConsumerState<AppRoot>
       settingsProvider.select((s) => s.widget.enabled),
       (previous, enabled) => _syncWidgetMode(enabled),
     );
-    ref.listen<(bool, ScreenEdge, EdgeDockAccent, double)>(
+    ref.listen<
+      (
+        bool,
+        ScreenEdge,
+        EdgeDockAccent,
+        double,
+        String?,
+        int?,
+        int?,
+        int?,
+        int?,
+        String,
+      )
+    >(
       settingsProvider.select(
         (s) => (
           s.edgeDock.enabled,
           s.edgeDock.edge,
           s.edgeDock.accent,
           s.edgeDock.opacity,
+          s.edgeDock.displayId,
+          s.edgeDock.backgroundColor,
+          s.edgeDock.textColor,
+          s.edgeDock.warningColor,
+          s.edgeDock.criticalColor,
+          // Sets don't compare equal by value, so watch a stable string key
+          // derived from the set instead - the actual Set<EdgeDockMetric>
+          // is re-read from settings below when acting on a change.
+          (s.edgeDock.visibleMetrics.map((m) => m.name).toList()..sort()).join(
+            ',',
+          ),
         ),
       ),
       (previous, next) async {
-        final (enabled, edge, accent, opacity) = next;
+        final (
+          enabled,
+          edge,
+          accent,
+          opacity,
+          displayId,
+          backgroundColor,
+          textColor,
+          warningColor,
+          criticalColor,
+          _,
+        ) = next;
+        final currentEdgeDock = ref.read(settingsProvider).edgeDock;
         final dockedConfigChanged =
-            previous != null &&
-            previous.$1 &&
-            enabled &&
-            (previous.$2 != edge ||
-                previous.$3 != accent ||
-                previous.$4 != opacity);
+            previous != null && previous.$1 && enabled && previous != next;
         if (dockedConfigChanged) {
-          // Edge/accent/opacity changed while already docked - re-dock to
-          // apply it.
+          // Something changed while already docked - re-dock to apply it.
           await _syncEdgeDockMode(
             false,
             previous.$2,
@@ -533,6 +612,18 @@ class _AppRootState extends ConsumerState<AppRoot>
           edge,
           accent: accent,
           opacity: opacity,
+          displayId: displayId,
+          backgroundColor: backgroundColor,
+          textColor: textColor,
+          warningColor: warningColor,
+          criticalColor: criticalColor,
+          visibleMetrics: currentEdgeDock.visibleMetrics,
+          // Not part of the watched tuple above deliberately - the dragged
+          // position already applies live inside the dock's own window
+          // (see EdgeDockApp._onDragUpdate); re-dock is only needed to
+          // pick up the *latest* value when some other change here already
+          // triggers one, not on every drag-end persist.
+          positionOffset: currentEdgeDock.positionOffset,
         );
       },
     );

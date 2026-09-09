@@ -49,6 +49,90 @@ void main() {
       expect(restored.edge, ScreenEdge.right);
       expect(restored.accent, EdgeDockAccent.auto);
     });
+
+    test('defaults to primary display and default colors, all metrics on', () {
+      const settings = EdgeDockSettings();
+      expect(settings.displayId, isNull);
+      expect(settings.backgroundColor, isNull);
+      expect(settings.textColor, isNull);
+      expect(settings.warningColor, isNull);
+      expect(settings.criticalColor, isNull);
+      expect(settings.visibleMetrics, kAllEdgeDockMetrics);
+    });
+
+    test('copyWith sets displayId and colors', () {
+      const settings = EdgeDockSettings();
+      final updated = settings.copyWith(
+        displayId: 'DISPLAY-2',
+        backgroundColor: 0xFF000000,
+        textColor: 0xFFFFFFFF,
+        warningColor: 0xFFFFC107,
+        criticalColor: 0xFFE53935,
+        visibleMetrics: {EdgeDockMetric.health},
+      );
+      expect(updated.displayId, 'DISPLAY-2');
+      expect(updated.backgroundColor, 0xFF000000);
+      expect(updated.textColor, 0xFFFFFFFF);
+      expect(updated.warningColor, 0xFFFFC107);
+      expect(updated.criticalColor, 0xFFE53935);
+      expect(updated.visibleMetrics, {EdgeDockMetric.health});
+    });
+
+    test('copyWith clear* flags reset a field back to null', () {
+      const settings = EdgeDockSettings(
+        displayId: 'DISPLAY-2',
+        backgroundColor: 0xFF000000,
+      );
+      final cleared = settings.copyWith(
+        clearDisplayId: true,
+        clearBackgroundColor: true,
+      );
+      expect(cleared.displayId, isNull);
+      expect(cleared.backgroundColor, isNull);
+    });
+
+    test('round-trips displayId/colors/visibleMetrics through JSON', () {
+      const settings = EdgeDockSettings(
+        displayId: 'DISPLAY-2',
+        backgroundColor: 0xFF000000,
+        textColor: 0xFFFFFFFF,
+        warningColor: 0xFFFFC107,
+        criticalColor: 0xFFE53935,
+        visibleMetrics: {EdgeDockMetric.health, EdgeDockMetric.smart},
+      );
+      final restored = EdgeDockSettings.fromJson(settings.toJson());
+      expect(restored.displayId, 'DISPLAY-2');
+      expect(restored.backgroundColor, 0xFF000000);
+      expect(restored.textColor, 0xFFFFFFFF);
+      expect(restored.warningColor, 0xFFFFC107);
+      expect(restored.criticalColor, 0xFFE53935);
+      expect(restored.visibleMetrics, {
+        EdgeDockMetric.health,
+        EdgeDockMetric.smart,
+      });
+    });
+
+    test('malformed visibleMetrics JSON falls back to all metrics', () {
+      final restored = EdgeDockSettings.fromJson({'visibleMetrics': null});
+      expect(restored.visibleMetrics, kAllEdgeDockMetrics);
+    });
+
+    test('positionOffset defaults to 0 (centered)', () {
+      const settings = EdgeDockSettings();
+      expect(settings.positionOffset, 0);
+    });
+
+    test('copyWith updates positionOffset', () {
+      const settings = EdgeDockSettings();
+      final updated = settings.copyWith(positionOffset: 42.5);
+      expect(updated.positionOffset, 42.5);
+    });
+
+    test('positionOffset round-trips through JSON', () {
+      const settings = EdgeDockSettings(positionOffset: -75);
+      final restored = EdgeDockSettings.fromJson(settings.toJson());
+      expect(restored.positionOffset, -75);
+    });
   });
 
   group('AppSettings', () {

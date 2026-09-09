@@ -82,12 +82,29 @@ class WidgetSettings {
 /// into a compact panel on hover. Independent of [WidgetSettings]'s mini
 /// monitor window. See
 /// docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
+/// All optional detail-panel rows, shown by default (matches the original
+/// always-shown behavior).
+const kAllEdgeDockMetrics = <EdgeDockMetric>{
+  EdgeDockMetric.health,
+  EdgeDockMetric.smart,
+  EdgeDockMetric.powerOnHours,
+  EdgeDockMetric.transferSpeed,
+  EdgeDockMetric.freeCapacity,
+};
+
 class EdgeDockSettings {
   const EdgeDockSettings({
     this.enabled = false,
     this.edge = ScreenEdge.right,
     this.accent = EdgeDockAccent.auto,
     this.opacity = 1.0,
+    this.displayId,
+    this.backgroundColor,
+    this.textColor,
+    this.warningColor,
+    this.criticalColor,
+    this.visibleMetrics = kAllEdgeDockMetrics,
+    this.positionOffset = 0,
   });
 
   final bool enabled;
@@ -95,16 +112,65 @@ class EdgeDockSettings {
   final EdgeDockAccent accent;
   final double opacity;
 
+  /// Which connected display (by its `Display.id`) the dock attaches to.
+  /// `null` means "follow the primary display" - also the fallback used if
+  /// the saved display is no longer connected.
+  final String? displayId;
+
+  /// ARGB overrides for the dock's panel background/text/warning/critical
+  /// colors. `null` means "use the app's default color" for that slot.
+  final int? backgroundColor;
+  final int? textColor;
+  final int? warningColor;
+  final int? criticalColor;
+
+  /// Which optional rows appear in the hover detail panel. Temperature is
+  /// always shown regardless of this set.
+  final Set<EdgeDockMetric> visibleMetrics;
+
+  /// User-dragged position along the docked edge, in logical pixels offset
+  /// from the centered position (positive = down for left/right edges,
+  /// right for top/bottom edges). `0` is the default centered position.
+  /// `EdgeDockGeometry.railRect` clamps this so the rail always stays fully
+  /// on-screen regardless of what's stored here (e.g. after an unplug/
+  /// resolution change).
+  final double positionOffset;
+
   EdgeDockSettings copyWith({
     bool? enabled,
     ScreenEdge? edge,
     EdgeDockAccent? accent,
     double? opacity,
+    String? displayId,
+    int? backgroundColor,
+    int? textColor,
+    int? warningColor,
+    int? criticalColor,
+    Set<EdgeDockMetric>? visibleMetrics,
+    double? positionOffset,
+    bool clearDisplayId = false,
+    bool clearBackgroundColor = false,
+    bool clearTextColor = false,
+    bool clearWarningColor = false,
+    bool clearCriticalColor = false,
   }) => EdgeDockSettings(
     enabled: enabled ?? this.enabled,
     edge: edge ?? this.edge,
     accent: accent ?? this.accent,
     opacity: opacity ?? this.opacity,
+    displayId: clearDisplayId ? null : (displayId ?? this.displayId),
+    backgroundColor: clearBackgroundColor
+        ? null
+        : (backgroundColor ?? this.backgroundColor),
+    textColor: clearTextColor ? null : (textColor ?? this.textColor),
+    warningColor: clearWarningColor
+        ? null
+        : (warningColor ?? this.warningColor),
+    criticalColor: clearCriticalColor
+        ? null
+        : (criticalColor ?? this.criticalColor),
+    visibleMetrics: visibleMetrics ?? this.visibleMetrics,
+    positionOffset: positionOffset ?? this.positionOffset,
   );
 
   Map<String, dynamic> toJson() => {
@@ -112,6 +178,13 @@ class EdgeDockSettings {
     'edge': edge.name,
     'accent': accent.name,
     'opacity': opacity,
+    'displayId': displayId,
+    'backgroundColor': backgroundColor,
+    'textColor': textColor,
+    'warningColor': warningColor,
+    'criticalColor': criticalColor,
+    'visibleMetrics': visibleMetrics.map((m) => m.name).toList(),
+    'positionOffset': positionOffset,
   };
 
   factory EdgeDockSettings.fromJson(Map<String, dynamic> json) =>
@@ -126,6 +199,19 @@ class EdgeDockSettings {
           orElse: () => EdgeDockAccent.auto,
         ),
         opacity: (json['opacity'] as num?)?.toDouble() ?? 1.0,
+        displayId: json['displayId'] as String?,
+        backgroundColor: (json['backgroundColor'] as num?)?.toInt(),
+        textColor: (json['textColor'] as num?)?.toInt(),
+        warningColor: (json['warningColor'] as num?)?.toInt(),
+        criticalColor: (json['criticalColor'] as num?)?.toInt(),
+        visibleMetrics: json['visibleMetrics'] is List
+            ? (json['visibleMetrics'] as List)
+                  .whereType<String>()
+                  .map((n) => EdgeDockMetric.values.where((m) => m.name == n))
+                  .expand((matches) => matches)
+                  .toSet()
+            : kAllEdgeDockMetrics,
+        positionOffset: (json['positionOffset'] as num?)?.toDouble() ?? 0,
       );
 }
 
