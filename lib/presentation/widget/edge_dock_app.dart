@@ -37,7 +37,9 @@ class EdgeDockApp extends StatefulWidget {
 
 class _EdgeDockAppState extends State<EdgeDockApp> {
   static const _tag = 'EdgeDockApp';
-  static const _pollInterval = Duration(milliseconds: 120);
+  // Fast enough to feel immediate without a noticeable poll-to-poll step;
+  // window_manager's native setBounds animation smooths the actual motion.
+  static const _pollInterval = Duration(milliseconds: 60);
 
   MiniWidgetSnapshot _snapshot = MiniWidgetSnapshot.empty;
   final _hoverTracker = EdgeDockHoverTracker();
@@ -45,6 +47,7 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
   Offset _displayPosition = Offset.zero;
   Size _displaySize = const Size(1920, 1080);
   late ScreenEdge _edge;
+  late Color? _accentOverride;
 
   @override
   void initState() {
@@ -53,6 +56,11 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
       (e) => e.name == widget.initialArgs['edge'],
       orElse: () => ScreenEdge.right,
     );
+    final accent = EdgeDockAccent.values.firstWhere(
+      (a) => a.name == widget.initialArgs['accent'],
+      orElse: () => EdgeDockAccent.auto,
+    );
+    _accentOverride = resolveAccent(accent);
     final snapJson = widget.initialArgs['snapshot'];
     if (snapJson is Map<String, dynamic>) {
       try {
@@ -109,6 +117,24 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
       await windowManager.setResizable(false);
       if (!Platform.isLinux) {
         await windowManager.setHasShadow(false);
+      }
+      if (Platform.isMacOS) {
+        // Otherwise the dock disappears the moment the user's main window
+        // (or any app) goes native fullscreen, since fullscreen apps get
+        // their own Space by default. window_manager already wraps the
+        // NSWindow collectionBehavior flags needed for this - no native
+        // Swift code required.
+        try {
+          await windowManager.setVisibleOnAllWorkspaces(
+            true,
+            visibleOnFullScreen: true,
+          );
+        } catch (e) {
+          AppLogger.instance.debug(
+            _tag,
+            'setVisibleOnAllWorkspaces failed: $e',
+          );
+        }
       }
 
       final display = await screenRetriever.getPrimaryDisplay();
@@ -168,9 +194,23 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
       theme: AppTheme.dark(),
       home: Scaffold(
         backgroundColor: Colors.transparent,
-        body: _hoverTracker.expanded
-            ? EdgeDockPanel(snapshot: _snapshot)
-            : EdgeDockStrip(snapshot: _snapshot),
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: _hoverTracker.expanded
+              ? EdgeDockPanel(
+                  key: const ValueKey('panel'),
+                  snapshot: _snapshot,
+                  accentOverride: _accentOverride,
+                )
+              : EdgeDockStrip(
+                  key: const ValueKey('strip'),
+                  snapshot: _snapshot,
+                  edge: _edge,
+                  accentOverride: _accentOverride,
+                ),
+        ),
       ),
     );
   }

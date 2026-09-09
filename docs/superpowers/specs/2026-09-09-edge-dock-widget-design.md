@@ -123,3 +123,33 @@ segmented edge picker (Left/Right/Top/Bottom), following the existing
   deferred, noted above).
 - No changes to the existing mini monitor window's behavior.
 - No new platform channel / native plugin code.
+
+## Follow-up revision (2026-09-09, same day)
+
+Requested after first landing: visual polish, customizable accent color,
+smoother hover response, and visibility over native fullscreen apps.
+
+- **Collapsed state redesign**: the collapsed element is now a rounded pill
+  "badge" (40x96, `stripThickness`/`stripLength` in `EdgeDockGeometry`
+  repurposed to these dimensions) showing a small thermometer icon + the
+  worst device's value, instead of a bare 6px color sliver — legible even
+  before hovering, closer to the requested reference interaction (a small
+  glanceable indicator that reveals detail on hover).
+- **Accent color**: `EdgeDockSettings.accent` (`EdgeDockAccent` enum: auto +
+  6 curated colors) lets the user override the automatic severity tint.
+  `auto` preserves the original behavior. Implemented as a fixed palette
+  rather than a full color picker (matches how the rest of the app already
+  exposes fixed design-system colors; avoids a picker dependency for a
+  window that's mostly glanced at, not styled precisely).
+- **Smoother interaction**: cursor poll interval reduced from 120ms to 60ms;
+  content now cross-fades via `AnimatedSwitcher` between the badge and panel
+  instead of an abrupt swap, while `window_manager`'s native `setBounds`
+  animation still handles the actual window-size/position motion.
+- **Fullscreen visibility (macOS)**: `window_manager` already wraps the
+  NSWindow `collectionBehavior` flags needed for a window to join all
+  Spaces and stay visible over fullscreen apps
+  (`setVisibleOnAllWorkspaces(true, visibleOnFullScreen: true)`) — this is
+  called for the edge dock window on macOS. No native Swift code needed;
+  it was a matter of using an already-wrapped API. Windows/Linux have no
+  equivalent call in `window_manager`; their always-on-top + skip-taskbar
+  behavior over fullscreen windows is unverified and left as-is.

@@ -12,6 +12,7 @@ import '../../domain/enums/storage_enums.dart';
 import '../../domain/enums/ui_enums.dart';
 import '../app_root.dart' show edgeDockActiveProvider, widgetModeActiveProvider;
 import '../theme/app_theme.dart';
+import '../widget/edge_dock_view.dart' show resolveAccent;
 
 enum _Section {
   general,
@@ -1042,7 +1043,6 @@ class _WidgetSection extends ConsumerWidget {
       _SettingRow(
         label: 'Edge dock position',
         isDark: isDark,
-        isLast: true,
         trailing: _SegmentedControl<ScreenEdge>(
           isDark: isDark,
           selected: settings.edgeDock.edge,
@@ -1057,6 +1057,17 @@ class _WidgetSection extends ConsumerWidget {
           ),
         ),
       ),
+      _SettingRow(
+        label: 'Edge dock color',
+        isDark: isDark,
+        isLast: true,
+        trailing: _EdgeDockAccentPicker(
+          selected: settings.edgeDock.accent,
+          onChanged: (accent) => notifier.updateWith(
+            (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(accent: accent)),
+          ),
+        ),
+      ),
     ];
 
     return Column(
@@ -1068,6 +1079,65 @@ class _WidgetSection extends ConsumerWidget {
         const SizedBox(height: AppSpacing.sm),
         _SectionGroup(isDark: isDark, children: edgeDockRows),
       ],
+    );
+  }
+}
+
+class _EdgeDockAccentPicker extends StatelessWidget {
+  const _EdgeDockAccentPicker({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final EdgeDockAccent selected;
+  final ValueChanged<EdgeDockAccent> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: EdgeDockAccent.values.map((accent) {
+        final isSelected = accent == selected;
+        final color = resolveAccent(accent) ?? AppColors.textMuted;
+        return Padding(
+          padding: const EdgeInsets.only(left: 6),
+          child: Tooltip(
+            message: accent == EdgeDockAccent.auto
+                ? 'Auto (by severity)'
+                : accent.name,
+            child: GestureDetector(
+              onTap: () => onChanged(accent),
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: accent == EdgeDockAccent.auto
+                      ? Colors.transparent
+                      : color,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected ? color : AppColors.border,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: accent == EdgeDockAccent.auto
+                    ? const Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 11,
+                        color: AppColors.textMuted,
+                      )
+                    : (isSelected
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            )
+                          : null),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

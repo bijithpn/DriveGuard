@@ -4,30 +4,45 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('EdgeDockSettings', () {
-    test('defaults to disabled, docked right', () {
+    test('defaults to disabled, docked right, auto accent', () {
       const settings = EdgeDockSettings();
       expect(settings.enabled, isFalse);
       expect(settings.edge, ScreenEdge.right);
+      expect(settings.accent, EdgeDockAccent.auto);
     });
 
     test('copyWith updates only the given fields', () {
       const settings = EdgeDockSettings();
-      final updated = settings.copyWith(enabled: true, edge: ScreenEdge.left);
+      final updated = settings.copyWith(
+        enabled: true,
+        edge: ScreenEdge.left,
+        accent: EdgeDockAccent.purple,
+      );
       expect(updated.enabled, isTrue);
       expect(updated.edge, ScreenEdge.left);
+      expect(updated.accent, EdgeDockAccent.purple);
     });
 
     test('round-trips through JSON', () {
-      const settings = EdgeDockSettings(enabled: true, edge: ScreenEdge.top);
+      const settings = EdgeDockSettings(
+        enabled: true,
+        edge: ScreenEdge.top,
+        accent: EdgeDockAccent.teal,
+      );
       final restored = EdgeDockSettings.fromJson(settings.toJson());
       expect(restored.enabled, isTrue);
       expect(restored.edge, ScreenEdge.top);
+      expect(restored.accent, EdgeDockAccent.teal);
     });
 
     test('falls back to defaults on malformed JSON', () {
-      final restored = EdgeDockSettings.fromJson({'edge': 'not-a-real-edge'});
+      final restored = EdgeDockSettings.fromJson({
+        'edge': 'not-a-real-edge',
+        'accent': 'not-a-real-accent',
+      });
       expect(restored.enabled, isFalse);
       expect(restored.edge, ScreenEdge.right);
+      expect(restored.accent, EdgeDockAccent.auto);
     });
   });
 

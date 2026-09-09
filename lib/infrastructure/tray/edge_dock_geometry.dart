@@ -9,10 +9,13 @@ import '../../domain/enums/ui_enums.dart';
 class EdgeDockGeometry {
   const EdgeDockGeometry._();
 
-  static const double stripThickness = 6;
-  static const double stripLength = 120;
-  static const double panelWidth = 260;
-  static const double panelHeight = 200;
+  // A rounded pill-shaped badge, not a hairline strip - thick enough to
+  // hold a small icon and value text even collapsed, closer to a "docked
+  // tab" than a bare color sliver.
+  static const double stripThickness = 40;
+  static const double stripLength = 96;
+  static const double panelWidth = 268;
+  static const double panelHeight = 224;
 
   /// The collapsed strip's rect, in screen coordinates, centered on [edge]
   /// of a display occupying [visiblePosition]/[visibleSize].

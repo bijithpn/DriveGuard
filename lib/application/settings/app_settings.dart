@@ -83,18 +83,31 @@ class WidgetSettings {
 /// monitor window. See
 /// docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
 class EdgeDockSettings {
-  const EdgeDockSettings({this.enabled = false, this.edge = ScreenEdge.right});
+  const EdgeDockSettings({
+    this.enabled = false,
+    this.edge = ScreenEdge.right,
+    this.accent = EdgeDockAccent.auto,
+  });
 
   final bool enabled;
   final ScreenEdge edge;
+  final EdgeDockAccent accent;
 
-  EdgeDockSettings copyWith({bool? enabled, ScreenEdge? edge}) =>
-      EdgeDockSettings(
-        enabled: enabled ?? this.enabled,
-        edge: edge ?? this.edge,
-      );
+  EdgeDockSettings copyWith({
+    bool? enabled,
+    ScreenEdge? edge,
+    EdgeDockAccent? accent,
+  }) => EdgeDockSettings(
+    enabled: enabled ?? this.enabled,
+    edge: edge ?? this.edge,
+    accent: accent ?? this.accent,
+  );
 
-  Map<String, dynamic> toJson() => {'enabled': enabled, 'edge': edge.name};
+  Map<String, dynamic> toJson() => {
+    'enabled': enabled,
+    'edge': edge.name,
+    'accent': accent.name,
+  };
 
   factory EdgeDockSettings.fromJson(Map<String, dynamic> json) =>
       EdgeDockSettings(
@@ -102,6 +115,10 @@ class EdgeDockSettings {
         edge: ScreenEdge.values.firstWhere(
           (e) => e.name == json['edge'],
           orElse: () => ScreenEdge.right,
+        ),
+        accent: EdgeDockAccent.values.firstWhere(
+          (a) => a.name == json['accent'],
+          orElse: () => EdgeDockAccent.auto,
         ),
       );
 }

@@ -193,6 +193,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       await _syncEdgeDockMode(
         settings.edgeDock.enabled,
         settings.edgeDock.edge,
+        accent: settings.edgeDock.accent,
       );
       return;
     }
@@ -233,7 +234,11 @@ class _AppRootState extends ConsumerState<AppRoot>
     }
 
     await _syncWidgetMode(settings.widget.enabled);
-    await _syncEdgeDockMode(settings.edgeDock.enabled, settings.edgeDock.edge);
+    await _syncEdgeDockMode(
+      settings.edgeDock.enabled,
+      settings.edgeDock.edge,
+      accent: settings.edgeDock.accent,
+    );
   }
 
   TemperatureSeverity _combinedSeverity(
@@ -382,7 +387,11 @@ class _AppRootState extends ConsumerState<AppRoot>
     await widget.windowController.updateEdgeDockSnapshot(snapshot);
   }
 
-  Future<void> _syncEdgeDockMode(bool shouldBeActive, ScreenEdge edge) async {
+  Future<void> _syncEdgeDockMode(
+    bool shouldBeActive,
+    ScreenEdge edge, {
+    EdgeDockAccent accent = EdgeDockAccent.auto,
+  }) async {
     if (_edgeDockSyncInFlight) return;
     final alreadyActive = ref.read(edgeDockActiveProvider);
     if (shouldBeActive == alreadyActive) return;
@@ -392,6 +401,7 @@ class _AppRootState extends ConsumerState<AppRoot>
         final initialSnapshot = _buildSnapshot();
         await widget.windowController.enterEdgeDockMode(
           edge.name,
+          accentName: accent.name,
           initialSnapshot: initialSnapshot,
         );
         ref.read(edgeDockActiveProvider.notifier).state = true;
@@ -486,15 +496,22 @@ class _AppRootState extends ConsumerState<AppRoot>
       settingsProvider.select((s) => s.widget.enabled),
       (previous, enabled) => _syncWidgetMode(enabled),
     );
-    ref.listen<(bool, ScreenEdge)>(
-      settingsProvider.select((s) => (s.edgeDock.enabled, s.edgeDock.edge)),
+    ref.listen<(bool, ScreenEdge, EdgeDockAccent)>(
+      settingsProvider.select(
+        (s) => (s.edgeDock.enabled, s.edgeDock.edge, s.edgeDock.accent),
+      ),
       (previous, next) async {
-        final (enabled, edge) = next;
-        if (previous != null && previous.$1 && enabled && previous.$2 != edge) {
-          // Edge changed while already docked - re-dock at the new edge.
-          await _syncEdgeDockMode(false, previous.$2);
+        final (enabled, edge, accent) = next;
+        final dockedConfigChanged =
+            previous != null &&
+            previous.$1 &&
+            enabled &&
+            (previous.$2 != edge || previous.$3 != accent);
+        if (dockedConfigChanged) {
+          // Edge or accent changed while already docked - re-dock to apply it.
+          await _syncEdgeDockMode(false, previous.$2, accent: previous.$3);
         }
-        await _syncEdgeDockMode(enabled, edge);
+        await _syncEdgeDockMode(enabled, edge, accent: accent);
       },
     );
     ref.listen(settingsProvider, (previous, next) {

@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../../application/widget/mini_widget_snapshot.dart';
 import '../../domain/enums/storage_enums.dart';
+import '../../domain/enums/ui_enums.dart';
 import '../theme/app_theme.dart';
 
 /// The worst-severity device across the snapshot, used both for the
-/// collapsed strip's tint and as the expanded panel's headline device.
+/// collapsed badge's tint/value and as the expanded panel's headline.
 MiniWidgetDeviceSnapshot? worstDevice(List<MiniWidgetDeviceSnapshot> devices) {
   if (devices.isEmpty) return null;
   const rank = {
@@ -36,31 +37,91 @@ Color severityColor(TemperatureSeverity severity) {
   }
 }
 
-/// The collapsed strip: a slim bar tinted by the worst connected drive's
-/// severity, glanceable without reading text.
+/// Resolves a user-chosen accent to a concrete color, or `null` for
+/// [EdgeDockAccent.auto] (caller falls back to severity-based tinting).
+Color? resolveAccent(EdgeDockAccent accent) {
+  switch (accent) {
+    case EdgeDockAccent.auto:
+      return null;
+    case EdgeDockAccent.blue:
+      return AppColors.accent;
+    case EdgeDockAccent.teal:
+      return const Color(0xFF2DD4BF);
+    case EdgeDockAccent.purple:
+      return const Color(0xFF9B7BFF);
+    case EdgeDockAccent.pink:
+      return const Color(0xFFEC6BAE);
+    case EdgeDockAccent.orange:
+      return const Color(0xFFFF9F45);
+    case EdgeDockAccent.red:
+      return AppColors.critical;
+  }
+}
+
+bool _isVertical(ScreenEdge edge) =>
+    edge == ScreenEdge.left || edge == ScreenEdge.right;
+
+/// The collapsed badge: a rounded pill docked to the edge, tinted by the
+/// worst connected drive's severity (or a user-chosen accent), showing a
+/// glanceable icon + value even before it's hovered.
 class EdgeDockStrip extends StatelessWidget {
-  const EdgeDockStrip({super.key, required this.snapshot});
+  const EdgeDockStrip({
+    super.key,
+    required this.snapshot,
+    required this.edge,
+    this.accentOverride,
+  });
 
   final MiniWidgetSnapshot snapshot;
+  final ScreenEdge edge;
+  final Color? accentOverride;
 
   @override
   Widget build(BuildContext context) {
     final worst = worstDevice(snapshot.devices);
-    final color = worst == null
-        ? AppColors.textMuted
-        : severityColor(worst.severity);
+    final color =
+        accentOverride ??
+        (worst == null ? AppColors.textMuted : severityColor(worst.severity));
+
+    final icon = Icon(Icons.thermostat_rounded, size: 16, color: color);
+    final valueText = Text(
+      worst?.valueText ?? '--',
+      style: TextStyle(
+        color: color,
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
 
     return Container(
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(3),
+        color: AppColors.bg1.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.55), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.5),
-            blurRadius: 6,
-            spreadRadius: -1,
+            color: color.withValues(alpha: 0.35),
+            blurRadius: 12,
+            spreadRadius: -2,
+          ),
+          const BoxShadow(
+            color: AppColors.shadowDark,
+            blurRadius: 10,
+            offset: Offset(0, 3),
           ),
         ],
+      ),
+      child: Center(
+        child: _isVertical(edge)
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [icon, const SizedBox(height: 3), valueText],
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [icon, const SizedBox(width: 5), valueText],
+              ),
       ),
     );
   }
@@ -69,13 +130,18 @@ class EdgeDockStrip extends StatelessWidget {
 /// The expanded panel: a compact live summary, sliding out from the docked
 /// edge on hover.
 class EdgeDockPanel extends StatelessWidget {
-  const EdgeDockPanel({super.key, required this.snapshot});
+  const EdgeDockPanel({super.key, required this.snapshot, this.accentOverride});
 
   final MiniWidgetSnapshot snapshot;
+  final Color? accentOverride;
 
   @override
   Widget build(BuildContext context) {
     final devices = snapshot.devices;
+    final worst = worstDevice(devices);
+    final headerColor =
+        accentOverride ??
+        (worst == null ? AppColors.textMuted : severityColor(worst.severity));
 
     return Material(
       color: Colors.transparent,
@@ -87,33 +153,86 @@ class EdgeDockPanel extends StatelessWidget {
           boxShadow: const [
             BoxShadow(
               color: AppColors.shadowDark,
-              blurRadius: 24,
-              offset: Offset(0, 6),
+              blurRadius: 28,
+              offset: Offset(0, 8),
             ),
           ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: devices.isEmpty
-                ? const Center(
-                    child: Text(
-                      'Scanning...',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _PanelHeader(color: headerColor, deviceCount: devices.length),
+              Expanded(
+                child: devices.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Scanning...',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: devices.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) =>
+                            _EdgeDockDeviceRow(device: devices[index]),
                       ),
-                    ),
-                  )
-                : ListView.separated(
-                    itemCount: devices.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) =>
-                        _EdgeDockDeviceRow(device: devices[index]),
-                  ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PanelHeader extends StatelessWidget {
+  const _PanelHeader({required this.color, required this.deviceCount});
+
+  final Color color;
+  final int deviceCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        border: Border(
+          bottom: BorderSide(color: color.withValues(alpha: 0.18)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'DriveGuard',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$deviceCount drive${deviceCount == 1 ? '' : 's'}',
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -129,10 +248,11 @@ class _EdgeDockDeviceRow extends StatelessWidget {
     final color = severityColor(device.severity);
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 28,
-          height: 28,
+          width: 30,
+          height: 30,
           child: CustomPaint(
             painter: _RingPainter(fraction: device.fraction, color: color),
             child: Center(
@@ -148,26 +268,47 @@ class _EdgeDockDeviceRow extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            device.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Text(
-          device.valueText,
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            fontFeatures: const [FontFeature.tabularFigures()],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      device.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    device.valueText,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 5),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: device.fraction.clamp(0.0, 1.0),
+                  minHeight: 4,
+                  backgroundColor: AppColors.bg3,
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+            ],
           ),
         ),
       ],
