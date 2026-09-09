@@ -12,6 +12,7 @@ import '../../domain/enums/ui_enums.dart';
 import '../../infrastructure/tray/edge_dock_geometry.dart'
     show EdgeDockGeometry;
 import '../theme/app_theme.dart';
+import 'edge_dock_organic_painter.dart';
 
 /// Resolved colors for the edge dock's own surfaces (panel background, body
 /// text) plus severity overrides, kept in one place instead of scattering
@@ -132,6 +133,7 @@ class EdgeDockContent extends StatelessWidget {
     required this.panelLocalRect,
     this.pinnedIndex,
     this.onTapRing,
+    this.onTapActionPod,
     this.onArrowKey,
     this.onDragStart,
     this.onDragUpdate,
@@ -147,6 +149,7 @@ class EdgeDockContent extends StatelessWidget {
   final int? pinnedIndex;
   final ValueChanged<int?> onHover;
   final ValueChanged<int?>? onTapRing;
+  final VoidCallback? onTapActionPod;
   final void Function({required bool forward})? onArrowKey;
   final VoidCallback? onDragStart;
   final ValueChanged<double>? onDragUpdate;
@@ -213,6 +216,7 @@ class EdgeDockContent extends StatelessWidget {
                 pinnedIndex: pinnedIndex,
                 onHover: onHover,
                 onTapRing: onTapRing,
+                onTapActionPod: onTapActionPod,
                 onDragStart: onDragStart,
                 onDragUpdate: onDragUpdate,
                 onDragEnd: onDragEnd,
@@ -252,6 +256,7 @@ class _Rail extends StatelessWidget {
     required this.reducedMotion,
     this.pinnedIndex,
     this.onTapRing,
+    this.onTapActionPod,
     this.onDragStart,
     this.onDragUpdate,
     this.onDragEnd,
@@ -263,6 +268,7 @@ class _Rail extends StatelessWidget {
   final int? pinnedIndex;
   final ValueChanged<int?> onHover;
   final ValueChanged<int?>? onTapRing;
+  final VoidCallback? onTapActionPod;
   final VoidCallback? onDragStart;
   final ValueChanged<double>? onDragUpdate;
   final VoidCallback? onDragEnd;
@@ -289,29 +295,58 @@ class _Rail extends StatelessWidget {
             ),
           );
 
-    final content = Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.background.withValues(alpha: 0.94),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.bg3, width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowDark,
-            blurRadius: 16,
-            offset: Offset(0, 4),
-          ),
-        ],
+    final count = devices.isEmpty ? 1 : devices.length;
+    final mainRailLength =
+        count * EdgeDockGeometry.itemBlockLength +
+        (count - 1) * EdgeDockGeometry.itemSpacing;
+
+    final pod = _BottomActionPod(
+      theme: theme,
+      reducedMotion: reducedMotion,
+      onTap: onTapActionPod,
+    );
+
+    final content = CustomPaint(
+      painter: EdgeDockOrganicPainter(
+        edge: edge,
+        backgroundColor: theme.background.withValues(alpha: 0.96),
+        borderColor: const Color(0xFF1E1E26),
+        borderWidth: 1.0,
+        mainRailLength: mainRailLength,
+        podDiameter: 36.0,
+        podSpacing: 10.0,
+        showPod: true,
+        dockDepth: EdgeDockGeometry.railThickness,
       ),
-      child: vertical
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: _withSpacing(items, vertical: true),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: _withSpacing(items, vertical: false),
-            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+        child: vertical
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _withSpacing(items, vertical: true),
+                  ),
+                  const SizedBox(height: 10),
+                  pod,
+                ],
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _withSpacing(items, vertical: false),
+                  ),
+                  const SizedBox(width: 10),
+                  pod,
+                ],
+              ),
+      ),
     );
 
     if (onDragUpdate == null) return content;
@@ -399,7 +434,10 @@ class _RingItem extends StatelessWidget {
     final color = accentOverride ?? severityColor(device.severity, theme);
     final scaleDuration = reducedMotion
         ? Duration.zero
-        : const Duration(milliseconds: 120);
+        : const Duration(milliseconds: 150);
+    final displayValue = device.valueText.isNotEmpty
+        ? device.valueText
+        : '${(device.fraction * 100).round()}%';
 
     return MouseRegion(
       onEnter: (_) => onEnter(),
@@ -413,7 +451,7 @@ class _RingItem extends StatelessWidget {
               },
         child: Semantics(
           button: true,
-          label: '${device.name}, ${device.valueText}',
+          label: '${device.name}, $displayValue',
           hint: pinned
               ? 'Details pinned open. Activate to unpin.'
               : 'Activate to pin details open.',
@@ -432,6 +470,7 @@ class _RingItem extends StatelessWidget {
                       fraction: device.fraction,
                       color: color,
                       pinned: pinned,
+                      selected: selected,
                     ),
                     child: Center(
                       child: Icon(
@@ -440,7 +479,7 @@ class _RingItem extends StatelessWidget {
                             : device.type == StorageDeviceType.ssd
                             ? Icons.storage_rounded
                             : Icons.album_rounded,
-                        size: 14,
+                        size: 15,
                         color: color,
                       ),
                     ),
@@ -448,12 +487,12 @@ class _RingItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  device.valueText,
+                  displayValue,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,
-                    fontSize: 9.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
@@ -485,18 +524,100 @@ class _EmptyRingItem extends StatelessWidget {
             child: Center(
               child: Icon(
                 Icons.hourglass_empty_rounded,
-                size: 13,
+                size: 14,
                 color: theme.mutedText,
               ),
             ),
           ),
         ),
         const SizedBox(height: 4),
-        Text('--', style: TextStyle(color: theme.mutedText, fontSize: 9.5)),
+        Text(
+          '--',
+          style: TextStyle(
+            color: theme.mutedText,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
       ],
     );
   }
 }
+
+class _BottomActionPod extends StatefulWidget {
+  const _BottomActionPod({
+    required this.theme,
+    required this.reducedMotion,
+    this.onTap,
+  });
+
+  final EdgeDockTheme theme;
+  final bool reducedMotion;
+  final VoidCallback? onTap;
+
+  @override
+  State<_BottomActionPod> createState() => _BottomActionPodState();
+}
+
+class _BottomActionPodState extends State<_BottomActionPod> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scaleDuration = widget.reducedMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 150);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap == null
+            ? null
+            : () {
+                Focus.of(context).requestFocus();
+                widget.onTap!();
+              },
+        child: Semantics(
+          button: true,
+          label: 'Settings',
+          hint: 'Open settings and dock actions',
+          child: AnimatedScale(
+            scale: _hovered ? 1.12 : 1.0,
+            duration: scaleDuration,
+            curve: Curves.easeOutCubic,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _hovered
+                    ? widget.theme.text.withValues(alpha: 0.12)
+                    : widget.theme.background.withValues(alpha: 0.6),
+                border: Border.all(
+                  color: _hovered
+                      ? widget.theme.text.withValues(alpha: 0.3)
+                      : const Color(0xFF1E1E26),
+                  width: 1.0,
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.tune_rounded,
+                  size: 16,
+                  color: _hovered ? widget.theme.text : widget.theme.mutedText,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 /// The rows the detail panel renders for [device], given which optional
 /// [EdgeDockMetric]s are enabled - temperature is always first and always
@@ -687,20 +808,22 @@ class _RingPainter extends CustomPainter {
     required this.fraction,
     required this.color,
     this.pinned = false,
+    this.selected = false,
   });
 
   final double fraction;
   final Color color;
   final bool pinned;
+  final bool selected;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.width / 2 - 2.5;
-    const strokeWidth = 3.0;
+    const strokeWidth = 3.2;
 
     final track = Paint()
-      ..color = AppColors.bg3
+      ..color = const Color(0xFF1A1A22)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius, track);
@@ -721,15 +844,13 @@ class _RingPainter extends CustomPainter {
       );
     }
 
-    if (pinned) {
-      // A thin outer ring, distinct from the progress arc, so a pinned
-      // ring (details staying open without the pointer) reads differently
-      // from a merely-hovered one.
-      final pin = Paint()
-        ..color = color
+    if (pinned || selected) {
+      // Outer glow / indicator ring distinct from the progress arc
+      final indicator = Paint()
+        ..color = color.withValues(alpha: pinned ? 0.85 : 0.35)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
-      canvas.drawCircle(center, radius + 1.75, pin);
+        ..strokeWidth = pinned ? 1.5 : 1.0;
+      canvas.drawCircle(center, radius + 2.0, indicator);
     }
   }
 
@@ -737,8 +858,10 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(covariant _RingPainter oldDelegate) =>
       oldDelegate.fraction != fraction ||
       oldDelegate.color != color ||
-      oldDelegate.pinned != pinned;
+      oldDelegate.pinned != pinned ||
+      oldDelegate.selected != selected;
 }
+
 
 /// Debounces the "pointer left the whole dock" event by a short grace
 /// period, so a fast cursor movement between the rail and the detail card
