@@ -2,135 +2,185 @@ import 'dart:ui';
 
 import '../../domain/enums/ui_enums.dart';
 
-/// Pure geometry for the edge-docked hover panel: where the collapsed strip
-/// and expanded panel sit on a display, given the chosen edge. Kept free of
-/// window_manager/screen_retriever so it's unit-testable without a real
-/// window. See docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
+/// Pure geometry for the edge-docked hover widget: a rail of per-device
+/// ring indicators docked to a screen edge, plus a detail panel that
+/// appears beside whichever ring is hovered. Kept free of window_manager/
+/// screen_retriever so it's unit-testable without a real window. See
+/// docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
 class EdgeDockGeometry {
   const EdgeDockGeometry._();
 
-  // A rounded pill-shaped badge, not a hairline strip - thick enough to
-  // hold a small icon and value text even collapsed, closer to a "docked
-  // tab" than a bare color sliver.
-  static const double stripThickness = 40;
-  static const double stripLength = 96;
-  static const double panelWidth = 268;
-  static const double panelHeight = 224;
+  static const double ringDiameter = 40;
+  static const double itemBlockLength = 60; // ring + value label, stacked
+  static const double itemSpacing = 10;
+  static const double railPadding = 12;
+  static const double railThickness = 64;
 
-  /// The collapsed strip's rect, in screen coordinates, centered on [edge]
-  /// of a display occupying [visiblePosition]/[visibleSize].
-  static Rect stripRect(
+  static const double panelWidth = 240;
+  static const double panelHeight = 168;
+  static const double panelGap = 8;
+
+  static double railLength(int deviceCount) {
+    final count = deviceCount < 1 ? 1 : deviceCount;
+    return railPadding * 2 +
+        count * itemBlockLength +
+        (count - 1) * itemSpacing;
+  }
+
+  /// The rail's rect (the always-visible collapsed state), in screen
+  /// coordinates, centered on [edge] of a display occupying
+  /// [visiblePosition]/[visibleSize].
+  static Rect railRect(
     Offset visiblePosition,
     Size visibleSize,
     ScreenEdge edge,
+    int deviceCount,
   ) {
+    final length = railLength(deviceCount);
     switch (edge) {
       case ScreenEdge.left:
         return Rect.fromLTWH(
           visiblePosition.dx,
-          visiblePosition.dy + (visibleSize.height - stripLength) / 2,
-          stripThickness,
-          stripLength,
+          visiblePosition.dy + (visibleSize.height - length) / 2,
+          railThickness,
+          length,
         );
       case ScreenEdge.right:
         return Rect.fromLTWH(
-          visiblePosition.dx + visibleSize.width - stripThickness,
-          visiblePosition.dy + (visibleSize.height - stripLength) / 2,
-          stripThickness,
-          stripLength,
+          visiblePosition.dx + visibleSize.width - railThickness,
+          visiblePosition.dy + (visibleSize.height - length) / 2,
+          railThickness,
+          length,
         );
       case ScreenEdge.top:
         return Rect.fromLTWH(
-          visiblePosition.dx + (visibleSize.width - stripLength) / 2,
+          visiblePosition.dx + (visibleSize.width - length) / 2,
           visiblePosition.dy,
-          stripLength,
-          stripThickness,
+          length,
+          railThickness,
         );
       case ScreenEdge.bottom:
         return Rect.fromLTWH(
-          visiblePosition.dx + (visibleSize.width - stripLength) / 2,
-          visiblePosition.dy + visibleSize.height - stripThickness,
-          stripLength,
-          stripThickness,
+          visiblePosition.dx + (visibleSize.width - length) / 2,
+          visiblePosition.dy + visibleSize.height - railThickness,
+          length,
+          railThickness,
         );
     }
   }
 
-  /// The expanded panel's rect, sliding out from the same edge/anchor as
-  /// the strip.
-  static Rect panelRect(
+  /// The screen-space center of the [index]th device's ring within [rail].
+  static Offset ringCenter(Rect rail, ScreenEdge edge, int index) {
+    final along =
+        railPadding +
+        itemBlockLength / 2 +
+        index * (itemBlockLength + itemSpacing);
+    if (edge == ScreenEdge.left || edge == ScreenEdge.right) {
+      return Offset(rail.center.dx, rail.top + along);
+    }
+    return Offset(rail.left + along, rail.center.dy);
+  }
+
+  /// The detail panel's rect for a ring centered at [ringCenter], placed
+  /// beside the rail on the side that opens away from the screen edge, and
+  /// clamped so it never renders outside the display's visible bounds.
+  static Rect panelRectFor(
+    Rect rail,
+    ScreenEdge edge,
+    Offset ringCenter,
     Offset visiblePosition,
     Size visibleSize,
-    ScreenEdge edge,
   ) {
+    double left;
+    double top;
     switch (edge) {
       case ScreenEdge.left:
-        return Rect.fromLTWH(
-          visiblePosition.dx,
-          visiblePosition.dy + (visibleSize.height - panelHeight) / 2,
-          panelWidth,
-          panelHeight,
-        );
+        left = rail.right + panelGap;
+        top = ringCenter.dy - panelHeight / 2;
       case ScreenEdge.right:
-        return Rect.fromLTWH(
-          visiblePosition.dx + visibleSize.width - panelWidth,
-          visiblePosition.dy + (visibleSize.height - panelHeight) / 2,
-          panelWidth,
-          panelHeight,
-        );
+        left = rail.left - panelGap - panelWidth;
+        top = ringCenter.dy - panelHeight / 2;
       case ScreenEdge.top:
-        return Rect.fromLTWH(
-          visiblePosition.dx + (visibleSize.width - panelWidth) / 2,
-          visiblePosition.dy,
-          panelWidth,
-          panelHeight,
-        );
+        left = ringCenter.dx - panelWidth / 2;
+        top = rail.bottom + panelGap;
       case ScreenEdge.bottom:
-        return Rect.fromLTWH(
-          visiblePosition.dx + (visibleSize.width - panelWidth) / 2,
-          visiblePosition.dy + visibleSize.height - panelHeight,
-          panelWidth,
-          panelHeight,
-        );
+        left = ringCenter.dx - panelWidth / 2;
+        top = rail.top - panelGap - panelHeight;
     }
+
+    const margin = 4.0;
+    final minLeft = visiblePosition.dx + margin;
+    final maxLeft =
+        visiblePosition.dx + visibleSize.width - panelWidth - margin;
+    final minTop = visiblePosition.dy + margin;
+    final maxTop =
+        visiblePosition.dy + visibleSize.height - panelHeight - margin;
+
+    left = maxLeft < minLeft ? minLeft : left.clamp(minLeft, maxLeft);
+    top = maxTop < minTop ? minTop : top.clamp(minTop, maxTop);
+    return Rect.fromLTWH(left, top, panelWidth, panelHeight);
   }
+
+  /// The OS window rect that must contain both the rail and, if hovering,
+  /// the detail panel - window_manager only controls one rectangle, so the
+  /// two are rendered as regions within this union.
+  static Rect windowRectFor(Rect rail, Rect? panel) =>
+      panel == null ? rail : rail.expandToInclude(panel);
 }
 
-/// Decides expand/collapse from a periodically polled cursor position. A
-/// short grace period after the cursor leaves both rects avoids flicker
-/// while moving from the strip toward the panel (they aren't contiguous
-/// during the slide animation).
+/// Decides which ring (if any) is hovered from a periodically polled cursor
+/// position. The rail and the currently-shown detail panel are treated as
+/// one interactive zone - moving from a ring toward its panel keeps it
+/// open - with a short grace period before collapsing so the transition
+/// isn't flicker-prone.
 class EdgeDockHoverTracker {
   EdgeDockHoverTracker({
     this.collapseGrace = const Duration(milliseconds: 400),
+    this.ringHitRadius = EdgeDockGeometry.itemBlockLength / 2,
   });
 
   final Duration collapseGrace;
-  bool _expanded = false;
+  final double ringHitRadius;
+
+  int? _hoveredIndex;
   DateTime? _lastInsideAt;
 
-  bool get expanded => _expanded;
+  int? get hoveredIndex => _hoveredIndex;
 
-  /// Feeds one polled cursor sample in. Returns true if [expanded] changed
-  /// as a result.
+  /// Feeds one polled cursor sample in. [currentPanelRect] is the panel
+  /// rect for the *currently* hovered item (if any) - used so moving the
+  /// cursor into that panel keeps the same item selected. Returns true if
+  /// [hoveredIndex] changed as a result.
   bool update({
     required Offset cursor,
-    required Rect stripRect,
-    required Rect panelRect,
+    required Rect railRect,
+    required List<Offset> ringCenters,
+    required Rect? currentPanelRect,
     required DateTime now,
   }) {
-    final inside = stripRect.contains(cursor) || panelRect.contains(cursor);
-    if (inside) {
+    int? candidate;
+    if (railRect.contains(cursor)) {
+      for (var i = 0; i < ringCenters.length; i++) {
+        if ((ringCenters[i] - cursor).distance <= ringHitRadius) {
+          candidate = i;
+          break;
+        }
+      }
+    } else if (currentPanelRect != null && currentPanelRect.contains(cursor)) {
+      candidate = _hoveredIndex;
+    }
+
+    if (candidate != null) {
       _lastInsideAt = now;
-      if (_expanded) return false;
-      _expanded = true;
+      if (_hoveredIndex == candidate) return false;
+      _hoveredIndex = candidate;
       return true;
     }
 
-    if (!_expanded) return false;
+    if (_hoveredIndex == null) return false;
     final last = _lastInsideAt;
     if (last != null && now.difference(last) < collapseGrace) return false;
-    _expanded = false;
+    _hoveredIndex = null;
     return true;
   }
 }

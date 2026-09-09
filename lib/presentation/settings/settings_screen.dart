@@ -1060,11 +1060,28 @@ class _WidgetSection extends ConsumerWidget {
       _SettingRow(
         label: 'Edge dock color',
         isDark: isDark,
-        isLast: true,
         trailing: _EdgeDockAccentPicker(
           selected: settings.edgeDock.accent,
           onChanged: (accent) => notifier.updateWith(
             (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(accent: accent)),
+          ),
+        ),
+      ),
+      _SettingRow(
+        label: 'Edge dock opacity',
+        isDark: isDark,
+        isLast: true,
+        trailing: SizedBox(
+          width: 140,
+          child: Slider(
+            value: settings.edgeDock.opacity,
+            min: 0.4,
+            max: 1.0,
+            divisions: 12,
+            label: '${(settings.edgeDock.opacity * 100).round()}%',
+            onChanged: (v) => notifier.updateWith(
+              (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(opacity: v)),
+            ),
           ),
         ),
       ),

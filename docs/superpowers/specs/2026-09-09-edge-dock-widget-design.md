@@ -153,3 +153,84 @@ smoother hover response, and visibility over native fullscreen apps.
   it was a matter of using an already-wrapped API. Windows/Linux have no
   equivalent call in `window_manager`; their always-on-top + skip-taskbar
   behavior over fullscreen windows is unverified and left as-is.
+
+## Second follow-up revision (2026-09-09, same day): per-device rail + native hover
+
+The user reported a `RenderFlex` overflow in the badge widget and asked for
+a full redesign: a rail of individually-hoverable per-device ring
+indicators (not one worst-device badge), a detail card beside whichever
+ring is hovered, and — critically — genuinely smooth, native-feeling hover
+instead of a polling loop.
+
+### Architecture change: dropped cursor polling entirely
+
+The earlier `Timer.periodic` + `screen_retriever.getCursorScreenPoint()`
+polling loop is gone. Realization: once hover state is driven by content
+*within* the dock's own OS window, ordinary Flutter `MouseRegion` widgets
+receive real native mouse enter/exit events from the OS (NSTrackingArea on
+macOS, WM_MOUSEMOVE/WM_MOUSELEAVE on Windows, X11/Wayland motion+crossing
+events on Linux via GTK) — no polling needed at all. `screen_retriever` is
+now called exactly once per window (`getPrimaryDisplay()` at startup) to
+learn the display's bounds; it plays no role in hover detection.
+
+The window still has to be *resized* on hover (Flutter can only render
+within its own native window), so `window_manager.setBounds` is still
+called reactively from the hover-state change, not from a poll tick.
+
+### New geometry (`EdgeDockGeometry`, rewritten)
+
+- `railRect(displayPos, displaySize, edge, deviceCount)`: the collapsed
+  rail's rect, sized to fit one ring-and-label block per device
+  (`railLength` grows with `deviceCount`).
+- `ringCenter(rail, edge, index)`: screen-space center of the Nth device's
+  ring, used only to position the detail panel next to it (not for hit
+  testing — that's native `MouseRegion` now).
+- `panelRectFor(rail, edge, ringCenter, displayPos, displaySize)`: the
+  detail card's rect, opening away from the docked edge, clamped to the
+  display's visible bounds so it never renders off-screen near the top/
+  bottom (or left/right for a horizontal rail).
+- `windowRectFor(rail, panel)`: the bounding box the OS window must cover
+  to show both regions at once.
+
+`EdgeDockHoverTracker` (still pure/unit-tested) is kept as a defensive
+grace-period debounce, used in tests; in the running app the equivalent
+role is played by `EdgeDockCollapseDebouncer`, a tiny `Timer` wrapper: an
+`onExit` from the dock's outer `MouseRegion` schedules a collapse ~150ms
+out, cancelled if hover resumes first.
+
+### Content (`edge_dock_view.dart`, rewritten)
+
+- `EdgeDockContent`: one `MouseRegion`-wrapped `Stack` containing the rail
+  (`Positioned.fromRect`) and, when a ring is hovered, the detail card
+  (`Positioned.fromRect`) — both positioned in window-local coordinates
+  (screen rect minus the window's current origin). Because both live
+  inside one `MouseRegion`, moving the cursor from a ring to its card is
+  invisible to hover tracking - `onExit` only fires when the cursor leaves
+  the window entirely.
+- Each ring (`_RingItem`) is its own `MouseRegion` reporting its index on
+  `onEnter`, with a small `AnimatedScale` (120ms) for hover feedback.
+- The detail card (`_DetailCard`) shows the hovered device's name plus
+  whichever of temperature/health/SMART status/power-on hours/read+write
+  speed/free capacity are non-null on the existing `MiniWidgetDeviceSnapshot`
+  - no new data plumbing; this was already exactly the field set the
+  mini-widget snapshot pipeline provides.
+
+### Settings addition: opacity
+
+`EdgeDockSettings.opacity` (0.4-1.0, default 1.0) added alongside `accent`,
+applied via `window_manager.setOpacity` (the same mechanism the existing
+mini-widget already uses for its own opacity setting) - whole-window
+opacity, not a separate background-only alpha channel, kept simple.
+
+### Explicitly not built (scope discipline given the size of the request)
+
+- Multi-monitor picker - still primary-display only.
+- A fully generic arbitrary-color picker - still a fixed accent palette.
+- Per-metric visibility toggles, keyboard navigation, reduced-motion
+  preference - not implemented; the existing fixed field set and
+  mouse-only interaction cover the core ask without an open-ended settings
+  surface.
+- A separate `MonitorWidgetTheme` class with independently configurable
+  success/warning/danger colors - reuses the app's existing `AppColors`
+  severity palette instead, consistent with how every other screen in the
+  app already sources its severity colors.

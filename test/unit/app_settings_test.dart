@@ -4,11 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('EdgeDockSettings', () {
-    test('defaults to disabled, docked right, auto accent', () {
+    test('defaults to disabled, docked right, auto accent, full opacity', () {
       const settings = EdgeDockSettings();
       expect(settings.enabled, isFalse);
       expect(settings.edge, ScreenEdge.right);
       expect(settings.accent, EdgeDockAccent.auto);
+      expect(settings.opacity, 1.0);
     });
 
     test('copyWith updates only the given fields', () {
@@ -17,10 +18,12 @@ void main() {
         enabled: true,
         edge: ScreenEdge.left,
         accent: EdgeDockAccent.purple,
+        opacity: 0.8,
       );
       expect(updated.enabled, isTrue);
       expect(updated.edge, ScreenEdge.left);
       expect(updated.accent, EdgeDockAccent.purple);
+      expect(updated.opacity, 0.8);
     });
 
     test('round-trips through JSON', () {
@@ -28,11 +31,13 @@ void main() {
         enabled: true,
         edge: ScreenEdge.top,
         accent: EdgeDockAccent.teal,
+        opacity: 0.75,
       );
       final restored = EdgeDockSettings.fromJson(settings.toJson());
       expect(restored.enabled, isTrue);
       expect(restored.edge, ScreenEdge.top);
       expect(restored.accent, EdgeDockAccent.teal);
+      expect(restored.opacity, 0.75);
     });
 
     test('falls back to defaults on malformed JSON', () {

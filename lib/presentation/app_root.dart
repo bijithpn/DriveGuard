@@ -194,6 +194,7 @@ class _AppRootState extends ConsumerState<AppRoot>
         settings.edgeDock.enabled,
         settings.edgeDock.edge,
         accent: settings.edgeDock.accent,
+        opacity: settings.edgeDock.opacity,
       );
       return;
     }
@@ -238,6 +239,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       settings.edgeDock.enabled,
       settings.edgeDock.edge,
       accent: settings.edgeDock.accent,
+      opacity: settings.edgeDock.opacity,
     );
   }
 
@@ -391,6 +393,7 @@ class _AppRootState extends ConsumerState<AppRoot>
     bool shouldBeActive,
     ScreenEdge edge, {
     EdgeDockAccent accent = EdgeDockAccent.auto,
+    double opacity = 1.0,
   }) async {
     if (_edgeDockSyncInFlight) return;
     final alreadyActive = ref.read(edgeDockActiveProvider);
@@ -402,6 +405,7 @@ class _AppRootState extends ConsumerState<AppRoot>
         await widget.windowController.enterEdgeDockMode(
           edge.name,
           accentName: accent.name,
+          opacity: opacity,
           initialSnapshot: initialSnapshot,
         );
         ref.read(edgeDockActiveProvider.notifier).state = true;
@@ -496,22 +500,40 @@ class _AppRootState extends ConsumerState<AppRoot>
       settingsProvider.select((s) => s.widget.enabled),
       (previous, enabled) => _syncWidgetMode(enabled),
     );
-    ref.listen<(bool, ScreenEdge, EdgeDockAccent)>(
+    ref.listen<(bool, ScreenEdge, EdgeDockAccent, double)>(
       settingsProvider.select(
-        (s) => (s.edgeDock.enabled, s.edgeDock.edge, s.edgeDock.accent),
+        (s) => (
+          s.edgeDock.enabled,
+          s.edgeDock.edge,
+          s.edgeDock.accent,
+          s.edgeDock.opacity,
+        ),
       ),
       (previous, next) async {
-        final (enabled, edge, accent) = next;
+        final (enabled, edge, accent, opacity) = next;
         final dockedConfigChanged =
             previous != null &&
             previous.$1 &&
             enabled &&
-            (previous.$2 != edge || previous.$3 != accent);
+            (previous.$2 != edge ||
+                previous.$3 != accent ||
+                previous.$4 != opacity);
         if (dockedConfigChanged) {
-          // Edge or accent changed while already docked - re-dock to apply it.
-          await _syncEdgeDockMode(false, previous.$2, accent: previous.$3);
+          // Edge/accent/opacity changed while already docked - re-dock to
+          // apply it.
+          await _syncEdgeDockMode(
+            false,
+            previous.$2,
+            accent: previous.$3,
+            opacity: previous.$4,
+          );
         }
-        await _syncEdgeDockMode(enabled, edge, accent: accent);
+        await _syncEdgeDockMode(
+          enabled,
+          edge,
+          accent: accent,
+          opacity: opacity,
+        );
       },
     );
     ref.listen(settingsProvider, (previous, next) {

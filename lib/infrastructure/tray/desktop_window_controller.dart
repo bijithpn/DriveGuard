@@ -153,6 +153,7 @@ class DesktopWindowController with WindowListener {
   Future<void> enterEdgeDockMode(
     String edgeName, {
     String accentName = 'auto',
+    double opacity = 1.0,
     MiniWidgetSnapshot? initialSnapshot,
   }) async {
     if (_edgeDockWindow != null) {
@@ -176,6 +177,7 @@ class DesktopWindowController with WindowListener {
         'mode': 'edgeDock',
         'edge': edgeName,
         'accent': accentName,
+        'opacity': opacity,
       };
       if (initialSnapshot != null) {
         args['snapshot'] = initialSnapshot.toJson();

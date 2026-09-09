@@ -87,26 +87,31 @@ class EdgeDockSettings {
     this.enabled = false,
     this.edge = ScreenEdge.right,
     this.accent = EdgeDockAccent.auto,
+    this.opacity = 1.0,
   });
 
   final bool enabled;
   final ScreenEdge edge;
   final EdgeDockAccent accent;
+  final double opacity;
 
   EdgeDockSettings copyWith({
     bool? enabled,
     ScreenEdge? edge,
     EdgeDockAccent? accent,
+    double? opacity,
   }) => EdgeDockSettings(
     enabled: enabled ?? this.enabled,
     edge: edge ?? this.edge,
     accent: accent ?? this.accent,
+    opacity: opacity ?? this.opacity,
   );
 
   Map<String, dynamic> toJson() => {
     'enabled': enabled,
     'edge': edge.name,
     'accent': accent.name,
+    'opacity': opacity,
   };
 
   factory EdgeDockSettings.fromJson(Map<String, dynamic> json) =>
@@ -120,6 +125,7 @@ class EdgeDockSettings {
           (a) => a.name == json['accent'],
           orElse: () => EdgeDockAccent.auto,
         ),
+        opacity: (json['opacity'] as num?)?.toDouble() ?? 1.0,
       );
 }
 
