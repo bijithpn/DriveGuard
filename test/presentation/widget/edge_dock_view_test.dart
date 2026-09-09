@@ -191,4 +191,115 @@ void main() {
       expect(hasOrganicPainter, isTrue);
     });
   });
+
+  group('Collapsed & Expanded State Machine', () {
+    testWidgets('collapsed state (expansionProgress == 0.0) hides rings and pod with opacity 0', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: EdgeDockContent(
+              snapshot: testSnapshot,
+              edge: ScreenEdge.right,
+              accentOverride: null,
+              hoveredIndex: null,
+              onHover: (_) {},
+              railLocalRect: const Rect.fromLTWH(0, 0, 68, 300),
+              panelLocalRect: null,
+              isExpanded: false,
+              expansionProgress: 0.0,
+            ),
+          ),
+        ),
+      );
+
+      final opacities = tester
+          .widgetList<Opacity>(find.byType(Opacity))
+          .map((o) => o.opacity)
+          .toList();
+      expect(opacities.every((op) => op == 0.0), isTrue);
+
+      final customPaints = tester.widgetList<CustomPaint>(find.byType(CustomPaint));
+      final painter = customPaints
+          .map((cp) => cp.painter)
+          .whereType<EdgeDockOrganicPainter>()
+          .first;
+      expect(painter.expansionProgress, 0.0);
+    });
+
+    testWidgets('expanded state (expansionProgress == 1.0) renders all rings and pod', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: EdgeDockContent(
+              snapshot: testSnapshot,
+              edge: ScreenEdge.left,
+              accentOverride: null,
+              hoveredIndex: null,
+              onHover: (_) {},
+              railLocalRect: const Rect.fromLTWH(0, 0, 68, 300),
+              panelLocalRect: null,
+              isExpanded: true,
+              expansionProgress: 1.0,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('42°C'), findsOneWidget);
+      expect(find.text('58°C'), findsOneWidget);
+      expect(find.text('35°C'), findsOneWidget);
+      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+    });
+
+    testWidgets('triggers onMouseEnterDock and onMouseExitDock on dock boundary', (
+      tester,
+    ) async {
+      var entered = false;
+      var exited = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: SizedBox(
+              width: 400,
+              height: 400,
+              child: EdgeDockContent(
+                snapshot: testSnapshot,
+                edge: ScreenEdge.left,
+                accentOverride: null,
+                hoveredIndex: null,
+                onHover: (_) {},
+                railLocalRect: const Rect.fromLTWH(0, 0, 68, 300),
+                panelLocalRect: null,
+                isExpanded: true,
+                expansionProgress: 1.0,
+                onMouseEnterDock: () => entered = true,
+                onMouseExitDock: () => exited = true,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(gesture.removePointer);
+      await gesture.addPointer(location: const Offset(500, 500));
+      await tester.pump();
+
+      await gesture.moveTo(const Offset(30, 100));
+      await tester.pump();
+      expect(entered, isTrue);
+
+      await gesture.moveTo(const Offset(600, 600));
+      await tester.pump();
+      expect(exited, isTrue);
+    });
+  });
 }

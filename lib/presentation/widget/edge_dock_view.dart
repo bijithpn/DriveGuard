@@ -141,6 +141,10 @@ class EdgeDockContent extends StatelessWidget {
     this.onDragEnd,
     this.theme = EdgeDockTheme.defaults,
     this.visibleMetrics = kAllEdgeDockMetrics,
+    this.isExpanded = true,
+    this.expansionProgress = 1.0,
+    this.onMouseEnterDock,
+    this.onMouseExitDock,
   });
 
   final MiniWidgetSnapshot snapshot;
@@ -159,6 +163,10 @@ class EdgeDockContent extends StatelessWidget {
   final Rect? panelLocalRect;
   final EdgeDockTheme theme;
   final Set<EdgeDockMetric> visibleMetrics;
+  final bool isExpanded;
+  final double expansionProgress;
+  final VoidCallback? onMouseEnterDock;
+  final VoidCallback? onMouseExitDock;
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
@@ -204,7 +212,11 @@ class EdgeDockContent extends StatelessWidget {
       skipTraversal: true,
       onKeyEvent: _handleKey,
       child: MouseRegion(
-        onExit: (_) => onHover(null),
+        onEnter: (_) => onMouseEnterDock?.call(),
+        onExit: (_) {
+          onMouseExitDock?.call();
+          onHover(null);
+        },
         child: Stack(
           children: [
             const Positioned.fill(child: SizedBox.expand()),
@@ -224,11 +236,14 @@ class EdgeDockContent extends StatelessWidget {
                 accentOverride: accentOverride,
                 theme: theme,
                 reducedMotion: reducedMotion,
+                isExpanded: isExpanded,
+                expansionProgress: expansionProgress,
               ),
             ),
             if (displayed != null &&
                 panelRect != null &&
-                displayed < devices.length)
+                displayed < devices.length &&
+                expansionProgress > 0.3)
               Positioned.fromRect(
                 rect: panelRect,
                 child: _DetailCard(
@@ -275,6 +290,8 @@ class _Rail extends StatelessWidget {
     this.onDragStart,
     this.onDragUpdate,
     this.onDragEnd,
+    this.isExpanded = true,
+    this.expansionProgress = 1.0,
   });
 
   final List<MiniWidgetDeviceSnapshot> devices;
@@ -290,6 +307,8 @@ class _Rail extends StatelessWidget {
   final Color? accentOverride;
   final EdgeDockTheme theme;
   final bool reducedMotion;
+  final bool isExpanded;
+  final double expansionProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -321,6 +340,76 @@ class _Rail extends StatelessWidget {
       onTap: onTapActionPod,
     );
 
+    final animatedItems = <Widget>[];
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+      if (expansionProgress >= 1.0) {
+        animatedItems.add(item);
+        continue;
+      }
+      final staggerDelay = (i * 0.05).clamp(0.0, 0.3);
+      final itemProgress = reducedMotion
+          ? (expansionProgress > 0.0 ? 1.0 : 0.0)
+          : ((expansionProgress - staggerDelay) / (1.0 - staggerDelay)).clamp(0.0, 1.0);
+      final curvedItemProgress = Curves.easeOutCubic.transform(itemProgress);
+
+      final slideDistance = 14.0 * (1.0 - curvedItemProgress);
+      Offset slideOffset;
+      switch (edge) {
+        case ScreenEdge.left:
+          slideOffset = Offset(-slideDistance, 0);
+        case ScreenEdge.right:
+          slideOffset = Offset(slideDistance, 0);
+        case ScreenEdge.top:
+          slideOffset = Offset(0, -slideDistance);
+        case ScreenEdge.bottom:
+          slideOffset = Offset(0, slideDistance);
+      }
+
+      animatedItems.add(
+        Transform.translate(
+          offset: slideOffset,
+          child: Opacity(
+            opacity: curvedItemProgress,
+            child: IgnorePointer(
+              ignoring: curvedItemProgress < 0.5,
+              child: item,
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget animatedPod = pod;
+    if (expansionProgress < 1.0) {
+      final podProgress = reducedMotion
+          ? (expansionProgress > 0.0 ? 1.0 : 0.0)
+          : ((expansionProgress - 0.15) / 0.85).clamp(0.0, 1.0);
+      final curvedPodProgress = Curves.easeOutCubic.transform(podProgress);
+      final podSlideDistance = 14.0 * (1.0 - curvedPodProgress);
+      Offset podSlideOffset;
+      switch (edge) {
+        case ScreenEdge.left:
+          podSlideOffset = Offset(-podSlideDistance, 0);
+        case ScreenEdge.right:
+          podSlideOffset = Offset(podSlideDistance, 0);
+        case ScreenEdge.top:
+          podSlideOffset = Offset(0, -podSlideDistance);
+        case ScreenEdge.bottom:
+          podSlideOffset = Offset(0, podSlideDistance);
+      }
+      animatedPod = Transform.translate(
+        offset: podSlideOffset,
+        child: Opacity(
+          opacity: curvedPodProgress,
+          child: IgnorePointer(
+            ignoring: curvedPodProgress < 0.5,
+            child: pod,
+          ),
+        ),
+      );
+    }
+
     final content = CustomPaint(
       painter: EdgeDockOrganicPainter(
         edge: edge,
@@ -332,6 +421,8 @@ class _Rail extends StatelessWidget {
         podSpacing: 10.0,
         showPod: true,
         dockDepth: EdgeDockGeometry.railThickness,
+        collapsedDepth: EdgeDockGeometry.collapsedThickness,
+        expansionProgress: expansionProgress,
       ),
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -344,10 +435,10 @@ class _Rail extends StatelessWidget {
                 children: [
                   Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: _withSpacing(items, vertical: true),
+                    children: _withSpacing(animatedItems, vertical: true),
                   ),
                   const SizedBox(height: 10),
-                  pod,
+                  animatedPod,
                 ],
               )
             : Row(
@@ -355,10 +446,10 @@ class _Rail extends StatelessWidget {
                 children: [
                   Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: _withSpacing(items, vertical: false),
+                    children: _withSpacing(animatedItems, vertical: false),
                   ),
                   const SizedBox(width: 10),
-                  pod,
+                  animatedPod,
                 ],
               ),
       ),

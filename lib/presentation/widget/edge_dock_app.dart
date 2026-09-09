@@ -36,7 +36,8 @@ class EdgeDockApp extends StatefulWidget {
   State<EdgeDockApp> createState() => _EdgeDockAppState();
 }
 
-class _EdgeDockAppState extends State<EdgeDockApp> {
+class _EdgeDockAppState extends State<EdgeDockApp>
+    with SingleTickerProviderStateMixin {
   static const _tag = 'EdgeDockApp';
 
   MiniWidgetSnapshot _snapshot = MiniWidgetSnapshot.empty;
@@ -51,6 +52,10 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
   late Set<EdgeDockMetric> _visibleMetrics;
   late double _alongOffset;
   int? _hoveredIndex;
+  bool _isHoveredDock = false;
+
+  late final AnimationController _expansionController;
+  late final Animation<double> _expansionAnimation;
 
   // Set by clicking a ring (or pressing Enter/Space while it's keyboard-
   // focused) - keeps the detail panel open without the pointer needing to
@@ -101,6 +106,19 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
         _snapshot = MiniWidgetSnapshot.fromJson(snapJson);
       } catch (_) {}
     }
+
+    _expansionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+    );
+    _expansionAnimation = CurvedAnimation(
+      parent: _expansionController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    )..addListener(() {
+        if (mounted) setState(() {});
+      });
+
     kEdgeDockChannel.setMethodCallHandler(_handleMethodCall);
     unawaited(kEdgeDockChannel.invokeMethod('ready').catchError((_) {}));
     unawaited(_initWindow());
@@ -108,6 +126,7 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
 
   @override
   void dispose() {
+    _expansionController.dispose();
     _collapseDebouncer.dispose();
     super.dispose();
   }
@@ -219,6 +238,17 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
     alongOffset: _alongOffset,
   );
 
+  Rect get _collapsedRailRect => EdgeDockGeometry.collapsedRailRect(
+    _displayPosition,
+    _displaySize,
+    _edge,
+    _snapshot.devices.length,
+    alongOffset: _alongOffset,
+  );
+
+  bool get _isExpanded =>
+      _isHoveredDock || _pinnedIndex != null || _expansionController.value > 0;
+
   /// Which device's ring is shown expanded: pinned (click/keyboard) wins
   /// over merely hovered.
   int? get _displayedIndex => _pinnedIndex ?? _hoveredIndex;
@@ -242,8 +272,14 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
 
   Future<void> _applyWindowBounds() async {
     final rail = _railRect;
+    final collapsedRail = _collapsedRailRect;
     final panel = _panelRect;
-    final windowRect = EdgeDockGeometry.windowRectFor(rail, panel);
+    final windowRect = EdgeDockGeometry.windowRectFor(
+      rail,
+      panel,
+      collapsedRail: collapsedRail,
+      isExpanded: _isExpanded,
+    );
     // Update the origin - and rebuild - before awaiting the native resize,
     // not after. With an animated native resize, the OS window kept
     // growing for ~200-300ms while Flutter had already redrawn assuming
@@ -262,9 +298,40 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
     }
   }
 
+  void _onMouseEnterDock() {
+    _collapseDebouncer.cancel();
+    _isHoveredDock = true;
+    final wasDismissed = _expansionController.value == 0.0;
+    if (wasDismissed) {
+      unawaited(_applyWindowBounds());
+    }
+    _expansionController.forward();
+  }
+
+  void _onMouseExitDock() {
+    _isHoveredDock = false;
+    if (_pinnedIndex != null) return;
+    _collapseDebouncer.schedule(() {
+      if (!mounted || _isHoveredDock || _pinnedIndex != null) return;
+      setState(() {
+        _hoveredIndex = null;
+      });
+      unawaited(_applyWindowBounds());
+      _expansionController.reverse().then((_) {
+        if (mounted && !_isHoveredDock && _pinnedIndex == null) {
+          unawaited(_applyWindowBounds());
+        }
+      });
+    });
+  }
+
   void _onHover(int? index) {
     if (index != null) {
       _collapseDebouncer.cancel();
+      _isHoveredDock = true;
+      if (_expansionController.value < 1.0) {
+        _expansionController.forward();
+      }
       if (_hoveredIndex == index) return;
       setState(() => _hoveredIndex = index);
       unawaited(_applyWindowBounds());
@@ -278,14 +345,7 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
       setState(() => _hoveredIndex = null);
       return;
     }
-    // Debounced: a fast cursor movement across the rail/panel boundary can
-    // report a same-frame exit+re-enter, and collapsing instantly would
-    // flicker. Cancelled above if hover resumes before the grace elapses.
-    _collapseDebouncer.schedule(() {
-      if (!mounted) return;
-      setState(() => _hoveredIndex = null);
-      unawaited(_applyWindowBounds());
-    });
+    _onMouseExitDock();
   }
 
   /// Toggles the pin on [index]: clicking (or pressing Enter/Space) an
@@ -294,8 +354,16 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
   void _onTapRing(int? index) {
     final next = (index == null || _pinnedIndex == index) ? null : index;
     if (next == _pinnedIndex) return;
-    setState(() => _pinnedIndex = next);
+    setState(() {
+      _pinnedIndex = next;
+      if (next != null) {
+        _expansionController.value = 1.0;
+      }
+    });
     unawaited(_applyWindowBounds());
+    if (next == null && !_isHoveredDock) {
+      _onMouseExitDock();
+    }
   }
 
   /// Arrow-key rail navigation, reusing the same hover mechanism the mouse
@@ -305,6 +373,9 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
   void _onArrowKey({required bool forward}) {
     final count = _snapshot.devices.length;
     if (count == 0) return;
+    if (_expansionController.value < 1.0) {
+      _expansionController.forward();
+    }
     final current = _displayedIndex ?? -1;
     final next = forward
         ? (current + 1) % count
@@ -358,6 +429,10 @@ class _EdgeDockAppState extends State<EdgeDockApp> {
           panelLocalRect: panel?.shift(-_windowOrigin),
           theme: _theme,
           visibleMetrics: _visibleMetrics,
+          isExpanded: _isExpanded,
+          expansionProgress: _expansionAnimation.value,
+          onMouseEnterDock: _onMouseEnterDock,
+          onMouseExitDock: _onMouseExitDock,
         ),
       ),
     );

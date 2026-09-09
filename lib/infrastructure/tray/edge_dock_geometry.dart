@@ -16,7 +16,8 @@ class EdgeDockGeometry {
   static const double itemBlockLength = 60; // ring + value label, stacked
   static const double itemSpacing = 10;
   static const double railPadding = 12;
-  static const double railThickness = 64;
+  static const double railThickness = 68;
+  static const double collapsedThickness = 14;
 
   static const double panelWidth = 240;
   static const double panelGap = 8;
@@ -54,7 +55,7 @@ class EdgeDockGeometry {
         (count - 1) * itemSpacing;
   }
 
-  /// The rail's rect (the always-visible collapsed state), in screen
+  /// The rail's rect (the always-visible expanded state), in screen
   /// coordinates, centered on [edge] of a display occupying
   /// [visiblePosition]/[visibleSize] and shifted along the edge by
   /// [alongOffset] (positive = down for left/right, right for top/bottom) -
@@ -121,6 +122,68 @@ class EdgeDockGeometry {
     }
   }
 
+  /// The minimal screen rect for the collapsed state along the configured [edge],
+  /// centered and shifted by [alongOffset] identically to [railRect].
+  static Rect collapsedRailRect(
+    Offset visiblePosition,
+    Size visibleSize,
+    ScreenEdge edge,
+    int deviceCount, {
+    double alongOffset = 0,
+  }) {
+    final length = railLength(deviceCount);
+    switch (edge) {
+      case ScreenEdge.left:
+        return Rect.fromLTWH(
+          visiblePosition.dx,
+          _clampAlong(
+            visiblePosition.dy +
+                (visibleSize.height - length) / 2 +
+                alongOffset,
+            visiblePosition.dy,
+            visiblePosition.dy + visibleSize.height - length,
+          ),
+          collapsedThickness,
+          length,
+        );
+      case ScreenEdge.right:
+        return Rect.fromLTWH(
+          visiblePosition.dx + visibleSize.width - collapsedThickness,
+          _clampAlong(
+            visiblePosition.dy +
+                (visibleSize.height - length) / 2 +
+                alongOffset,
+            visiblePosition.dy,
+            visiblePosition.dy + visibleSize.height - length,
+          ),
+          collapsedThickness,
+          length,
+        );
+      case ScreenEdge.top:
+        return Rect.fromLTWH(
+          _clampAlong(
+            visiblePosition.dx + (visibleSize.width - length) / 2 + alongOffset,
+            visiblePosition.dx,
+            visiblePosition.dx + visibleSize.width - length,
+          ),
+          visiblePosition.dy,
+          length,
+          collapsedThickness,
+        );
+      case ScreenEdge.bottom:
+        return Rect.fromLTWH(
+          _clampAlong(
+            visiblePosition.dx + (visibleSize.width - length) / 2 + alongOffset,
+            visiblePosition.dx,
+            visiblePosition.dx + visibleSize.width - length,
+          ),
+          visiblePosition.dy + visibleSize.height - collapsedThickness,
+          length,
+          collapsedThickness,
+        );
+    }
+  }
+
   static double _clampAlong(double value, double min, double max) =>
       max < min ? min : value.clamp(min, max);
 
@@ -180,11 +243,19 @@ class EdgeDockGeometry {
     return Rect.fromLTWH(left, top, panelWidth, panelHeight);
   }
 
-  /// The OS window rect that must contain both the rail and, if hovering,
-  /// the detail panel - window_manager only controls one rectangle, so the
-  /// two are rendered as regions within this union.
-  static Rect windowRectFor(Rect rail, Rect? panel) =>
-      panel == null ? rail : rail.expandToInclude(panel);
+  /// The OS window rect that must contain either the collapsed trigger, the
+  /// expanded rail, or both the rail and the detail panel.
+  static Rect windowRectFor(
+    Rect rail,
+    Rect? panel, {
+    Rect? collapsedRail,
+    bool isExpanded = true,
+  }) {
+    if (!isExpanded && collapsedRail != null && panel == null) {
+      return collapsedRail;
+    }
+    return panel == null ? rail : rail.expandToInclude(panel);
+  }
 
   /// Picks the display the dock should attach to: the one whose `id`
   /// matches [displayId], or [primary] if [displayId] is `null` or no
