@@ -46,8 +46,12 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
       );
       // WHEA (Windows Hardware Error Architecture) uncorrectable error
       // EventID 18 = hardware error, EventID 19 = hardware error (critical)
-      events.addAll(await _query('System', 18, 'WHEA-Logger', 'hardware-error'));
-      events.addAll(await _query('System', 19, 'WHEA-Logger', 'hardware-error'));
+      events.addAll(
+        await _query('System', 18, 'WHEA-Logger', 'hardware-error'),
+      );
+      events.addAll(
+        await _query('System', 19, 'WHEA-Logger', 'hardware-error'),
+      );
 
       // ── Storage / disk errors ─────────────────────────────────────────
       // Disk 7: "The device \Device\... has a bad block" / IO error
@@ -55,17 +59,11 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
       // Disk 11: "The driver detected a controller error"
       events.addAll(await _query('System', 11, 'disk', 'storage-error'));
       // StorPort 129: device did not respond in time
-      events.addAll(
-        await _query('System', 129, 'storahci', 'storage-error'),
-      );
+      events.addAll(await _query('System', 129, 'storahci', 'storage-error'));
       // StorPort 153: Windows attempted to reset device
-      events.addAll(
-        await _query('System', 153, 'storahci', 'storage-error'),
-      );
+      events.addAll(await _query('System', 153, 'storahci', 'storage-error'));
       // NTFS 55: file system is corrupt / dirty
-      events.addAll(
-        await _query('System', 55, 'Ntfs', 'storage-error'),
-      );
+      events.addAll(await _query('System', 55, 'Ntfs', 'storage-error'));
 
       // ── Memory diagnostics ────────────────────────────────────────────
       // MemoryDiagnostics-Results 1201/1202: hardware memory problem detected
@@ -226,9 +224,7 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
         }
 
         // Also capture hex stop code (0x0000xxxx)
-        final hexMatch = RegExp(
-          r'0x[0-9A-Fa-f]{4,16}',
-        ).firstMatch(block);
+        final hexMatch = RegExp(r'0x[0-9A-Fa-f]{4,16}').firstMatch(block);
         errorCode = hexMatch?.group(0);
 
         // Prefer the human-readable name as the error code shown in UI
@@ -247,12 +243,11 @@ class WindowsSystemDiagnostics implements SystemDiagnostics {
       // For BSoD events, try to extract a meaningful description
       String summary;
       if (category == 'kernel-panic' && stopCodeName != null) {
-        final bugcheckParam =
-            RegExp(r'BugcheckParameter1\s*:\s*(0x[0-9A-Fa-f]+)')
-                .firstMatch(block)
-                ?.group(1);
-        summary = stopCodeName +
-            (bugcheckParam != null ? ' ($bugcheckParam)' : '');
+        final bugcheckParam = RegExp(
+          r'BugcheckParameter1\s*:\s*(0x[0-9A-Fa-f]+)',
+        ).firstMatch(block)?.group(1);
+        summary =
+            stopCodeName + (bugcheckParam != null ? ' ($bugcheckParam)' : '');
       } else {
         // Default: first few non-empty lines of the block
         final lines = block

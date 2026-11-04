@@ -34,6 +34,11 @@ class AppDatabase {
       dbPath,
       options: OpenDatabaseOptions(
         version: _schemaVersion,
+        onConfigure: (db) async {
+          // WAL: readers don't block the frequent small writes.
+          await db.rawQuery('PRAGMA journal_mode=WAL');
+          await db.execute('PRAGMA synchronous=NORMAL');
+        },
         onCreate: (db, version) async {
           await _createSchema(db);
         },

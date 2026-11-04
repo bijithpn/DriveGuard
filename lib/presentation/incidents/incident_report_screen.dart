@@ -303,7 +303,7 @@ class _HeaderCard extends StatelessWidget {
                                   ShutdownClassification.kernelPanic
                           ? Icons.report_rounded
                           : incident.classification ==
-                                  ShutdownClassification.possiblePowerLoss
+                                ShutdownClassification.possiblePowerLoss
                           ? Icons.power_off_rounded
                           : Icons.warning_amber_rounded,
                       size: 13,
@@ -544,7 +544,8 @@ class _BsodBannerState extends State<_BsodBanner> {
   };
 
   static String _descriptionFor(String? code) {
-    if (code == null) return 'A critical system error caused the computer to stop.';
+    if (code == null)
+      return 'A critical system error caused the computer to stop.';
     // For OOM events like 'OOM: firefox', give a generic OOM description
     if (code.startsWith('OOM:')) {
       final process = code.substring(4).trim();
@@ -784,7 +785,6 @@ class _NavButton extends StatelessWidget {
   }
 }
 
-
 class _TimelineChart extends StatelessWidget {
   const _TimelineChart({required this.incident, required this.isDark});
   final ShutdownIncident incident;
@@ -831,7 +831,9 @@ class _TimelineChart extends StatelessWidget {
     final dataMin = values.reduce((a, b) => a < b ? a : b);
     final dataMax = values.reduce((a, b) => a > b ? a : b);
     // Make sure threshold lines are visible in the chart bounds
-    final effectiveMax = dataMax < _critThreshold ? _critThreshold + 4 : dataMax;
+    final effectiveMax = dataMax < _critThreshold
+        ? _critThreshold + 4
+        : dataMax;
     final minY = (dataMin - 8).clamp(0, double.infinity).toDouble();
     final maxY = effectiveMax + 8;
 
@@ -893,8 +895,7 @@ class _TimelineChart extends StatelessWidget {
                       showTitles: true,
                       reservedSize: 24,
                       getTitlesWidget: (value, meta) {
-                        final t =
-                            start.add(Duration(seconds: value.round()));
+                        final t = start.add(Duration(seconds: value.round()));
                         return SideTitleWidget(
                           axisSide: meta.axisSide,
                           child: Text(
@@ -943,7 +944,8 @@ class _TimelineChart extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                             color: AppColors.warning,
                           ),
-                          labelResolver: (_) => 'WARN ${_warnThreshold.round()}°',
+                          labelResolver: (_) =>
+                              'WARN ${_warnThreshold.round()}°',
                         ),
                       ),
                     // Critical threshold
@@ -962,7 +964,8 @@ class _TimelineChart extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                             color: AppColors.critical,
                           ),
-                          labelResolver: (_) => 'CRIT ${_critThreshold.round()}°',
+                          labelResolver: (_) =>
+                              'CRIT ${_critThreshold.round()}°',
                         ),
                       ),
                   ],
@@ -1006,23 +1009,23 @@ class _TimelineChart extends StatelessWidget {
                         });
                       },
                       getDotPainter: (spot, pct, bar, idx) {
-                        final match = eventSamples.cast<TimelineSample?>().firstWhere(
-                          (s) {
-                            final x = s!.timestamp
-                                .difference(start)
-                                .inSeconds
-                                .toDouble();
-                            return (spot.x - x).abs() < 0.5;
-                          },
-                          orElse: () => null,
-                        );
+                        final match = eventSamples
+                            .cast<TimelineSample?>()
+                            .firstWhere((s) {
+                              final x = s!.timestamp
+                                  .difference(start)
+                                  .inSeconds
+                                  .toDouble();
+                              return (spot.x - x).abs() < 0.5;
+                            }, orElse: () => null);
                         final color = _spotColor(match?.label);
                         return FlDotCirclePainter(
                           radius: 4,
                           color: color,
                           strokeWidth: 1.5,
-                          strokeColor:
-                              isDark ? AppColors.bg1 : AppColors.lightCard,
+                          strokeColor: isDark
+                              ? AppColors.bg1
+                              : AppColors.lightCard,
                         );
                       },
                     ),
@@ -1106,9 +1109,7 @@ class _TimelineChart extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: color.withValues(alpha: 0.28),
-                    ),
+                    border: Border.all(color: color.withValues(alpha: 0.28)),
                   ),
                   child: RichText(
                     text: TextSpan(
@@ -1253,7 +1254,6 @@ class _LinePainter extends CustomPainter {
   bool shouldRepaint(_LinePainter old) =>
       old.color != color || old.dashed != dashed || old.vertical != vertical;
 }
-
 
 class _DeviceStatRow extends StatelessWidget {
   const _DeviceStatRow({required this.stat, required this.isDark});

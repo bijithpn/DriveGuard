@@ -350,7 +350,10 @@ class _Rail extends StatelessWidget {
       final staggerDelay = (i * 0.05).clamp(0.0, 0.3);
       final itemProgress = reducedMotion
           ? (expansionProgress > 0.0 ? 1.0 : 0.0)
-          : ((expansionProgress - staggerDelay) / (1.0 - staggerDelay)).clamp(0.0, 1.0);
+          : ((expansionProgress - staggerDelay) / (1.0 - staggerDelay)).clamp(
+              0.0,
+              1.0,
+            );
       final curvedItemProgress = Curves.easeOutCubic.transform(itemProgress);
 
       final slideDistance = 14.0 * (1.0 - curvedItemProgress);
@@ -402,10 +405,7 @@ class _Rail extends StatelessWidget {
         offset: podSlideOffset,
         child: Opacity(
           opacity: curvedPodProgress,
-          child: IgnorePointer(
-            ignoring: curvedPodProgress < 0.5,
-            child: pod,
-          ),
+          child: IgnorePointer(ignoring: curvedPodProgress < 0.5, child: pod),
         ),
       );
     }
@@ -428,7 +428,9 @@ class _Rail extends StatelessWidget {
       child: ClipRect(
         child: Container(
           padding: EdgeInsets.symmetric(
-            horizontal: isVerticalEdge(edge) ? 12 : EdgeDockGeometry.filletRadius,
+            horizontal: isVerticalEdge(edge)
+                ? 12
+                : EdgeDockGeometry.filletRadius,
             vertical: isVerticalEdge(edge) ? EdgeDockGeometry.filletRadius : 12,
           ),
           child: vertical
@@ -734,7 +736,6 @@ class _BottomActionPodState extends State<_BottomActionPod> {
   }
 }
 
-
 /// The rows the detail panel renders for [device], given which optional
 /// [EdgeDockMetric]s are enabled - temperature is always first and always
 /// present. Shared between the widget (to build the rows) and the
@@ -1014,7 +1015,6 @@ class _RingPainter extends CustomPainter {
       oldDelegate.pinned != pinned ||
       oldDelegate.selected != selected;
 }
-
 
 /// Debounces the "pointer left the whole dock" event by a short grace
 /// period, so a fast cursor movement between the rail and the detail card

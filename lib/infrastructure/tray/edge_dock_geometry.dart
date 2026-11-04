@@ -13,7 +13,8 @@ class EdgeDockGeometry {
   const EdgeDockGeometry._();
 
   static const double ringDiameter = 40;
-  static const double itemBlockLength = 58; // ring (40) + spacing (4) + value label (14)
+  static const double itemBlockLength =
+      58; // ring (40) + spacing (4) + value label (14)
   static const double itemSpacing = 14;
   static const double filletRadius = 18;
   static const double railPadding = 18;

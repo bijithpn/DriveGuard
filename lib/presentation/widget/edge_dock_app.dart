@@ -111,13 +111,14 @@ class _EdgeDockAppState extends State<EdgeDockApp>
       vsync: this,
       duration: const Duration(milliseconds: 240),
     );
-    _expansionAnimation = CurvedAnimation(
-      parent: _expansionController,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    )..addListener(() {
-        if (mounted) setState(() {});
-      });
+    _expansionAnimation =
+        CurvedAnimation(
+          parent: _expansionController,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
 
     kEdgeDockChannel.setMethodCallHandler(_handleMethodCall);
     unawaited(kEdgeDockChannel.invokeMethod('ready').catchError((_) {}));

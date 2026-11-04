@@ -66,14 +66,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
     path.moveTo(0, 0);
 
     // 1. Top concave fillet S-curve from (0,0) to (d, rTop)
-    path.cubicTo(
-      0,
-      rTop * 0.55,
-      d * 0.45,
-      rTop,
-      d,
-      rTop,
-    );
+    path.cubicTo(0, rTop * 0.55, d * 0.45, rTop, d, rTop);
 
     // 2. Main rail body
     final yRailEnd = rTop + mainRailLength;
@@ -164,26 +157,45 @@ class EdgeDockOrganicPainter extends CustomPainter {
         return canonicalPath;
       case ScreenEdge.right:
         final matrix = Matrix4(
-          -1, 0, 0, 0,
-          0, 1, 0, 0,
-          0, 0, 1, 0,
-          size.width, 0, 0, 1,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          size.width,
+          0,
+          0,
+          1,
         );
         return canonicalPath.transform(matrix.storage);
       case ScreenEdge.top:
-        final matrix = Matrix4(
-          0, 1, 0, 0,
-          1, 0, 0, 0,
-          0, 0, 1, 0,
-          0, 0, 0, 1,
-        );
+        final matrix = Matrix4(0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
         return canonicalPath.transform(matrix.storage);
       case ScreenEdge.bottom:
         final matrix = Matrix4(
-          0, -1, 0, 0,
-          1, 0, 0, 0,
-          0, 0, 1, 0,
-          0, size.height, 0, 1,
+          0,
+          -1,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          size.height,
+          0,
+          1,
         );
         return canonicalPath.transform(matrix.storage);
     }
@@ -193,7 +205,10 @@ class EdgeDockOrganicPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
     final fillPath = _transformPathForEdge(_computeCanonicalFillPath(), size);
-    final strokePath = _transformPathForEdge(_computeCanonicalStrokePath(), size);
+    final strokePath = _transformPathForEdge(
+      _computeCanonicalStrokePath(),
+      size,
+    );
 
     // 1. Drop shadows
     if (shadows != null && shadows!.isNotEmpty) {

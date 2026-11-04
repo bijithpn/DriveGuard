@@ -72,10 +72,7 @@ class EdgeDockPopoverBubble extends StatelessWidget {
         borderWidth: borderWidth,
         shadows: shadows,
       ),
-      child: Padding(
-        padding: _effectivePadding(),
-        child: child,
-      ),
+      child: Padding(padding: _effectivePadding(), child: child),
     );
   }
 }

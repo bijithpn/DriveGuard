@@ -77,6 +77,16 @@ class _ScriptedMonitor extends StorageMonitor {
       nextVolumes[deviceId] ?? const [];
 }
 
+class _SlowMonitor extends _ScriptedMonitor {
+  _SlowMonitor(super.devices);
+
+  @override
+  Future<TemperatureReading?> readTemperature(String deviceId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    return super.readTemperature(deviceId);
+  }
+}
+
 StorageDevice _device(String id) => StorageDevice(
   id: id,
   type: StorageDeviceType.nvme,
@@ -86,6 +96,43 @@ StorageDevice _device(String id) => StorageDevice(
 );
 
 void main() {
+  test('overlapping poll cycles are skipped while one is in flight', () async {
+    final backend = _SlowMonitor([_device('d1')]);
+    backend.nextReadingOrError['d1'] = 40.0;
+    final service = MonitoringService(
+      backend: backend,
+      notifications: FakeNotificationService(),
+      historyStore: TemperatureHistoryStore(),
+    );
+    await service.start(const AppSettings());
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    final before = backend.readTemperatureCallCount['d1']!;
+
+    await Future.wait([
+      service.reinitializeAfterResume(),
+      service.reinitializeAfterResume(),
+    ]);
+
+    expect(backend.readTemperatureCallCount['d1']! - before, 1);
+    await service.dispose();
+  });
+
+  test(
+    'setUiActive can be toggled without error before and after start',
+    () async {
+      final service = MonitoringService(
+        backend: _ScriptedMonitor([_device('d1')]),
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+      service.setUiActive(false);
+      await service.start(const AppSettings());
+      service.setUiActive(true);
+      service.setUiActive(false);
+      await service.dispose();
+    },
+  );
+
   test(
     'a failing device does not stop other devices from being polled',
     () async {

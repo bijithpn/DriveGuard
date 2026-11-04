@@ -31,18 +31,21 @@ void main() {
       expect(rect.center.dy, closeTo(displaySize.height / 2, 0.01));
     });
 
-    test('right edge sits flush to display width with collapsedThickness width', () {
-      final rect = EdgeDockGeometry.collapsedRailRect(
-        displayPosition,
-        displaySize,
-        ScreenEdge.right,
-        2,
-      );
-      expect(rect.right, displaySize.width);
-      expect(rect.width, EdgeDockGeometry.collapsedThickness);
-      expect(rect.height, EdgeDockGeometry.railLength(2));
-      expect(rect.center.dy, closeTo(displaySize.height / 2, 0.01));
-    });
+    test(
+      'right edge sits flush to display width with collapsedThickness width',
+      () {
+        final rect = EdgeDockGeometry.collapsedRailRect(
+          displayPosition,
+          displaySize,
+          ScreenEdge.right,
+          2,
+        );
+        expect(rect.right, displaySize.width);
+        expect(rect.width, EdgeDockGeometry.collapsedThickness);
+        expect(rect.height, EdgeDockGeometry.railLength(2));
+        expect(rect.center.dy, closeTo(displaySize.height / 2, 0.01));
+      },
+    );
 
     test('top edge sits flush to y=0 with collapsedThickness height', () {
       final rect = EdgeDockGeometry.collapsedRailRect(
@@ -57,18 +60,21 @@ void main() {
       expect(rect.center.dx, closeTo(displaySize.width / 2, 0.01));
     });
 
-    test('bottom edge sits flush to display height with collapsedThickness height', () {
-      final rect = EdgeDockGeometry.collapsedRailRect(
-        displayPosition,
-        displaySize,
-        ScreenEdge.bottom,
-        2,
-      );
-      expect(rect.bottom, displaySize.height);
-      expect(rect.height, EdgeDockGeometry.collapsedThickness);
-      expect(rect.width, EdgeDockGeometry.railLength(2));
-      expect(rect.center.dx, closeTo(displaySize.width / 2, 0.01));
-    });
+    test(
+      'bottom edge sits flush to display height with collapsedThickness height',
+      () {
+        final rect = EdgeDockGeometry.collapsedRailRect(
+          displayPosition,
+          displaySize,
+          ScreenEdge.bottom,
+          2,
+        );
+        expect(rect.bottom, displaySize.height);
+        expect(rect.height, EdgeDockGeometry.collapsedThickness);
+        expect(rect.width, EdgeDockGeometry.railLength(2));
+        expect(rect.center.dx, closeTo(displaySize.width / 2, 0.01));
+      },
+    );
 
     test('shifts along offset and clamps within screen bounds', () {
       final shifted = EdgeDockGeometry.collapsedRailRect(
@@ -102,15 +108,18 @@ void main() {
     final collapsedRail = Rect.fromLTWH(1906, 400, 14, 200);
     final panel = Rect.fromLTWH(1604, 350, 240, 168);
 
-    test('returns collapsedRail when isExpanded is false and panel is null', () {
-      final windowRect = EdgeDockGeometry.windowRectFor(
-        rail,
-        null,
-        collapsedRail: collapsedRail,
-        isExpanded: false,
-      );
-      expect(windowRect, collapsedRail);
-    });
+    test(
+      'returns collapsedRail when isExpanded is false and panel is null',
+      () {
+        final windowRect = EdgeDockGeometry.windowRectFor(
+          rail,
+          null,
+          collapsedRail: collapsedRail,
+          isExpanded: false,
+        );
+        expect(windowRect, collapsedRail);
+      },
+    );
 
     test('returns rail when isExpanded is true and panel is null', () {
       final windowRect = EdgeDockGeometry.windowRectFor(

@@ -315,9 +315,11 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
 
           final displayName =
               package ?? exePath?.split('/').last ?? entity.path;
-          final errorCode =
-              (signal != null && signal.isNotEmpty) ? signal : (package ?? 'UNKNOWN');
-          final summary = 'Crash: $displayName'
+          final errorCode = (signal != null && signal.isNotEmpty)
+              ? signal
+              : (package ?? 'UNKNOWN');
+          final summary =
+              'Crash: $displayName'
               '${(signal != null && signal.isNotEmpty) ? ' signal $signal' : ''}';
 
           events.add(
@@ -397,15 +399,18 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
     ).firstMatch(line);
     if (dateMatch == null) return null;
 
-    final timestamp =
-        DateTime.tryParse('${dateMatch.group(1)} ${dateMatch.group(2)}');
+    final timestamp = DateTime.tryParse(
+      '${dateMatch.group(1)} ${dateMatch.group(2)}',
+    );
     if (timestamp == null) return null;
 
     // After the timestamp portion, strip optional timezone label then split
     final afterTs = line.substring(dateMatch.end).trim();
     final withoutTz = afterTs.replaceFirst(RegExp(r'^[A-Z+\d:]+\s*'), '');
-    final cols =
-        withoutTz.split(RegExp(r'\s+')).where((c) => c.isNotEmpty).toList();
+    final cols = withoutTz
+        .split(RegExp(r'\s+'))
+        .where((c) => c.isNotEmpty)
+        .toList();
 
     // cols: PID  UID  GID  SIG  COREFILE  [EXE...]
     if (cols.length < 5) return null;
@@ -462,6 +467,5 @@ class LinuxSystemDiagnostics implements SystemDiagnostics {
     return DateTime.tryParse(match.group(1)!) ?? DateTime.now();
   }
 
-  String _truncate(String s) =>
-      s.length > 160 ? '${s.substring(0, 160)}…' : s;
+  String _truncate(String s) => s.length > 160 ? '${s.substring(0, 160)}…' : s;
 }

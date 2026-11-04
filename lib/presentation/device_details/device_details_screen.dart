@@ -73,12 +73,8 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final devices = ref.watch(devicesProvider);
     final settings = ref.watch(settingsProvider);
-    final device = devices
-        .where((d) => d.id == widget.deviceId)
-        .cast<StorageDevice?>()
-        .firstOrNull;
+    final device = ref.watch(deviceProvider(widget.deviceId));
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (device == null) {
@@ -1215,8 +1211,10 @@ class _HistoryChartState extends State<_HistoryChart> {
 
   @override
   Widget build(BuildContext context) {
-    final sortedSamples = List<HistoryPoint>.from(widget.samples)
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    final sortedSamples = downsampleHistory(
+      List<HistoryPoint>.from(widget.samples)
+        ..sort((a, b) => a.timestamp.compareTo(b.timestamp)),
+    ).toList();
 
     final now = DateTime.now();
     if (widget.currentCelsius != null) {
@@ -3241,8 +3239,4 @@ class _CapabilityChip extends StatelessWidget {
       ),
     );
   }
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

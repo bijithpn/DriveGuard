@@ -37,7 +37,6 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final devices = ref.watch(devicesProvider);
     final settings = ref.watch(settingsProvider);
     final monitoringService = ref.watch(monitoringServiceProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -46,27 +45,29 @@ class DashboardScreen extends ConsumerWidget {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _Sidebar(
-            devices: devices,
-            settings: settings,
-            isDark: isDark,
-            monitoringEnabled: settings.monitoringEnabled,
-            onToggleMonitoring: () => ref
-                .read(settingsProvider.notifier)
-                .updateWith(
-                  (s) => s.copyWith(monitoringEnabled: !s.monitoringEnabled),
-                ),
-            onRescan: monitoringService.rescan,
-            onOpenSettings: () =>
-                Navigator.of(context).push(_slideRoute(const SettingsScreen())),
-            onOpenIncidents: () => Navigator.of(
-              context,
-            ).push(_slideRoute(const IncidentHistoryScreen())),
+          Consumer(
+            builder: (context, ref, _) => _Sidebar(
+              devices: ref.watch(devicesProvider),
+              settings: settings,
+              isDark: isDark,
+              monitoringEnabled: settings.monitoringEnabled,
+              onToggleMonitoring: () => ref
+                  .read(settingsProvider.notifier)
+                  .updateWith(
+                    (s) => s.copyWith(monitoringEnabled: !s.monitoringEnabled),
+                  ),
+              onRescan: monitoringService.rescan,
+              onOpenSettings: () => Navigator.of(
+                context,
+              ).push(_slideRoute(const SettingsScreen())),
+              onOpenIncidents: () => Navigator.of(
+                context,
+              ).push(_slideRoute(const IncidentHistoryScreen())),
+            ),
           ),
 
           Expanded(
             child: _DriveListPane(
-              devices: devices,
               settings: settings,
               isDark: isDark,
               onOpenDevice: (deviceId) => Navigator.of(
@@ -475,14 +476,12 @@ class _SidebarIconButton extends StatelessWidget {
 
 class _DriveListPane extends StatelessWidget {
   const _DriveListPane({
-    required this.devices,
     required this.settings,
     required this.isDark,
     required this.onOpenDevice,
     required this.onToggleCompactView,
   });
 
-  final List<StorageDevice> devices;
   final dynamic settings;
   final bool isDark;
   final ValueChanged<String> onOpenDevice;
@@ -495,11 +494,13 @@ class _DriveListPane extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _DriveListToolbar(
-          deviceCount: devices.length,
-          compactView: compactView,
-          isDark: isDark,
-          onToggleCompactView: onToggleCompactView,
+        Consumer(
+          builder: (context, ref, _) => _DriveListToolbar(
+            deviceCount: ref.watch(deviceIdsProvider).length,
+            compactView: compactView,
+            isDark: isDark,
+            onToggleCompactView: onToggleCompactView,
+          ),
         ),
 
         Divider(
@@ -508,19 +509,32 @@ class _DriveListPane extends StatelessWidget {
           color: isDark ? AppColors.divider : AppColors.lightBorder,
         ),
 
-        if (devices.isNotEmpty)
-          _OverviewStrip(devices: devices, settings: settings, isDark: isDark),
+        Consumer(
+          builder: (context, ref, _) {
+            final devices = ref.watch(devicesProvider);
+            if (devices.isEmpty) return const SizedBox.shrink();
+            return _OverviewStrip(
+              devices: devices,
+              settings: settings,
+              isDark: isDark,
+            );
+          },
+        ),
 
         Expanded(
-          child: devices.isEmpty
-              ? const _EmptyState()
-              : _DriveScrollBody(
-                  devices: devices,
-                  settings: settings,
-                  isDark: isDark,
-                  compactView: compactView,
-                  onOpenDevice: onOpenDevice,
-                ),
+          child: Consumer(
+            builder: (context, ref, _) {
+              final ids = ref.watch(deviceIdsProvider);
+              if (ids.isEmpty) return const _EmptyState();
+              return _DriveScrollBody(
+                ids: ids,
+                settings: settings,
+                isDark: isDark,
+                compactView: compactView,
+                onOpenDevice: onOpenDevice,
+              );
+            },
+          ),
         ),
       ],
     );
@@ -928,14 +942,14 @@ class _SegmentButton extends StatelessWidget {
 
 class _DriveScrollBody extends StatelessWidget {
   const _DriveScrollBody({
-    required this.devices,
+    required this.ids,
     required this.settings,
     required this.isDark,
     required this.compactView,
     required this.onOpenDevice,
   });
 
-  final List<StorageDevice> devices;
+  final List<String> ids;
   final dynamic settings;
   final bool isDark;
   final bool compactView;
@@ -945,7 +959,7 @@ class _DriveScrollBody extends StatelessWidget {
   Widget build(BuildContext context) {
     if (compactView) {
       return _DriveListView(
-        devices: devices,
+        ids: ids,
         settings: settings,
         isDark: isDark,
         onOpenDevice: onOpenDevice,
@@ -978,17 +992,25 @@ class _DriveScrollBody extends StatelessWidget {
                   mainAxisSpacing: AppSpacing.md,
                 ),
                 delegate: SliverChildBuilderDelegate((context, index) {
-                  final device = devices[index];
+                  final id = ids[index];
                   return KeyedSubtree(
-                    key: ValueKey(device.id),
-                    child: DriveCard(
-                      device: device,
-                      thresholds: settings.thresholdsFor(device.id),
-                      unit: settings.temperatureUnit,
-                      onTap: () => onOpenDevice(device.id),
+                    key: ValueKey(id),
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final device = ref.watch(deviceProvider(id));
+                        if (device == null) return const SizedBox.shrink();
+                        return RepaintBoundary(
+                          child: DriveCard(
+                            device: device,
+                            thresholds: settings.thresholdsFor(device.id),
+                            unit: settings.temperatureUnit,
+                            onTap: () => onOpenDevice(device.id),
+                          ),
+                        );
+                      },
                     ),
                   );
-                }, childCount: devices.length),
+                }, childCount: ids.length),
               ),
             ),
           ],
@@ -1000,13 +1022,13 @@ class _DriveScrollBody extends StatelessWidget {
 
 class _DriveListView extends StatelessWidget {
   const _DriveListView({
-    required this.devices,
+    required this.ids,
     required this.settings,
     required this.isDark,
     required this.onOpenDevice,
   });
 
-  final List<StorageDevice> devices;
+  final List<String> ids;
   final dynamic settings;
   final bool isDark;
   final ValueChanged<String> onOpenDevice;
@@ -1018,19 +1040,25 @@ class _DriveListView extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           sliver: SliverList.separated(
-            itemCount: devices.length,
+            itemCount: ids.length,
             separatorBuilder: (context, index) =>
                 const SizedBox(height: AppSpacing.xs),
             itemBuilder: (context, index) {
-              final device = devices[index];
+              final id = ids[index];
               return KeyedSubtree(
-                key: ValueKey(device.id),
-                child: _DriveListItem(
-                  device: device,
-                  thresholds: settings.thresholdsFor(device.id),
-                  unit: settings.temperatureUnit,
-                  isDark: isDark,
-                  onTap: () => onOpenDevice(device.id),
+                key: ValueKey(id),
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final device = ref.watch(deviceProvider(id));
+                    if (device == null) return const SizedBox.shrink();
+                    return _DriveListItem(
+                      device: device,
+                      thresholds: settings.thresholdsFor(device.id),
+                      unit: settings.temperatureUnit,
+                      isDark: isDark,
+                      onTap: () => onOpenDevice(device.id),
+                    );
+                  },
                 ),
               );
             },

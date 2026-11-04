@@ -63,6 +63,9 @@ class _AppRootState extends ConsumerState<AppRoot>
     widget.windowController.onCloseHandler = () async => onWindowClose();
     widget.windowController.onMinimizeHandler = () async => onWindowMinimize();
 
+    ref.listenManual(widgetModeActiveProvider, (_, _) => _syncUiActivity());
+    ref.listenManual(edgeDockActiveProvider, (_, _) => _syncUiActivity());
+
     kWidgetChannel.setMethodCallHandler(_handleWidgetChannelCall);
     kEdgeDockChannel.setMethodCallHandler(_handleEdgeDockChannelCall);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initTray());
@@ -76,6 +79,29 @@ class _AppRootState extends ConsumerState<AppRoot>
       (_) => _maybeShowStartupIncident(),
     );
   }
+
+  /// Tells the monitoring service whether anything is showing live data so it
+  /// can throttle polling while the app sits hidden in the tray.
+  Future<void> _syncUiActivity() async {
+    try {
+      final overlayActive =
+          ref.read(widgetModeActiveProvider) ||
+          ref.read(edgeDockActiveProvider);
+      var visible = overlayActive;
+      if (!visible) {
+        visible =
+            await windowManager.isVisible() &&
+            !await windowManager.isMinimized();
+      }
+      if (!mounted) return;
+      ref.read(monitoringServiceProvider).setUiActive(visible);
+    } catch (_) {
+      // Window APIs can throw during startup/shutdown; keep current state.
+    }
+  }
+
+  @override
+  void onWindowEvent(String eventName) => unawaited(_syncUiActivity());
 
   Future<void> _maybeShowStartupIncident() async {
     final incident = ref.read(startupIncidentProvider);
@@ -480,6 +506,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(_syncUiActivity());
       ref.read(monitoringServiceProvider).reinitializeAfterResume();
     }
   }
@@ -491,6 +518,7 @@ class _AppRootState extends ConsumerState<AppRoot>
 
     if (isWidgetActive || (settings.closeToTray && settings.showTrayIcon)) {
       await windowManager.hide();
+      unawaited(_syncUiActivity());
     } else {
       await _quitApp();
     }
@@ -502,6 +530,7 @@ class _AppRootState extends ConsumerState<AppRoot>
     if (settings.minimizeToTray && settings.showTrayIcon) {
       await windowManager.hide();
     }
+    unawaited(_syncUiActivity());
   }
 
   Future<void> _syncWidgetMode(

@@ -46,29 +46,32 @@ void main() {
       }
     });
 
-    test('collapsed progress produces narrower bounds than expanded progress', () {
-      const collapsedPainter = EdgeDockOrganicPainter(
-        edge: ScreenEdge.left,
-        dockDepth: 52.0,
-        collapsedDepth: 8.0,
-        expansionProgress: 0.0,
-      );
+    test(
+      'collapsed progress produces narrower bounds than expanded progress',
+      () {
+        const collapsedPainter = EdgeDockOrganicPainter(
+          edge: ScreenEdge.left,
+          dockDepth: 52.0,
+          collapsedDepth: 8.0,
+          expansionProgress: 0.0,
+        );
 
-      const expandedPainter = EdgeDockOrganicPainter(
-        edge: ScreenEdge.left,
-        dockDepth: 52.0,
-        collapsedDepth: 8.0,
-        expansionProgress: 1.0,
-      );
+        const expandedPainter = EdgeDockOrganicPainter(
+          edge: ScreenEdge.left,
+          dockDepth: 52.0,
+          collapsedDepth: 8.0,
+          expansionProgress: 1.0,
+        );
 
-      const size = Size(60, 300);
-      final collapsedBounds = collapsedPainter.computePath(size).getBounds();
-      final expandedBounds = expandedPainter.computePath(size).getBounds();
+        const size = Size(60, 300);
+        final collapsedBounds = collapsedPainter.computePath(size).getBounds();
+        final expandedBounds = expandedPainter.computePath(size).getBounds();
 
-      expect(collapsedBounds.width, lessThan(expandedBounds.width));
-      expect(collapsedBounds.width, closeTo(8.0, 1.0));
-      expect(expandedBounds.width, closeTo(52.0, 1.0));
-    });
+        expect(collapsedBounds.width, lessThan(expandedBounds.width));
+        expect(collapsedBounds.width, closeTo(8.0, 1.0));
+        expect(expandedBounds.width, closeTo(52.0, 1.0));
+      },
+    );
 
     test('showPod: false computes shorter path than showPod: true', () {
       const withPod = EdgeDockOrganicPainter(
@@ -103,10 +106,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: CustomPaint(
-              size: const Size(60, 300),
-              painter: painter,
-            ),
+            body: CustomPaint(size: const Size(60, 300), painter: painter),
           ),
         ),
       );
@@ -159,28 +159,29 @@ void main() {
       expect(path.contains(const Offset(0.5, 23.0)), isTrue);
     });
 
-    testWidgets('renders EdgeDockPopoverBubble with child and custom decoration', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: EdgeDockPopoverBubble(
-              edge: ScreenEdge.left,
-              targetArrowPosition: 50,
-              child: Text('Popover Content'),
+    testWidgets(
+      'renders EdgeDockPopoverBubble with child and custom decoration',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: EdgeDockPopoverBubble(
+                edge: ScreenEdge.left,
+                targetArrowPosition: 50,
+                child: Text('Popover Content'),
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Popover Content'), findsOneWidget);
-      expect(
-        find.byWidgetPredicate(
-          (w) => w is CustomPaint && w.painter is EdgeDockSpeechBubblePainter,
-        ),
-        findsOneWidget,
-      );
-    });
+        expect(find.text('Popover Content'), findsOneWidget);
+        expect(
+          find.byWidgetPredicate(
+            (w) => w is CustomPaint && w.painter is EdgeDockSpeechBubblePainter,
+          ),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }

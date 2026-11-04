@@ -185,9 +185,7 @@ void main() {
     testWidgets('telemetry rows render key-value metrics when enabled', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        testHarness(visibleMetrics: kAllEdgeDockMetrics),
-      );
+      await tester.pumpWidget(testHarness(visibleMetrics: kAllEdgeDockMetrics));
       await tester.pumpAndSettle();
 
       expect(find.text('Temperature'), findsOneWidget);
@@ -269,11 +267,7 @@ void main() {
     testWidgets('calculates targetArrowPosition relative to panelRect', (
       tester,
     ) async {
-      await tester.pumpWidget(
-        testHarness(
-          edge: ScreenEdge.left,
-        ),
-      );
+      await tester.pumpWidget(testHarness(edge: ScreenEdge.left));
       await tester.pumpAndSettle();
 
       final bubble = tester.widget<EdgeDockPopoverBubble>(

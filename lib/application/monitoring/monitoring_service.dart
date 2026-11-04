@@ -105,6 +105,16 @@ class MonitoringService {
   AppSettings _settings = const AppSettings();
   bool _paused = false;
   bool _started = false;
+  bool _disposed = false;
+  bool _uiActive = true;
+  bool _polling = false;
+  bool _discovering = false;
+  bool _healthPolling = false;
+
+  /// Minimum poll interval while no window/widget is visible. Alerts keep
+  /// working, but we stop spawning backend processes at the 2s rate.
+  static const _backgroundMinPollInterval = Duration(seconds: 15);
+  static const _backgroundMinHealthInterval = Duration(minutes: 10);
 
   bool get isPaused => _paused;
 
@@ -158,17 +168,39 @@ class MonitoringService {
     if (_started && intervalsChanged) _rescheduleTimers();
   }
 
+  /// Tells the service whether anything on screen (main window, mini widget,
+  /// edge dock) is currently showing live data. When nothing is, polling is
+  /// throttled to save CPU and battery.
+  void setUiActive(bool active) {
+    if (_uiActive == active) return;
+    _uiActive = active;
+    if (_started) {
+      _rescheduleTimers();
+      if (active) unawaited(_pollAll());
+    }
+  }
+
+  Duration get _effectivePollInterval => _uiActive
+      ? _settings.pollingInterval
+      : _max(_settings.pollingInterval, _backgroundMinPollInterval);
+
+  Duration get _effectiveHealthInterval => _uiActive
+      ? _settings.healthPollingInterval
+      : _max(_settings.healthPollingInterval, _backgroundMinHealthInterval);
+
+  static Duration _max(Duration a, Duration b) => a >= b ? a : b;
+
   void _rescheduleTimers() {
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
     _healthTimer?.cancel();
-    _pollTimer = Timer.periodic(_settings.pollingInterval, (_) => _pollAll());
+    _pollTimer = Timer.periodic(_effectivePollInterval, (_) => _pollAll());
     _discoveryTimer = Timer.periodic(
       _settings.deviceDiscoveryInterval,
       (_) => _discoverDevices(),
     );
     _healthTimer = Timer.periodic(
-      _settings.healthPollingInterval,
+      _effectiveHealthInterval,
       (_) => _pollHealthAll(),
     );
   }
@@ -213,6 +245,16 @@ class MonitoringService {
   }
 
   Future<void> _discoverDevices() async {
+    if (_discovering || _disposed) return;
+    _discovering = true;
+    try {
+      await _discoverDevicesImpl();
+    } finally {
+      _discovering = false;
+    }
+  }
+
+  Future<void> _discoverDevicesImpl() async {
     List<StorageDevice> discovered;
     try {
       discovered = await _backend.getDevices();
@@ -438,7 +480,13 @@ class MonitoringService {
               _devices[id]!.monitoringStatus != MonitoringStatus.disconnected,
         )
         .toList();
-    await Future.wait(ids.map(_pollHealthOne));
+    if (_healthPolling || _disposed) return;
+    _healthPolling = true;
+    try {
+      await Future.wait(ids.map(_pollHealthOne));
+    } finally {
+      _healthPolling = false;
+    }
     _emit();
   }
 
@@ -651,13 +699,19 @@ class MonitoringService {
 
   Future<void> _pollAll() async {
     if (_paused || !_settings.monitoringEnabled) return;
+    if (_polling || _disposed) return;
     final ids = _devices.keys
         .where(
           (id) =>
               _devices[id]!.monitoringStatus != MonitoringStatus.disconnected,
         )
         .toList();
-    await Future.wait(ids.map(_pollOne));
+    _polling = true;
+    try {
+      await Future.wait(ids.map(_pollOne));
+    } finally {
+      _polling = false;
+    }
     _emit();
   }
 
@@ -1084,6 +1138,7 @@ class MonitoringService {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
     _healthTimer?.cancel();

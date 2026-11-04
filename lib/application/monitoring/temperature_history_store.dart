@@ -28,6 +28,45 @@ class HistoryStats {
   final int samplesCount;
 }
 
+/// Reduces [points] (assumed time-ordered) to at most ~[maxPoints] by keeping
+/// the min and max sample of each bucket, so peaks and troughs survive but
+/// the chart has far fewer spots to lay out and paint.
+List<HistoryPoint> downsampleHistory(
+  List<HistoryPoint> points, {
+  int maxPoints = 300,
+}) {
+  if (points.length <= maxPoints || maxPoints < 4) return points;
+  final bucketCount = maxPoints ~/ 2;
+  final bucketSize = points.length / bucketCount;
+  final out = <HistoryPoint>[points.first];
+  for (var b = 0; b < bucketCount; b++) {
+    final start = (b * bucketSize).floor();
+    final end = (((b + 1) * bucketSize).floor()).clamp(
+      start + 1,
+      points.length,
+    );
+    var minI = start;
+    var maxI = start;
+    for (var i = start; i < end; i++) {
+      if (points[i].celsius < points[minI].celsius) minI = i;
+      if (points[i].celsius > points[maxI].celsius) maxI = i;
+    }
+    if (minI == maxI) {
+      out.add(points[minI]);
+    } else if (minI < maxI) {
+      out
+        ..add(points[minI])
+        ..add(points[maxI]);
+    } else {
+      out
+        ..add(points[maxI])
+        ..add(points[minI]);
+    }
+  }
+  if (out.last != points.last) out.add(points.last);
+  return out;
+}
+
 class TemperatureHistoryStore {
   TemperatureHistoryStore({TelemetryPersistenceRepository? persistence})
     : _persistence = persistence ?? TelemetryPersistenceRepository();
@@ -120,11 +159,14 @@ class TemperatureHistoryStore {
 
   List<HistoryPoint> pointsFor(String deviceId, Duration window) {
     final cutoff = DateTime.now().subtract(window);
-    final points = <HistoryPoint>[
-      ...(_aggregated[deviceId] ?? const <HistoryPoint>[]),
-      ...(_raw[deviceId] ?? const <HistoryPoint>[]),
-    ];
-    return points.where((p) => p.timestamp.isAfter(cutoff)).toList();
+    final points = <HistoryPoint>[];
+    for (final p in _aggregated[deviceId] ?? const <HistoryPoint>[]) {
+      if (p.timestamp.isAfter(cutoff)) points.add(p);
+    }
+    for (final p in _raw[deviceId] ?? const <HistoryPoint>[]) {
+      if (p.timestamp.isAfter(cutoff)) points.add(p);
+    }
+    return points;
   }
 
   HistoryStats statsFor(

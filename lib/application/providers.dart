@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/app_constants.dart';
@@ -111,6 +112,36 @@ class DevicesNotifier extends Notifier<List<StorageDevice>> {
 final devicesProvider = NotifierProvider<DevicesNotifier, List<StorageDevice>>(
   DevicesNotifier.new,
 );
+
+/// Ordered device ids. Only notifies when the set/order of devices changes,
+/// not on every temperature poll — lists can key off this and let each row
+/// watch [deviceProvider] for its own updates.
+class DeviceIdsNotifier extends Notifier<List<String>> {
+  @override
+  List<String> build() {
+    ref.listen<List<StorageDevice>>(devicesProvider, (_, devices) {
+      final ids = [for (final d in devices) d.id];
+      if (!listEquals(ids, state)) state = ids;
+    });
+    return [for (final d in ref.read(devicesProvider)) d.id];
+  }
+}
+
+final deviceIdsProvider = NotifierProvider<DeviceIdsNotifier, List<String>>(
+  DeviceIdsNotifier.new,
+);
+
+/// A single device by id; rebuilds only when that device's data changes.
+final deviceProvider = Provider.family<StorageDevice?, String>((ref, id) {
+  return ref.watch(
+    devicesProvider.select((list) {
+      for (final d in list) {
+        if (d.id == id) return d;
+      }
+      return null;
+    }),
+  );
+});
 
 class ActivityNotifier extends Notifier<Map<String, StorageActivity>> {
   StreamSubscription<StorageActivity>? _subscription;

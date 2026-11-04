@@ -104,8 +104,9 @@ class MacOSSystemDiagnostics implements SystemDiagnostics {
             }
 
             // Fall back: look for "Kernel version:" line for OS version
-            final versionMatch =
-                RegExp(r'Kernel version:\s*([^\n]+)').firstMatch(content);
+            final versionMatch = RegExp(
+              r'Kernel version:\s*([^\n]+)',
+            ).firstMatch(content);
             if (errorCode == null && versionMatch != null) {
               errorCode = 'KERNEL_PANIC';
               summary = 'Kernel Panic (${versionMatch.group(1)?.trim()})';
@@ -167,15 +168,14 @@ class MacOSSystemDiagnostics implements SystemDiagnostics {
                 ? '${content.substring(0, 1200)}…'
                 : content;
 
-            processName =
-                RegExp(r'^Process:\s+(\S+)', multiLine: true)
-                    .firstMatch(content)
-                    ?.group(1);
-            exceptionType =
-                RegExp(r'^Exception Type:\s+(.+)', multiLine: true)
-                    .firstMatch(content)
-                    ?.group(1)
-                    ?.trim();
+            processName = RegExp(
+              r'^Process:\s+(\S+)',
+              multiLine: true,
+            ).firstMatch(content)?.group(1);
+            exceptionType = RegExp(
+              r'^Exception Type:\s+(.+)',
+              multiLine: true,
+            ).firstMatch(content)?.group(1)?.trim();
             errorCode = exceptionType ?? 'EXC_CRASH';
             summary =
                 'App Crash: ${processName ?? entity.uri.pathSegments.last}'
@@ -297,8 +297,9 @@ class MacOSSystemDiagnostics implements SystemDiagnostics {
       }
 
       // Extract disk identifiers e.g. /dev/disk0, /dev/disk1
-      final diskMatches =
-          RegExp(r'/dev/(disk\d+)(?!s)').allMatches(listResult.stdout);
+      final diskMatches = RegExp(
+        r'/dev/(disk\d+)(?!s)',
+      ).allMatches(listResult.stdout);
       final disks = diskMatches.map((m) => m.group(1)!).toSet().take(4);
 
       for (final disk in disks) {
@@ -313,9 +314,7 @@ class MacOSSystemDiagnostics implements SystemDiagnostics {
           final info = infoResult.stdout;
 
           // Look for SMART Status
-          final smartMatch = RegExp(
-            r'SMART Status:\s*(.+)',
-          ).firstMatch(info);
+          final smartMatch = RegExp(r'SMART Status:\s*(.+)').firstMatch(info);
           final smartStatus = smartMatch?.group(1)?.trim();
           if (smartStatus != null &&
               !smartStatus.toLowerCase().contains('verified') &&
