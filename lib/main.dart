@@ -243,6 +243,12 @@ void _armTerminationSignalHandlers(ProviderContainer container) {
     } catch (e) {
       AppLogger.instance.error('main', 'Shutdown flush failed', e);
     }
+    try {
+      await container
+          .read(heartbeatServiceProvider)
+          .stop()
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {}
     exit(0);
   }
 

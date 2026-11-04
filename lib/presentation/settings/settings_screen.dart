@@ -13,6 +13,7 @@ import '../../core/logging/app_logger.dart';
 import '../../domain/entities/device_capabilities.dart';
 import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
+import '../../domain/enums/incident_enums.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/enums/ui_enums.dart';
 import '../app_root.dart' show edgeDockActiveProvider, widgetModeActiveProvider;

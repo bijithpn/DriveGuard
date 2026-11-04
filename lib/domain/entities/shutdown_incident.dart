@@ -90,6 +90,32 @@ class ShutdownIncident {
       classification != ShutdownClassification.osShutdownClean &&
       classification != ShutdownClassification.osRebootClean;
 
+  /// error: the system itself went down abnormally (or strong thermal link).
+  /// warning: the machine restarted but the cause is unknown.
+  /// info: only the app session ended (crash / forced quit / dev restart).
+  IncidentSeverity get severity {
+    switch (classification) {
+      case ShutdownClassification.kernelPanic:
+      case ShutdownClassification.bsod:
+      case ShutdownClassification.osShutdownUnexpected:
+      case ShutdownClassification.possiblePowerLoss:
+        return IncidentSeverity.error;
+      case ShutdownClassification.unknown:
+        return correlationLevel == CorrelationLevel.high ||
+                correlationLevel == CorrelationLevel.moderate
+            ? IncidentSeverity.error
+            : IncidentSeverity.warning;
+      case ShutdownClassification.appSessionEndedUnexpectedly:
+        return correlationLevel == CorrelationLevel.none
+            ? IncidentSeverity.info
+            : IncidentSeverity.warning;
+      case ShutdownClassification.cleanAppExit:
+      case ShutdownClassification.osShutdownClean:
+      case ShutdownClassification.osRebootClean:
+        return IncidentSeverity.info;
+    }
+  }
+
   Map<String, Object?> toMap() => {
     'id': id,
     'session_id': sessionId,

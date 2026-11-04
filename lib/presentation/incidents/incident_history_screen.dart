@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/providers.dart';
+import '../../core/utils/date_format.dart';
 import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/enums/incident_enums.dart';
 import '../components/app_shell.dart';
@@ -11,12 +12,26 @@ import 'incident_report_screen.dart';
 
 /// Every time DriveGuard noticed the computer shut down unexpectedly, with
 /// how strongly drive temperature correlates with it.
-class IncidentHistoryScreen extends ConsumerWidget {
+class IncidentHistoryScreen extends ConsumerStatefulWidget {
   const IncidentHistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final incidentsAsync = ref.watch(incidentListProvider);
+  ConsumerState<IncidentHistoryScreen> createState() =>
+      _IncidentHistoryScreenState();
+}
+
+class _IncidentHistoryScreenState extends ConsumerState<IncidentHistoryScreen> {
+  /// null = all. Default hides info-level noise (app restarts).
+  IncidentSeverity? _min = IncidentSeverity.warning;
+
+  bool _passes(ShutdownIncident i) =>
+      _min == null || i.severity.index >= _min!.index;
+
+  @override
+  Widget build(BuildContext context) {
+    final AsyncValue<List<ShutdownIncident>> incidentsAsync = ref.watch(
+      incidentListProvider,
+    );
 
     return AppShell(
       section: AppSection.incidents,
@@ -28,50 +43,81 @@ class IncidentHistoryScreen extends ConsumerWidget {
             style: AppText.secondary(context),
           ),
         ),
-        data: (incidents) => Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                PageHeader(
-                  title: 'Incidents',
-                  subtitle: incidents.isEmpty
-                      ? 'Unexpected shutdowns and crashes appear here'
-                      : '${incidents.length} recorded  ·  newest first',
-                ),
-                Expanded(
-                  child: incidents.isEmpty
-                      ? const _EmptyState()
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.page,
-                            AppSpacing.xs,
-                            AppSpacing.page,
-                            AppSpacing.page,
+        data: (all) {
+          final incidents = all.where(_passes).toList();
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  PageHeader(
+                    title: 'Incidents',
+                    subtitle: all.isEmpty
+                        ? 'Unexpected shutdowns and crashes appear here'
+                        : '${incidents.length} shown of ${all.length}  ·  newest first',
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.page,
+                      0,
+                      AppSpacing.page,
+                      AppSpacing.sm,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SegmentedSwitch<IncidentSeverity?>(
+                        value: _min,
+                        onChanged: (v) => setState(() => _min = v),
+                        options: const [
+                          (
+                            IncidentSeverity.error,
+                            'Errors',
+                            Icons.error_outline_rounded,
                           ),
-                          children: [
-                            Surface(
-                              padding: EdgeInsets.zero,
-                              clip: true,
-                              child: Column(
-                                children: [
-                                  for (var i = 0; i < incidents.length; i++)
-                                    _IncidentRow(
-                                      incident: incidents[i],
-                                      first: i == 0,
-                                    ),
-                                ],
-                              ),
+                          (
+                            IncidentSeverity.warning,
+                            'Warnings & errors',
+                            Icons.warning_amber_rounded,
+                          ),
+                          (null, 'All', Icons.list_rounded),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: incidents.isEmpty
+                        ? const _EmptyState()
+                        : ListView(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.page,
+                              AppSpacing.xs,
+                              AppSpacing.page,
+                              AppSpacing.page,
                             ),
-                          ],
-                        ),
-                ),
-              ],
+                            children: [
+                              Surface(
+                                padding: EdgeInsets.zero,
+                                clip: true,
+                                child: Column(
+                                  children: [
+                                    for (var i = 0; i < incidents.length; i++)
+                                      _IncidentRow(
+                                        incident: incidents[i],
+                                        first: i == 0,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -90,7 +136,7 @@ class _EmptyState extends StatelessWidget {
         Text('No incidents recorded', style: AppText.heading(context)),
         const SizedBox(height: 4),
         Text(
-          'Every DriveGuard session so far has ended cleanly.',
+          'Nothing to show for this filter.',
           style: AppText.secondary(context),
         ),
       ],
@@ -111,11 +157,10 @@ class _IncidentRowState extends State<_IncidentRow> {
   bool _hover = false;
   ShutdownIncident get incident => widget.incident;
 
-  Color _color() => switch (incident.correlationLevel) {
-    CorrelationLevel.high => AppColors.critical,
-    CorrelationLevel.moderate => AppColors.warning,
-    CorrelationLevel.low => AppColors.warm,
-    CorrelationLevel.none => AppColors.normal,
+  Color _color() => switch (incident.severity) {
+    IncidentSeverity.error => AppColors.critical,
+    IncidentSeverity.warning => AppColors.warning,
+    IncidentSeverity.info => AppColors.normal,
   };
 
   String _classification() => switch (incident.classification) {
@@ -138,25 +183,7 @@ class _IncidentRowState extends State<_IncidentRow> {
     CorrelationLevel.none => 'No thermal correlation',
   };
 
-  static String _date(DateTime dt) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  ·  $h:$m ${dt.hour >= 12 ? 'PM' : 'AM'}';
-  }
+  static String _date(DateTime dt) => formatDateTime(dt);
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +227,18 @@ class _IncidentRowState extends State<_IncidentRow> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_classification(), style: AppText.heading(context)),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _classification(),
+                            style: AppText.heading(context),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _SeverityBadge(incident.severity, color),
+                      ],
+                    ),
                     const SizedBox(height: 3),
                     Text(
                       [
@@ -245,4 +283,32 @@ class _IncidentRowState extends State<_IncidentRow> {
       ),
     );
   }
+}
+
+class _SeverityBadge extends StatelessWidget {
+  const _SeverityBadge(this.severity, this.color);
+  final IncidentSeverity severity;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      switch (severity) {
+        IncidentSeverity.error => 'ERROR',
+        IncidentSeverity.warning => 'WARNING',
+        IncidentSeverity.info => 'INFO',
+      },
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.6,
+        color: color,
+      ),
+    ),
+  );
 }

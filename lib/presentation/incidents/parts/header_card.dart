@@ -173,14 +173,8 @@ class _HeaderCard extends StatelessWidget {
     );
   }
 
-  String _fmtFull(DateTime? dt) {
-    if (dt == null) return 'unknown';
-    final date =
-        '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-    final time =
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
-    return '$date $time';
-  }
+  String _fmtFull(DateTime? dt) =>
+      dt == null ? 'unknown' : formatDateTime(dt, seconds: true);
 
   String _fmtDuration(Duration d) {
     if (d.inHours > 0) return '${d.inHours}h ${d.inMinutes.remainder(60)}m';

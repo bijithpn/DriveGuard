@@ -325,11 +325,5 @@ class _BsodBannerState extends State<_BsodBanner> {
     );
   }
 
-  String _fmtFull(DateTime dt) {
-    final d =
-        '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-    final t =
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
-    return '$d  $t';
-  }
+  String _fmtFull(DateTime dt) => formatDateTime(dt, seconds: true);
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../domain/entities/storage_thresholds.dart';
 import '../../domain/entities/temperature_thresholds.dart';
+import '../../domain/enums/incident_enums.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/enums/ui_enums.dart';
 
@@ -360,6 +361,7 @@ class AppSettings {
     this.minimizeToTray = true,
     this.closeToTray = true,
     this.diagnosticLoggingEnabled = false,
+    this.incidentPopupLevel = IncidentPopupLevel.warningsAndErrors,
     this.widget = const WidgetSettings(),
     this.edgeDock = const EdgeDockSettings(),
     this.mockBackendForced = false,
@@ -405,6 +407,7 @@ class AppSettings {
   final bool closeToTray;
 
   final bool diagnosticLoggingEnabled;
+  final IncidentPopupLevel incidentPopupLevel;
   final WidgetSettings widget;
   final EdgeDockSettings edgeDock;
 
@@ -457,6 +460,7 @@ class AppSettings {
     bool? minimizeToTray,
     bool? closeToTray,
     bool? diagnosticLoggingEnabled,
+    IncidentPopupLevel? incidentPopupLevel,
     WidgetSettings? widget,
     EdgeDockSettings? edgeDock,
     bool? mockBackendForced,
@@ -502,6 +506,7 @@ class AppSettings {
       closeToTray: closeToTray ?? this.closeToTray,
       diagnosticLoggingEnabled:
           diagnosticLoggingEnabled ?? this.diagnosticLoggingEnabled,
+      incidentPopupLevel: incidentPopupLevel ?? this.incidentPopupLevel,
       widget: widget ?? this.widget,
       edgeDock: edgeDock ?? this.edgeDock,
       mockBackendForced: mockBackendForced ?? this.mockBackendForced,
@@ -544,6 +549,7 @@ class AppSettings {
     'minimizeToTray': minimizeToTray,
     'closeToTray': closeToTray,
     'diagnosticLoggingEnabled': diagnosticLoggingEnabled,
+    'incidentPopupLevel': incidentPopupLevel.name,
     'widget': widget.toJson(),
     'edgeDock': edgeDock.toJson(),
     'mockBackendForced': mockBackendForced,
@@ -650,6 +656,10 @@ class AppSettings {
       closeToTray: json['closeToTray'] as bool? ?? true,
       diagnosticLoggingEnabled:
           json['diagnosticLoggingEnabled'] as bool? ?? false,
+      incidentPopupLevel: IncidentPopupLevel.values.firstWhere(
+        (v) => v.name == json['incidentPopupLevel'],
+        orElse: () => IncidentPopupLevel.warningsAndErrors,
+      ),
       widget: json['widget'] != null
           ? WidgetSettings.fromJson(json['widget'] as Map<String, dynamic>)
           : const WidgetSettings(),

@@ -24,6 +24,33 @@ class _AdvancedSection extends ConsumerWidget {
           ),
         ),
         _SettingRow(
+          label: 'Incident pop-ups',
+          subtitle: 'Which unexpected-shutdown reports open a dialog at launch',
+          isDark: isDark,
+          trailing: DropdownButton<IncidentPopupLevel>(
+            value: settings.incidentPopupLevel,
+            underline: const SizedBox.shrink(),
+            onChanged: (v) {
+              if (v == null) return;
+              notifier.updateWith((s) => s.copyWith(incidentPopupLevel: v));
+            },
+            items: const [
+              DropdownMenuItem(
+                value: IncidentPopupLevel.errorsOnly,
+                child: Text('Errors only'),
+              ),
+              DropdownMenuItem(
+                value: IncidentPopupLevel.warningsAndErrors,
+                child: Text('Warnings & errors'),
+              ),
+              DropdownMenuItem(
+                value: IncidentPopupLevel.off,
+                child: Text('Never'),
+              ),
+            ],
+          ),
+        ),
+        _SettingRow(
           label: 'Simulated devices',
           subtitle: 'Developer mode — use mock data instead of real drives',
           isDark: isDark,

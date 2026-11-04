@@ -25,6 +25,7 @@ import '../infrastructure/tray/desktop_window_controller.dart'
 import 'components/device_presentation.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'device_details/device_details_screen.dart';
+import '../domain/enums/incident_enums.dart';
 import 'incidents/incident_report_screen.dart';
 import 'incidents/startup_incident_dialog.dart';
 import 'protection/thermal_protection_ui.dart';
@@ -111,12 +112,22 @@ class _AppRootState extends ConsumerState<AppRoot>
 
   Future<void> _maybeShowStartupIncident() async {
     final incident = ref.read(startupIncidentProvider);
-    if (incident == null || !mounted) return;
+    if (incident == null || !mounted || incident.notificationShown) return;
+    // Mark first: whatever the filter decides, this incident is handled once.
     unawaited(
       ref
           .read(incidentRepositoryProvider)
           ?.markIncidentNotificationShown(incident.id),
     );
+    final level = ref.read(settingsProvider).incidentPopupLevel;
+    final show = switch (level) {
+      IncidentPopupLevel.off => false,
+      IncidentPopupLevel.errorsOnly =>
+        incident.severity == IncidentSeverity.error,
+      IncidentPopupLevel.warningsAndErrors =>
+        incident.severity != IncidentSeverity.info,
+    };
+    if (!show) return;
     await showStartupIncidentDialog(
       rootNavigatorKey.currentContext ?? context,
       incident,

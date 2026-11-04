@@ -231,10 +231,12 @@ final activityProvider =
       ActivityNotifier.new,
     );
 
-final incidentListProvider = FutureProvider.autoDispose((ref) {
-  final repo = ref.watch(incidentRepositoryProvider);
-  return repo?.listIncidents() ?? Future.value(const []);
-});
+final incidentListProvider = FutureProvider.autoDispose<List<ShutdownIncident>>(
+  (ref) {
+    final repo = ref.watch(incidentRepositoryProvider);
+    return repo?.listIncidents() ?? Future.value(const <ShutdownIncident>[]);
+  },
+);
 
 final incidentDetailProvider = FutureProvider.autoDispose
     .family<ShutdownIncident?, String>((ref, incidentId) {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:uuid/uuid.dart';
 
 import '../../core/logging/app_logger.dart';
+import '../../core/utils/boot_time.dart';
 import '../../domain/entities/monitoring_session.dart';
 import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/enums/incident_enums.dart';
@@ -17,7 +18,9 @@ class StartupRecoveryService {
     SystemDiagnostics? diagnostics,
     IncidentCorrelationEngine engine = const IncidentCorrelationEngine(),
     Uuid? uuid,
-  }) : _repository = repository,
+    Future<DateTime?> Function()? bootTimeProvider,
+  }) : _bootTimeProvider = bootTimeProvider ?? BootTime.current,
+       _repository = repository,
        _diagnostics = diagnostics ?? SystemDiagnosticsFactory.create(),
        _engine = engine,
        _uuid = uuid ?? const Uuid();
@@ -28,6 +31,7 @@ class StartupRecoveryService {
   final SystemDiagnostics _diagnostics;
   final IncidentCorrelationEngine _engine;
   final Uuid _uuid;
+  final Future<DateTime?> Function() _bootTimeProvider;
 
   Future<MonitoringSession> startNewSession({
     required String appVersion,
@@ -75,11 +79,26 @@ class StartupRecoveryService {
       'Previous session ${previous.id} did not end cleanly — investigating',
     );
 
+    // If the OS booted *before* the last heartbeat, the machine never went
+    // down: only the app stopped (crash, forced quit, dev restart). Skip the
+    // slow OS log scan and don't blame the system.
+    final bootedAt = await _bootTime();
+    final heartbeat = previous.lastHeartbeatAt;
+    final sameBoot =
+        bootedAt != null &&
+        heartbeat != null &&
+        bootedAt.isBefore(heartbeat.subtract(const Duration(seconds: 30)));
+
     PreviousBootDiagnosis diagnosis;
     try {
-      diagnosis = await _diagnostics.diagnosePreviousBoot(
-        approximateShutdownTime: previous.lastHeartbeatAt,
-      );
+      diagnosis = sameBoot
+          ? const PreviousBootDiagnosis(
+              classification: ShutdownClassification.osShutdownClean,
+              events: [],
+            )
+          : await _diagnostics.diagnosePreviousBoot(
+              approximateShutdownTime: heartbeat,
+            );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Platform diagnostics failed', e);
       diagnosis = const PreviousBootDiagnosis(
@@ -110,7 +129,8 @@ class StartupRecoveryService {
       diagnosis.events,
     );
     if (!saved) {
-      return _repository.incidentBySessionId(previous.id);
+      // Already recorded (and already presented) earlier — never re-surface.
+      return null;
     }
     AppLogger.instance.warning(
       _tag,
@@ -119,6 +139,8 @@ class StartupRecoveryService {
     );
     return incident;
   }
+
+  Future<DateTime?> _bootTime() => _bootTimeProvider();
 
   Future<void> markShown(String incidentId) =>
       _repository.markIncidentNotificationShown(incidentId);

@@ -36,6 +36,20 @@ class MacOSSystemDiagnostics implements SystemDiagnostics {
     // ── Disk errors from system_profiler / diskutil ───────────────────────
     events.addAll(await _scanDiskErrors());
 
+    // Only evidence near the shutdown is relevant; unrelated app crashes and
+    // routine "thermal" log lines from earlier must not condemn the system.
+    if (approximateShutdownTime != null) {
+      final from = approximateShutdownTime.subtract(const Duration(hours: 1));
+      final to = approximateShutdownTime.add(const Duration(hours: 1));
+      events.removeWhere(
+        (e) =>
+            e.category != 'kernel-panic' &&
+            (e.timestamp.isBefore(from) || e.timestamp.isAfter(to)),
+      );
+    }
+    // App crash reports describe app problems, not the OS going down.
+    final osEvents = events.where((e) => e.category != 'app-crash');
+
     events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     ShutdownClassification classification;
@@ -48,10 +62,12 @@ class MacOSSystemDiagnostics implements SystemDiagnostics {
         classification = ShutdownClassification.osRebootClean;
       } else if (cleanShutdown) {
         classification = ShutdownClassification.osShutdownClean;
-      } else if (events.isEmpty) {
-        classification = ShutdownClassification.unknown;
-      } else {
+      } else if (osEvents.any(
+        (e) => e.category == 'storage-error' || e.category == 'thermal',
+      )) {
         classification = ShutdownClassification.osShutdownUnexpected;
+      } else {
+        classification = ShutdownClassification.unknown;
       }
     }
 
