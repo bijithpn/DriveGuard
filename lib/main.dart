@@ -193,6 +193,10 @@ Future<ProviderContainer> _initServices(AppSettings settings) async {
   final recoveryService = StartupRecoveryService(
     repository: incidentRepository,
   );
+  final purged = await incidentRepository.purgeDuplicateIncidents();
+  if (purged > 0) {
+    AppLogger.instance.info('main', 'Removed $purged duplicate incidents');
+  }
   final session = await recoveryService.startNewSession(
     appVersion: AppConstants.appVersion,
     pollingInterval: settings.pollingInterval,

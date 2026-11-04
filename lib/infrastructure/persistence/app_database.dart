@@ -11,7 +11,7 @@ class AppDatabase {
 
   static const _tag = 'AppDatabase';
   static const _fileName = 'driveguard.db';
-  static const _schemaVersion = 2;
+  static const _schemaVersion = 3;
 
   final Database _db;
   Database get db => _db;
@@ -47,6 +47,12 @@ class AppDatabase {
             await db.execute(
               'ALTER TABLE diagnostic_events ADD COLUMN error_code TEXT',
             );
+          }
+          if (oldVersion < 3) {
+            await db.execute(
+              'ALTER TABLE incidents ADD COLUMN fingerprint TEXT',
+            );
+            await _createFingerprintIndex(db);
           }
         },
       ),
@@ -95,9 +101,11 @@ class AppDatabase {
         correlation_level TEXT NOT NULL,
         summary TEXT NOT NULL,
         primary_device_id TEXT,
-        notification_shown INTEGER NOT NULL DEFAULT 0
+        notification_shown INTEGER NOT NULL DEFAULT 0,
+        fingerprint TEXT
       )
     ''');
+    await _createFingerprintIndex(db);
 
     await db.execute('''
       CREATE TABLE incident_device_stats (
@@ -128,6 +136,13 @@ class AppDatabase {
       'CREATE INDEX idx_diag_session ON diagnostic_events(session_id)',
     );
   }
+
+  /// One row per real-world event. NULLs (legacy rows awaiting backfill) are
+  /// treated as distinct by SQLite, so this is safe to create before backfill.
+  static Future<void> _createFingerprintIndex(Database db) => db.execute(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_incidents_fingerprint '
+    'ON incidents(fingerprint)',
+  );
 
   static Future<AppDatabase> openInMemoryForTesting() async {
     sqfliteFfiInit();

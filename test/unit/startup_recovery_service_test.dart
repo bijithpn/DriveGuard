@@ -142,6 +142,86 @@ void main() {
     expect(await repo.listIncidents(), hasLength(1));
   });
 
+  test(
+    'a relaunch loop collapses into one incident, not one per launch',
+    () async {
+      // One unclean session, then the machine rebooted; the app is then
+      // relaunched repeatedly, each launch dying before its first heartbeat.
+      await seedSession('a', DateTime(2026, 11, 4, 17));
+      final boot = DateTime(2026, 11, 4, 18, 30);
+      final s = service(_FakeDiagnostics(unknownDiag), bootedAt: boot);
+      for (final id in ['b', 'c', 'd', 'e', 'f']) {
+        await repo.createSession(
+          MonitoringSession(
+            id: id,
+            startedAt: DateTime(
+              2026,
+              11,
+              4,
+              19,
+            ).add(Duration(seconds: id.codeUnitAt(0))),
+            operatingSystem: 'macos',
+            appVersion: '1.0.0',
+            pollingIntervalSeconds: 5,
+          ),
+        );
+        await recover(s, id);
+      }
+      // The reboot after 'a' + one burst of dying relaunches b..e.
+      final incidents = await repo.listIncidents();
+      expect(incidents, hasLength(2));
+      expect(
+        incidents.where(
+          (i) =>
+              i.classification ==
+              ShutdownClassification.appSessionEndedUnexpectedly,
+        ),
+        hasLength(1),
+      );
+    },
+  );
+
+  test('restarts of the app on the same boot never blame the OS', () async {
+    await seedSession('a', DateTime(2026, 11, 4, 17));
+    final s = service(
+      _FakeDiagnostics(
+        const PreviousBootDiagnosis(
+          classification: ShutdownClassification.osShutdownUnexpected,
+          events: [],
+        ),
+      ),
+      bootedAt: DateTime(2026, 11, 3),
+    );
+    for (final id in ['b', 'c', 'd']) {
+      await repo.createSession(
+        MonitoringSession(
+          id: id,
+          startedAt: DateTime(
+            2026,
+            11,
+            4,
+            19,
+          ).add(Duration(seconds: id.codeUnitAt(0))),
+          operatingSystem: 'macos',
+          appVersion: '1.0.0',
+          pollingIntervalSeconds: 5,
+        ),
+      );
+      await recover(s, id);
+    }
+    // 'a' (18:00) and the burst b..c (19:00) are two events; never OS-blamed.
+    final incidents = await repo.listIncidents();
+    expect(incidents, hasLength(2));
+    expect(
+      incidents.every(
+        (i) =>
+            i.classification ==
+            ShutdownClassification.appSessionEndedUnexpectedly,
+      ),
+      isTrue,
+    );
+  });
+
   test('notification_shown persists so the popup is one-time', () async {
     await seedSession('a', DateTime(2026, 11, 4, 17));
     await seedSession('b', DateTime(2026, 11, 4, 19));

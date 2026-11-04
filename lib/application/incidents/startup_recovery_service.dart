@@ -84,10 +84,11 @@ class StartupRecoveryService {
     // slow OS log scan and don't blame the system.
     final bootedAt = await _bootTime();
     final heartbeat = previous.lastHeartbeatAt;
+    // A session that died before its first heartbeat is judged by its start.
+    final lastActive = heartbeat ?? previous.startedAt;
     final sameBoot =
         bootedAt != null &&
-        heartbeat != null &&
-        bootedAt.isBefore(heartbeat.subtract(const Duration(seconds: 30)));
+        bootedAt.isBefore(lastActive.subtract(const Duration(seconds: 30)));
 
     PreviousBootDiagnosis diagnosis;
     try {
@@ -121,6 +122,7 @@ class StartupRecoveryService {
       criticalCelsiusFor: criticalCelsiusFor,
       newIncidentId: _uuid.v4(),
       now: DateTime.now(),
+      currentBootAt: bootedAt,
     );
     if (incident == null) return null;
 
@@ -129,7 +131,12 @@ class StartupRecoveryService {
       diagnosis.events,
     );
     if (!saved) {
-      // Already recorded (and already presented) earlier — never re-surface.
+      // Same real-world event already recorded (and presented) — never
+      // re-surface it, even if a different session noticed it.
+      AppLogger.instance.info(
+        _tag,
+        'Duplicate incident ${incident.fingerprint} ignored',
+      );
       return null;
     }
     AppLogger.instance.warning(

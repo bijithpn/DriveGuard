@@ -1,4 +1,5 @@
 import '../../core/logging/app_logger.dart';
+import '../../domain/entities/incident_fingerprint.dart';
 import '../../domain/entities/monitoring_session.dart';
 import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/entities/system_diagnostic_event.dart';
@@ -117,10 +118,15 @@ class IncidentRepository {
     List<SystemDiagnosticEvent> diagnosticEvents,
   ) async {
     try {
+      final fingerprint = incident.fingerprint;
       final existing = await _appDb.db.query(
         'incidents',
-        where: 'session_id = ?',
-        whereArgs: [incident.sessionId],
+        where: fingerprint == null
+            ? 'session_id = ?'
+            : 'session_id = ? OR fingerprint = ?',
+        whereArgs: fingerprint == null
+            ? [incident.sessionId]
+            : [incident.sessionId, fingerprint],
         limit: 1,
       );
       if (existing.isNotEmpty) return false;
@@ -137,6 +143,67 @@ class IncidentRepository {
     } catch (e) {
       AppLogger.instance.error(_tag, 'saveIncidentIfNew failed', e);
       return false;
+    }
+  }
+
+  /// Backfills fingerprints on legacy rows, then deletes every incident that
+  /// describes an event already recorded (keeping the earliest). Idempotent;
+  /// returns how many duplicates were removed.
+  Future<int> purgeDuplicateIncidents() async {
+    try {
+      final db = _appDb.db;
+      return await db.transaction((txn) async {
+        final rows = await txn.query(
+          'incidents',
+          columns: [
+            'id',
+            'session_id',
+            'detected_at',
+            'estimated_shutdown_at',
+            'classification',
+            'fingerprint',
+          ],
+          orderBy: 'detected_at ASC, rowid ASC',
+        );
+        final seen = <String>{};
+        final doomed = <Map<String, Object?>>[];
+        for (final r in rows) {
+          var fp = r['fingerprint'] as String?;
+          if (fp == null) {
+            fp = IncidentFingerprint.legacy(
+              classification: r['classification'] as String,
+              detectedAtMs: r['detected_at'] as int,
+              estimatedShutdownAtMs: r['estimated_shutdown_at'] as int?,
+            );
+            if (!seen.contains(fp)) {
+              await txn.update(
+                'incidents',
+                {'fingerprint': fp},
+                where: 'id = ?',
+                whereArgs: [r['id']],
+              );
+            }
+          }
+          if (!seen.add(fp)) doomed.add(r);
+        }
+        for (final r in doomed) {
+          await txn.delete(
+            'incident_device_stats',
+            where: 'incident_id = ?',
+            whereArgs: [r['id']],
+          );
+          await txn.delete(
+            'diagnostic_events',
+            where: 'session_id = ?',
+            whereArgs: [r['session_id']],
+          );
+          await txn.delete('incidents', where: 'id = ?', whereArgs: [r['id']]);
+        }
+        return doomed.length;
+      });
+    } catch (e) {
+      AppLogger.instance.error(_tag, 'purgeDuplicateIncidents failed', e);
+      return 0;
     }
   }
 

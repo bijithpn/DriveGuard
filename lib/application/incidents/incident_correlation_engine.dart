@@ -1,3 +1,4 @@
+import '../../domain/entities/incident_fingerprint.dart';
 import '../../domain/entities/monitoring_session.dart';
 import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/entities/system_diagnostic_event.dart';
@@ -15,6 +16,7 @@ class IncidentCorrelationEngine {
     required double Function(String deviceId) criticalCelsiusFor,
     required String newIncidentId,
     required DateTime now,
+    DateTime? currentBootAt,
   }) {
     if (previousSession.endedCleanly) return null;
 
@@ -38,6 +40,12 @@ class IncidentCorrelationEngine {
         deviceStats: const [],
         timeline: const [],
         diagnosticEvents: diagnosis.events,
+        fingerprint: IncidentFingerprint.app(
+          classification: classification,
+          currentBootAt: currentBootAt,
+          lastActiveAt:
+              previousSession.lastHeartbeatAt ?? previousSession.startedAt,
+        ),
       );
     }
 
@@ -121,6 +129,11 @@ class IncidentCorrelationEngine {
       deviceStats: stats,
       timeline: timeline,
       diagnosticEvents: diagnosis.events,
+      fingerprint: IncidentFingerprint.system(
+        classification: classification,
+        currentBootAt: currentBootAt,
+        eventAt: estimatedShutdownAt,
+      ),
     );
   }
 

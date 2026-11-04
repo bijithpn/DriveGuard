@@ -64,9 +64,14 @@ class ShutdownIncident {
     this.timeline = const [],
     this.diagnosticEvents = const [],
     this.notificationShown = false,
+    this.fingerprint,
   });
 
   final String id;
+
+  /// Hash identifying the real-world event (see [IncidentFingerprint]); two
+  /// incidents with the same fingerprint are the same event.
+  final String? fingerprint;
 
   final String sessionId;
 
@@ -127,6 +132,7 @@ class ShutdownIncident {
     'summary': summary,
     'primary_device_id': primaryDeviceId,
     'notification_shown': notificationShown ? 1 : 0,
+    'fingerprint': fingerprint,
   };
 
   factory ShutdownIncident.fromMap(
@@ -160,6 +166,7 @@ class ShutdownIncident {
       summary: map['summary'] as String,
       primaryDeviceId: map['primary_device_id'] as String?,
       notificationShown: (map['notification_shown'] as int? ?? 0) != 0,
+      fingerprint: map['fingerprint'] as String?,
       deviceStats: deviceStats,
       timeline: timeline,
       diagnosticEvents: diagnosticEvents,
