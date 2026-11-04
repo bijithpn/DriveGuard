@@ -34,3 +34,17 @@ Keep `build/symbols` per release; it is needed to symbolicate crash stacks.
   explicit device permissions.
 - Wayland: window positioning and always-on-top are limited; verify the edge dock on
   both X11 and Wayland sessions.
+
+## Automated releases
+`.github/workflows/release.yml` builds all three platforms when you push a tag (`git tag v1.0.0 && git push --tags`)
+and attaches the archives to a GitHub release. Debug symbols (`build/symbols`) are uploaded as workflow artifacts.
+It is **untested** - run it once on a throwaway tag first.
+
+Signing is skipped unless these repository secrets exist:
+
+| Platform | Secrets |
+|---|---|
+| macOS | `MACOS_CERT_P12` (base64 .p12), `MACOS_CERT_PASSWORD`, `MACOS_SIGN_IDENTITY`, `NOTARY_APPLE_ID`, `NOTARY_TEAM_ID`, `NOTARY_APP_PASSWORD` |
+| Windows | `WINDOWS_CERT_PFX` (base64 .pfx), `WINDOWS_CERT_PASSWORD` |
+
+Linux artifacts are an unsigned tarball; build a `.deb`/AppImage separately if you need one.
