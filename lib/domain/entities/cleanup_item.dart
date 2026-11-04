@@ -12,7 +12,8 @@ enum CleanupCategory {
   trash('Trash'),
   developer('Developer tools'),
   packages('Package caches'),
-  downloads('Downloads');
+  downloads('Downloads'),
+  projects('Project build files');
 
   const CleanupCategory(this.label);
   final String label;
@@ -32,6 +33,7 @@ class CleanupItem {
     this.sizeIsPartial = false,
     this.deleteContentsOnly = true,
     this.requiresAdmin = false,
+    this.project,
   });
 
   final String id;
@@ -54,6 +56,9 @@ class CleanupItem {
   /// Owned by the system: deleting needs the OS administrator prompt.
   final bool requiresAdmin;
 
+  /// Name of the project folder this item belongs to (project artifacts).
+  final String? project;
+
   CleanupItem copyWith({
     int? sizeBytes,
     int? fileCount,
@@ -72,6 +77,7 @@ class CleanupItem {
     sizeIsPartial: sizeIsPartial ?? this.sizeIsPartial,
     deleteContentsOnly: deleteContentsOnly,
     requiresAdmin: requiresAdmin,
+    project: project,
   );
 }
 

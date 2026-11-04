@@ -17,7 +17,17 @@ class UsageDonut extends StatelessWidget {
     required this.child,
     this.size = 190,
     this.thickness = 18,
+    this.animationKey,
+    this.total,
   });
+
+  /// The intro animation plays only when this key changes. Value updates
+  /// with the same key repaint instantly, so streaming data never restarts it.
+  final Object? animationKey;
+
+  /// Fixed denominator (e.g. 1.0 for a progress ring). Defaults to the sum
+  /// of the segments.
+  final double? total;
 
   final List<DonutSegment> segments;
   final Color trackColor;
@@ -31,12 +41,12 @@ class UsageDonut extends StatelessWidget {
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 700),
       curve: Curves.easeOutCubic,
-      key: ValueKey(segments.map((s) => s.value.round()).join(',')),
+      key: ValueKey(animationKey ?? 'static'),
       builder: (context, t, _) => SizedBox(
         width: size,
         height: size,
         child: CustomPaint(
-          painter: _DonutPainter(segments, trackColor, thickness, t),
+          painter: _DonutPainter(segments, trackColor, thickness, t, total),
           child: Center(child: child),
         ),
       ),
@@ -45,7 +55,14 @@ class UsageDonut extends StatelessWidget {
 }
 
 class _DonutPainter extends CustomPainter {
-  _DonutPainter(this.segments, this.track, this.thickness, this.t);
+  _DonutPainter(
+    this.segments,
+    this.track,
+    this.thickness,
+    this.t,
+    this.fixedTotal,
+  );
+  final double? fixedTotal;
 
   final List<DonutSegment> segments;
   final Color track;
@@ -62,7 +79,7 @@ class _DonutPainter extends CustomPainter {
       ..color = track;
     canvas.drawArc(arcRect, 0, math.pi * 2, false, base);
 
-    final total = segments.fold<double>(0, (s, e) => s + e.value);
+    final total = fixedTotal ?? segments.fold<double>(0, (s, e) => s + e.value);
     if (total <= 0) return;
     final gap = segments.where((s) => s.value > 0).length > 1 ? 0.045 : 0.0;
     var start = -math.pi / 2;
@@ -93,5 +110,8 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DonutPainter old) =>
-      old.t != t || old.segments != segments || old.track != track;
+      old.t != t ||
+      old.segments != segments ||
+      old.track != track ||
+      old.fixedTotal != fixedTotal;
 }

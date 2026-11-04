@@ -7,6 +7,7 @@ import '../protection/privileged_runner.dart';
 import '../../core/utils/safe_process_runner.dart';
 import '../../domain/entities/cleanup_item.dart';
 import 'cleanup_catalog.dart';
+import 'project_scanner.dart';
 
 /// Deletes [CleanupItem]s — but only ever inside the folders in the
 /// [CleanupCatalog]. Every path is resolved (symlinks included) and checked
@@ -22,7 +23,9 @@ class CleanupService {
     String? operatingSystem,
     Future<bool> Function(String path)? trash,
     PrivilegedRunner? privileged,
+    List<String>? projectRoots,
   }) : _privileged = privileged,
+       _projectRoots = projectRoots,
        _runner = runner ?? SafeProcessRunner.instance,
        _os = operatingSystem ?? Platform.operatingSystem,
        _trashOverride = trash,
@@ -37,6 +40,7 @@ class CleanupService {
   final Future<bool> Function(String path)? _trashOverride;
   final List<String> _roots;
   final PrivilegedRunner? _privileged;
+  final List<String>? _projectRoots;
 
   static String? _resolve(String path) {
     try {
@@ -63,6 +67,17 @@ class CleanupService {
     if (resolved == null) return false;
     if (resolved == home || resolved == sep || resolved.length < 4) {
       return false;
+    }
+    // Build folders of real projects (node_modules, build, …) anywhere under
+    // the user's code folders — validated by their project marker file.
+    final pRoots = [
+      for (final r in _projectRoots ?? [home]) _resolve(r) ?? r,
+    ];
+    if (pRoots.any(
+          (r) => resolved.startsWith(r.endsWith(sep) ? r : '$r$sep'),
+        ) &&
+        isProjectArtifact(resolved)) {
+      return true;
     }
     return _roots.any(
       (r) =>
@@ -211,6 +226,39 @@ class CleanupService {
         ..add(u >> 8);
     }
     return base64.encode(bytes);
+  }
+
+  /// Empties the whole system Trash / Recycle Bin (permanent). Review and
+  /// Manual cleanups only move files there, so this is what really frees the
+  /// space.
+  Future<bool> emptyTrash() async {
+    try {
+      switch (_os) {
+        case 'macos':
+          await _runner.run('osascript', [
+            '-e',
+            'tell application "Finder" to empty trash',
+          ], timeout: const Duration(minutes: 5));
+          return true;
+        case 'linux':
+          await _runner.run('gio', [
+            'trash',
+            '--empty',
+          ], timeout: const Duration(minutes: 5));
+          return true;
+        case 'windows':
+          await _runner.run('powershell', [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            'Clear-RecycleBin -Force -ErrorAction Stop',
+          ], timeout: const Duration(minutes: 5));
+          return true;
+      }
+    } catch (e) {
+      AppLogger.instance.warning(_tag, 'Empty trash failed: $e');
+    }
+    return false;
   }
 
   Future<bool> _deletePermanently(CleanupItem item) {

@@ -5,8 +5,11 @@ import 'dart:ui' as ui;
 
 import 'package:tray_manager/tray_manager.dart';
 
+import '../../application/settings/app_settings.dart' show TraySettings;
 import '../../core/logging/app_logger.dart';
 import '../../domain/enums/storage_enums.dart';
+import '../../domain/enums/ui_enums.dart';
+import 'tray_icon_painter.dart';
 
 class TrayDeviceSummary {
   const TrayDeviceSummary({
@@ -14,14 +17,31 @@ class TrayDeviceSummary {
     required this.name,
     required this.valueText,
     required this.severity,
+    this.celsius,
+    this.fraction = 0,
+    this.detail,
   });
 
   final String id;
   final String name;
+
+  /// Formatted in the user's unit, e.g. "42°C".
   final String valueText;
   final TemperatureSeverity severity;
+  final double? celsius;
+
+  /// 0..1 — how close to the critical limit (drives the ring style).
+  final double fraction;
+
+  /// One-line extra info for the detailed menu ("Normal · 63% used").
+  final String? detail;
 }
 
+/// System-tray / menu-bar presence.
+///
+/// The icon is drawn at runtime from the user's chosen style, so it looks the
+/// same on every platform — nothing depends on the OS supporting a text label
+/// next to the icon (Windows doesn't, and macOS/Linux do it inconsistently).
 class AppTrayService {
   static const _tag = 'AppTrayService';
 
@@ -30,6 +50,10 @@ class AppTrayService {
   final void Function() onOpenSettings;
   final void Function() onRescan;
   final void Function() onQuit;
+  final void Function()? onOpenStorageSense;
+
+  /// Called when the user changes an option from the tray menu itself.
+  final void Function(TraySettings)? onTraySettingsChanged;
 
   AppTrayService({
     required this.onOpenDashboard,
@@ -37,19 +61,28 @@ class AppTrayService {
     required this.onOpenSettings,
     required this.onRescan,
     required this.onQuit,
-  });
+    this.onOpenStorageSense,
+    this.onTraySettingsChanged,
+    TraySettings settings = const TraySettings(),
+  }) : _settings = settings;
 
+  TraySettings _settings;
   TemperatureSeverity _lastSeverity = TemperatureSeverity.normal;
   bool _paused = false;
   List<TrayDeviceSummary> _devices = const [];
+  String? _averageText;
+  double _averageFraction = 0;
   final Map<String, String> _iconPathCache = {};
+  Directory? _iconDir;
 
   String? _selectedDeviceId;
   bool _selectionIsExplicit = false;
   _Listener? _listener;
+  Future<void> _queue = Future.value();
 
   Future<void> initialize() async {
-    await _applyIcon(TemperatureSeverity.normal);
+    await _prepareIconDir();
+    await _applyIcon();
     await _rebuildMenu();
     final listener = _Listener(
       onDoubleClick: onOpenDashboard,
@@ -72,86 +105,76 @@ class AppTrayService {
     }
   }
 
-  Future<void> updateSeverity(TemperatureSeverity severity) async {
-    if (severity == _lastSeverity) return;
+  /// Icon files live in one private folder that is wiped on start, so they
+  /// never pile up in the system temp directory.
+  Future<void> _prepareIconDir() async {
+    try {
+      final dir = Directory(
+        '${Directory.systemTemp.path}${Platform.pathSeparator}driveguard_tray',
+      );
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+      dir.createSync(recursive: true);
+      _iconDir = dir;
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'Icon dir unavailable: $e');
+    }
+  }
+
+  // --- Public updates (serialised so rapid updates can't interleave) -------
+
+  Future<void> _enqueue(Future<void> Function() job) {
+    _queue = _queue.then((_) => job()).catchError((Object e) {
+      AppLogger.instance.debug(_tag, 'Tray update failed: $e');
+    });
+    return _queue;
+  }
+
+  Future<void> updateSeverity(TemperatureSeverity severity) {
+    if (severity == _lastSeverity) return Future.value();
     _lastSeverity = severity;
-    await _applyIcon(severity);
+    return _enqueue(_applyIcon);
   }
 
-  Future<void> setPaused(bool paused) async {
-    if (paused == _paused) return;
+  Future<void> setPaused(bool paused) {
+    if (paused == _paused) return Future.value();
     _paused = paused;
-    await _rebuildMenu();
+    return _enqueue(_rebuildMenu);
   }
 
-  Future<void> updateDevices(List<TrayDeviceSummary> devices) async {
+  Future<void> updateDevices(
+    List<TrayDeviceSummary> devices, {
+    String? averageText,
+    double averageFraction = 0,
+  }) {
     _devices = devices;
-
+    _averageText = averageText;
+    _averageFraction = averageFraction;
     if (_selectionIsExplicit &&
         !devices.any((d) => d.id == _selectedDeviceId)) {
       _selectionIsExplicit = false;
     }
-    await _applyIcon(_lastSeverity);
-    await _rebuildMenu();
+    return _enqueue(() async {
+      await _applyIcon();
+      await _rebuildMenu();
+    });
   }
 
-  void _selectDevice(String id) {
-    _selectedDeviceId = id;
-    _selectionIsExplicit = true;
-    unawaited(_applyIcon(_lastSeverity));
-    unawaited(_rebuildMenu());
+  Future<void> applySettings(TraySettings settings) {
+    if (settings == _settings) return Future.value();
+    _settings = settings;
+    return _enqueue(() async {
+      await _applyIcon();
+      await _rebuildMenu();
+    });
   }
 
-  TrayDeviceSummary? get _displayedDevice {
-    if (_devices.isEmpty) return null;
-    if (_selectionIsExplicit) {
-      for (final d in _devices) {
-        if (d.id == _selectedDeviceId) return d;
-      }
-    }
-    return _devices.reduce(
-      (a, b) => _rank(a.severity) >= _rank(b.severity) ? a : b,
-    );
+  /// The OS light/dark appearance changed: neutral icon colours must flip.
+  Future<void> onBrightnessChanged() {
+    _iconPathCache.clear();
+    return _enqueue(_applyIcon);
   }
 
-  Future<void> _applyIcon(TemperatureSeverity severity) async {
-    try {
-      final displayed = _displayedDevice;
-      final label = displayed?.valueText;
-      final path = await _iconPathFor(severity, label);
-      await trayManager.setIcon(path);
-
-      if (!Platform.isLinux) {
-        try {
-          await trayManager.setToolTip(
-            'DriveGuard - ${_tooltipSummary(severity)}',
-          );
-        } catch (_) {}
-      }
-
-      if (Platform.isMacOS || Platform.isLinux) {
-        try {
-          await trayManager.setTitle(
-            displayed == null ? '' : displayed.valueText,
-          );
-        } catch (_) {}
-      }
-    } catch (e) {
-      AppLogger.instance.warning(_tag, 'Failed to apply tray icon: $e');
-    }
-  }
-
-  String _tooltipSummary(TemperatureSeverity severity) {
-    if (_devices.isEmpty) return _severityLabel(severity);
-    if (_devices.length == 1) {
-      final d = _devices.single;
-      return '${d.name}: ${d.valueText} · ${_severityLabel(d.severity)}';
-    }
-    final warmest = _devices.reduce(
-      (a, b) => _rank(a.severity) >= _rank(b.severity) ? a : b,
-    );
-    return '${_devices.length} drives · Warmest ${warmest.valueText} · ${_severityLabel(severity)}';
-  }
+  // --- What is displayed ----------------------------------------------------
 
   int _rank(TemperatureSeverity s) => switch (s) {
     TemperatureSeverity.critical => 4,
@@ -161,6 +184,134 @@ class AppTrayService {
     TemperatureSeverity.unavailable => 0,
   };
 
+  TrayDeviceSummary? get _hottest {
+    if (_devices.isEmpty) return null;
+    return _devices.reduce((a, b) {
+      final r = _rank(a.severity).compareTo(_rank(b.severity));
+      if (r != 0) return r > 0 ? a : b;
+      return (a.celsius ?? -1000) >= (b.celsius ?? -1000) ? a : b;
+    });
+  }
+
+  TrayDeviceSummary? get _displayedDevice {
+    if (_devices.isEmpty) return null;
+    if (_selectionIsExplicit) {
+      for (final d in _devices) {
+        if (d.id == _selectedDeviceId) return d;
+      }
+    }
+    return _hottest;
+  }
+
+  /// (text like "42°C", fraction, severity) shown by the icon.
+  ({String? text, double fraction, TemperatureSeverity severity}) get _shown {
+    if (_devices.isEmpty) {
+      return (
+        text: null,
+        fraction: 0,
+        severity: TemperatureSeverity.unavailable,
+      );
+    }
+    final worst = _lastSeverity;
+    if (!_selectionIsExplicit &&
+        _settings.metric == TrayMetric.average &&
+        _averageText != null) {
+      return (text: _averageText, fraction: _averageFraction, severity: worst);
+    }
+    final d = _displayedDevice;
+    return (text: d?.valueText, fraction: d?.fraction ?? 0, severity: worst);
+  }
+
+  // --- Icon -----------------------------------------------------------------
+
+  bool get _darkBackground =>
+      ui.PlatformDispatcher.instance.platformBrightness == ui.Brightness.dark;
+
+  Future<void> _applyIcon() async {
+    try {
+      final shown = _shown;
+      var spec = TrayIconSpec(
+        style: _settings.style,
+        severity: shown.severity,
+        numberText: trayNumberText(shown.text),
+        unit: trayUnitText(shown.text),
+        fraction: shown.fraction,
+        darkBackground: _darkBackground,
+      );
+      // macOS can tint monochrome images to match the menu bar automatically.
+      if (Platform.isMacOS && !spec.needsColor) {
+        spec = TrayIconSpec(
+          style: spec.style,
+          severity: spec.severity,
+          numberText: spec.numberText,
+          unit: spec.unit,
+          fraction: spec.fraction,
+          darkBackground: spec.darkBackground,
+          template: true,
+        );
+      }
+      final path = await _iconPathFor(spec);
+      await trayManager.setIcon(path, isTemplate: spec.template);
+
+      if (!Platform.isLinux) {
+        try {
+          await trayManager.setToolTip('DriveGuard — ${_tooltipSummary()}');
+        } catch (_) {}
+      }
+
+      // Text beside the icon is a macOS/Linux-only extra, and only when the
+      // icon itself doesn't already show the number.
+      if (Platform.isMacOS || Platform.isLinux) {
+        final iconShowsNumber =
+            _settings.style == TrayIconStyle.temperature ||
+            _settings.style == TrayIconStyle.ring;
+        try {
+          await trayManager.setTitle(
+            _settings.showText && !iconShowsNumber ? (shown.text ?? '') : '',
+          );
+        } catch (_) {}
+      }
+    } catch (e) {
+      AppLogger.instance.warning(_tag, 'Failed to apply tray icon: $e');
+    }
+  }
+
+  String _tooltipSummary() {
+    if (_devices.isEmpty) return 'Scanning for drives…';
+    if (_devices.length == 1) {
+      final d = _devices.single;
+      return '${d.name}: ${d.valueText} · ${_severityLabel(d.severity)}';
+    }
+    final h = _hottest!;
+    return '${_devices.length} drives · Hottest ${h.valueText} · '
+        '${_severityLabel(_lastSeverity)}';
+  }
+
+  String _severityLabel(TemperatureSeverity s) => switch (s) {
+    TemperatureSeverity.normal || TemperatureSeverity.warm => 'Normal',
+    TemperatureSeverity.warning => 'Warning',
+    TemperatureSeverity.critical => 'Critical',
+    TemperatureSeverity.unavailable => 'N/A',
+  };
+
+  Future<String> _iconPathFor(TrayIconSpec spec) async {
+    final isWindows = Platform.isWindows;
+    final key = '${spec.cacheKey}_${isWindows ? 'ico' : 'png'}';
+    final cached = _iconPathCache[key];
+    if (cached != null && File(cached).existsSync()) return cached;
+
+    final png = Uint8List.fromList(await renderTrayIconPng(spec));
+    final bytes = isWindows ? wrapPngInIco(png, 64, 64) : png;
+    final dir = _iconDir?.path ?? Directory.systemTemp.path;
+    final file = File(
+      '$dir${Platform.pathSeparator}dg_${key.replaceAll(RegExp(r'[^\w]'), '_')}.${isWindows ? 'ico' : 'png'}',
+    );
+    await file.writeAsBytes(bytes, flush: true);
+    _iconPathCache[key] = file.path;
+    return file.path;
+  }
+
+  /// Wraps a PNG in a single-image ICO container (Windows tray requires .ico).
   static Uint8List wrapPngInIco(Uint8List pngBytes, int width, int height) {
     final byteData = ByteData(22 + pngBytes.length);
 
@@ -182,142 +333,82 @@ class AppTrayService {
     return result;
   }
 
-  Future<String> _iconPathFor(
-    TemperatureSeverity severity,
-    String? label,
-  ) async {
-    final isWindows = Platform.isWindows;
-    final cacheKey =
-        '${severity.name}_${label ?? ''}_${isWindows ? "ico" : "png"}';
-    final cached = _iconPathCache[cacheKey];
-    if (cached != null && File(cached).existsSync()) return cached;
+  // --- Menu -----------------------------------------------------------------
 
-    final pngBytes = await _renderTrayIcon(_severityColor(severity), label);
-    final bytes = isWindows ? wrapPngInIco(pngBytes, 64, 64) : pngBytes;
-    final ext = isWindows ? 'ico' : 'png';
-    final safe = (label ?? '').replaceAll(RegExp(r'[^\w]'), '_');
-    final file = File(
-      '${Directory.systemTemp.path}${Platform.pathSeparator}driveguard_tray_${severity.name}_$safe.$ext',
-    );
-    await file.writeAsBytes(bytes, flush: true);
-    _iconPathCache[cacheKey] = file.path;
-    return file.path;
-  }
-
-  ui.Color _severityColor(TemperatureSeverity severity) {
-    switch (severity) {
-      case TemperatureSeverity.normal:
-      case TemperatureSeverity.warm:
-        return const ui.Color(0xFF3DD68C);
-      case TemperatureSeverity.warning:
-        return const ui.Color(0xFFFFBC42);
-      case TemperatureSeverity.critical:
-        return const ui.Color(0xFFFF4D4D);
-      case TemperatureSeverity.unavailable:
-        return const ui.Color(0xFF5E587A);
+  String get _overallLabel {
+    if (_paused) return 'Monitoring paused';
+    if (_devices.isEmpty) return 'Scanning for drives…';
+    final n = _devices.length;
+    final attention = _devices
+        .where((d) => _rank(d.severity) >= _rank(TemperatureSeverity.warning))
+        .length;
+    if (attention > 0) {
+      return '$attention of $n drive${n == 1 ? '' : 's'} need attention';
     }
-  }
-
-  Future<Uint8List> _renderTrayIcon(ui.Color color, String? label) async {
-    const double size = 64;
-    final recorder = ui.PictureRecorder();
-    final canvas = ui.Canvas(recorder);
-
-    final bgPaint = ui.Paint()
-      ..color = color
-      ..isAntiAlias = true;
-    canvas.drawRRect(
-      ui.RRect.fromRectAndRadius(
-        const ui.Rect.fromLTWH(2, 2, size - 4, size - 4),
-        const ui.Radius.circular(14),
-      ),
-      bgPaint,
-    );
-
-    final displayLabel = (label == null || label.length > 5)
-        ? (label == null ? null : 'N/A')
-        : label;
-
-    if (displayLabel != null && displayLabel.isNotEmpty) {
-      final fontSize = switch (displayLabel.length) {
-        <= 2 => 32.0,
-        3 => 27.0,
-        4 => 23.0,
-        _ => 18.0,
-      };
-      final style = ui.TextStyle(
-        color: const ui.Color(0xFFFFFFFF),
-        fontSize: fontSize,
-        fontWeight: ui.FontWeight.w800,
-      );
-      final paraStyle = ui.ParagraphStyle(
-        textAlign: ui.TextAlign.center,
-        maxLines: 1,
-      );
-      final builder = ui.ParagraphBuilder(paraStyle)
-        ..pushStyle(style)
-        ..addText(displayLabel);
-      final para = builder.build();
-      para.layout(const ui.ParagraphConstraints(width: size));
-
-      final yOffset = (size - para.height) / 2;
-      canvas.drawParagraph(para, ui.Offset(0, yOffset));
-    } else {
-      final linePaint = ui.Paint()
-        ..blendMode = ui.BlendMode.clear
-        ..style = ui.PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = ui.StrokeCap.round
-        ..isAntiAlias = true;
-      for (final y in [23.0, 32.0, 41.0]) {
-        canvas.drawLine(ui.Offset(17, y), ui.Offset(size - 17, y), linePaint);
-      }
-    }
-
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(size.toInt(), size.toInt());
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
-  }
-
-  String _severityLabel(TemperatureSeverity severity) {
-    switch (severity) {
-      case TemperatureSeverity.normal:
-      case TemperatureSeverity.warm:
-        return 'Normal';
-      case TemperatureSeverity.warning:
-        return 'Warning';
-      case TemperatureSeverity.critical:
-        return 'Critical';
-      case TemperatureSeverity.unavailable:
-        return 'N/A';
-    }
+    return n == 1 ? '1 drive · all normal' : '$n drives · all normal';
   }
 
   Future<void> _rebuildMenu() async {
     final displayed = _displayedDevice;
+    final detailed = _settings.menuDetail == TrayMenuDetail.detailed;
+    final showTextSupported = Platform.isMacOS || Platform.isLinux;
     final menu = Menu(
       items: [
-        if (_devices.isEmpty)
-          MenuItem(disabled: true, label: 'Scanning for drives…')
-        else ...[
-          for (final d in _devices)
-            MenuItem.checkbox(
-              key: 'device:${d.id}',
-              label: '${d.name}   ${d.valueText}',
-              checked: displayed?.id == d.id,
-            ),
-        ],
+        MenuItem(disabled: true, label: _overallLabel),
         MenuItem.separator(),
+        for (final d in _devices)
+          MenuItem.checkbox(
+            key: 'device:${d.id}',
+            label: detailed && d.detail != null
+                ? '${d.name}  —  ${d.valueText} · ${d.detail}'
+                : '${d.name}   ${d.valueText}',
+            checked: displayed?.id == d.id,
+          ),
+        if (_devices.isNotEmpty) MenuItem.separator(),
         MenuItem(key: 'open', label: 'Open Dashboard'),
+        if (onOpenStorageSense != null)
+          MenuItem(key: 'sense', label: 'Storage Sense'),
         MenuItem(
           key: 'pause_resume',
           label: _paused ? 'Resume Monitoring' : 'Pause Monitoring',
         ),
-        MenuItem(key: 'settings', label: 'Settings'),
         MenuItem(key: 'rescan', label: 'Rescan Drives'),
         MenuItem.separator(),
-        MenuItem(key: 'quit', label: 'Quit'),
+        MenuItem.submenu(
+          label: 'Tray Icon',
+          submenu: Menu(
+            items: [
+              for (final s in TrayIconStyle.values)
+                MenuItem.checkbox(
+                  key: 'style:${s.name}',
+                  label: s.label,
+                  checked: _settings.style == s,
+                ),
+              MenuItem.separator(),
+              for (final m in TrayMetric.values)
+                MenuItem.checkbox(
+                  key: 'metric:${m.name}',
+                  label: m.label,
+                  checked: !_selectionIsExplicit && _settings.metric == m,
+                ),
+              MenuItem.separator(),
+              if (showTextSupported)
+                MenuItem.checkbox(
+                  key: 'showtext',
+                  label: 'Show text beside icon',
+                  checked: _settings.showText,
+                ),
+              MenuItem.checkbox(
+                key: 'detail',
+                label: 'Detailed drive list',
+                checked: detailed,
+              ),
+            ],
+          ),
+        ),
+        MenuItem(key: 'settings', label: 'Settings…'),
+        MenuItem.separator(),
+        MenuItem(key: 'quit', label: 'Quit DriveGuard'),
       ],
     );
     try {
@@ -327,14 +418,61 @@ class AppTrayService {
     }
   }
 
+  void _change(TraySettings next) {
+    onTraySettingsChanged?.call(next);
+    unawaited(applySettings(next));
+  }
+
   void handleMenuClick(String key) {
     if (key.startsWith('device:')) {
-      _selectDevice(key.substring('device:'.length));
+      _selectedDeviceId = key.substring('device:'.length);
+      _selectionIsExplicit = true;
+      unawaited(
+        _enqueue(() async {
+          await _applyIcon();
+          await _rebuildMenu();
+        }),
+      );
+      return;
+    }
+    if (key.startsWith('style:')) {
+      final s = TrayIconStyle.values.where((e) => e.name == key.substring(6));
+      if (s.isNotEmpty) _change(_settings.copyWith(style: s.first));
+      return;
+    }
+    if (key.startsWith('metric:')) {
+      final m = TrayMetric.values.where((e) => e.name == key.substring(7));
+      if (m.isNotEmpty) {
+        _selectionIsExplicit = false; // choosing a metric un-pins a drive
+        final next = _settings.copyWith(metric: m.first);
+        if (next == _settings) {
+          unawaited(
+            _enqueue(() async {
+              await _applyIcon();
+              await _rebuildMenu();
+            }),
+          );
+        } else {
+          _change(next);
+        }
+      }
       return;
     }
     switch (key) {
+      case 'showtext':
+        _change(_settings.copyWith(showText: !_settings.showText));
+      case 'detail':
+        _change(
+          _settings.copyWith(
+            menuDetail: _settings.menuDetail == TrayMenuDetail.detailed
+                ? TrayMenuDetail.compact
+                : TrayMenuDetail.detailed,
+          ),
+        );
       case 'open':
         onOpenDashboard();
+      case 'sense':
+        onOpenStorageSense?.call();
       case 'pause_resume':
         onPauseResume();
       case 'settings':

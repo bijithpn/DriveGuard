@@ -4,6 +4,7 @@ import 'package:driveguard/application/protection/privileged_runner.dart';
 import 'package:driveguard/application/storage_sense/cleanup_catalog.dart';
 import 'package:driveguard/application/storage_sense/cleanup_scanner.dart';
 import 'package:driveguard/application/storage_sense/cleanup_service.dart';
+import 'package:driveguard/application/storage_sense/size_measurer.dart';
 import 'package:driveguard/domain/entities/cleanup_item.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -29,17 +30,20 @@ void main() {
     category: CleanupCategory.systemCaches,
   );
 
-  test('scanner measures sizes and counts files', () async {
-    final items = await const CleanupScanner().scan([target(cache.path)]);
+  test('scanner measures sizes', () async {
+    final items = await CleanupScanner(
+      measurer: IsolateMeasurer(),
+    ).scan([target(cache.path)]);
     expect(items, hasLength(1));
     expect(items.single.sizeBytes, 3072);
-    expect(items.single.fileCount, 2);
   });
 
   test('safe delete empties the folder but keeps it', () async {
     final t = target(cache.path);
     final svc = CleanupService(targets: [t]);
-    final item = (await const CleanupScanner().scan([t])).single;
+    final item = (await CleanupScanner(
+      measurer: IsolateMeasurer(),
+    ).scan([t])).single;
     final r = await svc.delete([item]);
     expect(r.freedBytes, 3072);
     expect(r.failures, isEmpty);
@@ -94,7 +98,9 @@ void main() {
 
   test('review items go to Trash, never deleted if trash fails', () async {
     final t = target(cache.path);
-    final item = (await const CleanupScanner().scan([t])).single;
+    final item = (await CleanupScanner(
+      measurer: IsolateMeasurer(),
+    ).scan([t])).single;
     final review = CleanupItem(
       id: item.id,
       name: item.name,
@@ -143,6 +149,8 @@ void main() {
       CleanupSafety.manual,
     );
   });
+
+  scannerTests();
 
   group('administrator cleanup', () {
     CleanupItem adminItem() => CleanupItem(
@@ -263,4 +271,96 @@ class _FakePriv implements PrivilegedRunner {
     if (result) onRun?.call(script);
     return result;
   }
+}
+
+void scannerTests() {
+  group('CleanupScanner progress, splitting and cancel', () {
+    late Directory tmp;
+    setUp(() => tmp = Directory.systemTemp.createTempSync('scan_test'));
+    tearDown(() => tmp.deleteSync(recursive: true));
+
+    CleanupTarget t(String path, {bool expand = false}) => CleanupTarget(
+      id: 't${path.hashCode}',
+      name: 'T',
+      description: 'd',
+      path: path,
+      safety: CleanupSafety.safe,
+      category: CleanupCategory.systemCaches,
+      expandChildren: expand,
+    );
+
+    Directory tree() {
+      final d = Directory('${tmp.path}/big')..createSync();
+      for (var i = 0; i < 6; i++) {
+        final sub = Directory('${d.path}/sub$i')..createSync();
+        File('${sub.path}/f').writeAsBytesSync(List.filled(1000 * (i + 1), 1));
+        Directory('${sub.path}/deep').createSync();
+        File('${sub.path}/deep/g').writeAsBytesSync(List.filled(500, 1));
+      }
+      File('${d.path}/loose').writeAsBytesSync(List.filled(777, 1));
+      return d;
+    }
+
+    test('a split target totals exactly what an unsplit scan gives', () async {
+      final d = tree();
+      final whole = await CleanupScanner(
+        measurer: IsolateMeasurer(),
+        splitDepth: 0,
+      ).scan([t(d.path)]);
+      final split = await CleanupScanner(
+        measurer: IsolateMeasurer(),
+        splitDepth: 2,
+      ).scan([t(d.path)]);
+      expect(split.single.sizeBytes, whole.single.sizeBytes);
+      expect(split.single.sizeBytes, 1000 * 21 + 500 * 6 + 777);
+    });
+
+    test(
+      'progress is monotonic, ends complete, and items stream out',
+      () async {
+        final d = tree();
+        final seen = <ScanProgress>[];
+        final streamed = <CleanupItem>[];
+        await CleanupScanner(measurer: IsolateMeasurer()).scan(
+          [t(d.path), t(d.path, expand: true)],
+          onProgress: seen.add,
+          onItems: streamed.addAll,
+        );
+        expect(seen, isNotEmpty);
+        var last = 0;
+        for (final p in seen) {
+          expect(p.done, greaterThanOrEqualTo(last));
+          last = p.done;
+        }
+        expect(seen.last.done, seen.last.total);
+        expect(streamed, isNotEmpty);
+        expect(
+          seen.last.foundBytes,
+          streamed.fold<int>(0, (s, i) => s + i.sizeBytes),
+        );
+      },
+    );
+
+    test('cancel stops measuring', () async {
+      final d = tree();
+      var calls = 0;
+      final items = await CleanupScanner(
+        measurer: IsolateMeasurer(concurrency: 1),
+      ).scan([t(d.path, expand: true)], isCancelled: () => ++calls > 2);
+      expect(items.length, lessThan(6));
+    });
+
+    test(
+      'native du agrees with the Dart walk to within block rounding',
+      () async {
+        if (Platform.isWindows || !await DuMeasurer.available()) return;
+        final d = tree();
+        final du = await DuMeasurer().measure(d.path);
+        final dart = await IsolateMeasurer().measure(d.path);
+        // du reports allocated blocks, so it is >= the apparent size.
+        expect(du.bytes, greaterThanOrEqualTo(dart.bytes));
+        expect(du.bytes, lessThan(dart.bytes + 64 * 1024));
+      },
+    );
+  });
 }

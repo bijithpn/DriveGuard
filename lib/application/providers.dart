@@ -9,6 +9,7 @@ import '../domain/entities/storage_activity.dart';
 import '../domain/entities/storage_device.dart';
 import '../domain/repositories/storage_monitor.dart';
 import '../infrastructure/persistence/incident_repository.dart';
+import '../infrastructure/persistence/local_state_repository.dart';
 import '../infrastructure/persistence/settings_repository.dart';
 import 'incidents/heartbeat_service.dart';
 import 'monitoring/metric_history_store.dart';
@@ -97,6 +98,11 @@ final thermalProtectionStateProvider = StreamProvider<ThermalProtectionState>((
   yield* service.stream;
 });
 
+/// Null in tests (no disk access); the app overrides it with the real thing.
+final localStateRepositoryProvider = Provider<LocalStateRepository?>(
+  (ref) => null,
+);
+
 final Provider<ResourceGuardService> resourceGuardProvider =
     Provider<ResourceGuardService>((ref) {
       final service = ResourceGuardService(
@@ -131,6 +137,7 @@ final Provider<MonitoringService> monitoringServiceProvider =
         incidentRepository: ref.watch(incidentRepositoryProvider),
         thermalProtection: ref.watch(thermalProtectionServiceProvider),
         resourceGuard: ref.watch(resourceGuardProvider),
+        localState: ref.watch(localStateRepositoryProvider),
         sessionId: ref.watch(sessionIdProvider),
       );
       ref.onDispose(service.dispose);

@@ -11,6 +11,8 @@ import '../providers.dart';
 import 'cleanup_catalog.dart';
 import 'cleanup_scanner.dart';
 import 'cleanup_service.dart';
+import 'project_scanner.dart';
+import 'size_measurer.dart';
 
 enum SenseStatus { idle, scanning, ready, deleting }
 
@@ -20,22 +22,34 @@ class StorageSenseState {
     this.items = const [],
     this.selected = const {},
     this.progress = 0,
+    this.scanProgress,
+    this.scanPhase = '',
     this.query = '',
     this.reclaimedBytes = 0,
     this.trashedBytes = 0,
     this.message,
     this.hasScanned = false,
+    this.groupByProject = false,
+    this.cachedAt,
   });
 
   final SenseStatus status;
   final List<CleanupItem> items;
   final Set<String> selected;
   final double progress;
+
+  /// Live detail while scanning (null otherwise).
+  final ScanProgress? scanProgress;
+  final String scanPhase;
   final String query;
   final int reclaimedBytes;
   final int trashedBytes;
   final String? message;
   final bool hasScanned;
+  final bool groupByProject;
+
+  /// Set while showing results from a previous scan that is being refreshed.
+  final DateTime? cachedAt;
 
   int bytesFor(CleanupSafety s) => items
       .where((i) => i.safety == s)
@@ -64,22 +78,34 @@ class StorageSenseState {
     List<CleanupItem>? items,
     Set<String>? selected,
     double? progress,
+    ScanProgress? scanProgress,
+    bool clearScanProgress = false,
+    String? scanPhase,
     String? query,
     int? reclaimedBytes,
     int? trashedBytes,
     String? message,
     bool clearMessage = false,
     bool? hasScanned,
+    bool? groupByProject,
+    DateTime? cachedAt,
+    bool clearCachedAt = false,
   }) => StorageSenseState(
     status: status ?? this.status,
     items: items ?? this.items,
     selected: selected ?? this.selected,
     progress: progress ?? this.progress,
+    scanProgress: clearScanProgress
+        ? null
+        : (scanProgress ?? this.scanProgress),
+    scanPhase: scanPhase ?? this.scanPhase,
     query: query ?? this.query,
     reclaimedBytes: reclaimedBytes ?? this.reclaimedBytes,
     trashedBytes: trashedBytes ?? this.trashedBytes,
     message: clearMessage ? null : (message ?? this.message),
     hasScanned: hasScanned ?? this.hasScanned,
+    groupByProject: groupByProject ?? this.groupByProject,
+    cachedAt: clearCachedAt ? null : (cachedAt ?? this.cachedAt),
   );
 }
 
@@ -93,30 +119,136 @@ class StorageSenseController extends Notifier<StorageSenseState> {
   @override
   StorageSenseState build() => const StorageSenseState();
 
+  bool _cancelScan = false;
+
+  /// Stops an in-progress scan; whatever was found so far stays listed.
+  void cancelScan() => _cancelScan = true;
+
   Future<void> scan() async {
     if (state.status == SenseStatus.scanning ||
         state.status == SenseStatus.deleting) {
       return;
     }
+    _cancelScan = false;
+
+    // Show the previous scan immediately (only entries that still exist) so
+    // the page is useful from the first frame while the fresh scan runs.
+    final repo = ref.read(localStateRepositoryProvider);
+    final cached = state.hasScanned ? null : await repo?.loadScan();
+    final stale = [
+      if (cached != null)
+        for (final i in cached.items)
+          if (FileSystemEntity.typeSync(i.path, followLinks: false) !=
+              FileSystemEntityType.notFound)
+            i,
+    ];
     state = state.copyWith(
       status: SenseStatus.scanning,
       progress: 0,
+      items: stale,
+      cachedAt: stale.isEmpty ? null : cached!.at,
       selected: {},
+      scanPhase: 'Looking for caches and logs',
       clearMessage: true,
     );
-    final items = await const CleanupScanner().scan(
-      _targets,
-      onProgress: (done, total) {
-        state = state.copyWith(progress: done / total);
-      },
-    );
-    items.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+
+    final measurer = await defaultMeasurer();
+    final found = <CleanupItem>[];
+    var sysDone = 0, sysTotal = 0, projDone = 0, projTotal = 0;
+    var sysListing = true;
+    var foundBytes = 0;
+    var current = '';
+    var best = 0.0;
+
+    void publish() {
+      // The first fresh result replaces the cached snapshot.
+      if (state.cachedAt != null && found.isNotEmpty) {
+        state = state.copyWith(clearCachedAt: true);
+      }
+      final total = sysTotal + projTotal;
+      var frac = total == 0 ? 0.0 : (sysDone + projDone) / total;
+      if (sysListing) frac = 0;
+      best = frac > best ? frac : best; // never move backwards
+      found.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+      state = state.copyWith(
+        items: List.of(found),
+        progress: best,
+        scanProgress: ScanProgress(
+          done: sysDone + projDone,
+          total: total,
+          current: current,
+          foundBytes: foundBytes,
+          listing: sysListing,
+        ),
+      );
+    }
+
+    void addItems(List<CleanupItem> more) {
+      for (final i in more) {
+        found.add(i);
+        foundBytes += i.sizeBytes;
+      }
+    }
+
+    await Future.wait([
+      CleanupScanner(measurer: measurer).scan(
+        _targets,
+        isCancelled: () => _cancelScan,
+        onItems: addItems,
+        onProgress: (p) {
+          sysDone = p.done;
+          sysTotal = p.total;
+          sysListing = p.listing;
+          current = p.current;
+          publish();
+        },
+      ),
+      ProjectScanner(measurer: measurer).scan(
+        ProjectScanner.defaultRoots(CleanupCatalog.home),
+        isCancelled: () => _cancelScan,
+        onItems: addItems,
+        onProgress: (d, t, c) {
+          projDone = d;
+          projTotal = t;
+          if (sysListing || c.isNotEmpty) current = c;
+          publish();
+        },
+      ),
+    ]);
+
+    found.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
+    final cancelled = _cancelScan;
     state = state.copyWith(
       status: SenseStatus.ready,
-      items: items,
+      items: found.isEmpty && cancelled ? state.items : found,
       progress: 1,
+      clearScanProgress: true,
+      clearCachedAt: found.isNotEmpty || !cancelled,
       hasScanned: true,
     );
+    if (!cancelled && repo != null) {
+      unawaited(repo.saveScan(found, DateTime.now()));
+    }
+  }
+
+  void setGroupByProject(bool v) => state = state.copyWith(groupByProject: v);
+
+  /// Permanently empties the system Trash, finally freeing space that
+  /// Review/Manual cleanups only moved there.
+  Future<void> emptyTrash() async {
+    if (state.status == SenseStatus.deleting) return;
+    state = state.copyWith(status: SenseStatus.deleting, clearMessage: true);
+    final ok = await _service.emptyTrash();
+    final freed = state.trashedBytes;
+    state = state.copyWith(
+      status: SenseStatus.ready,
+      trashedBytes: ok ? 0 : state.trashedBytes,
+      reclaimedBytes: ok ? state.reclaimedBytes + freed : state.reclaimedBytes,
+      message: ok
+          ? 'Trash emptied — ${formatBytes(freed)} of your cleanups is now free'
+          : 'Could not empty the Trash',
+    );
+    unawaited(ref.read(monitoringServiceProvider).rescan());
   }
 
   void setQuery(String q) => state = state.copyWith(query: q);
@@ -224,7 +356,9 @@ class VolumeUsage {
     required this.free,
     this.deviceName,
     this.isSsd = false,
+    this.deviceId,
   });
+  final String? deviceId;
   final String name;
   final int total;
   final int used;

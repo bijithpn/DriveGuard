@@ -215,6 +215,70 @@ class EdgeDockSettings {
       );
 }
 
+/// Tray / menu-bar appearance, chosen by the user.
+class TraySettings {
+  const TraySettings({
+    this.style = TrayIconStyle.glyph,
+    this.metric = TrayMetric.hottest,
+    this.showText = false,
+    this.menuDetail = TrayMenuDetail.compact,
+  });
+
+  final TrayIconStyle style;
+  final TrayMetric metric;
+
+  /// Extra text next to the icon (macOS menu bar / some Linux panels).
+  /// Ignored by styles that already draw the number inside the icon.
+  final bool showText;
+  final TrayMenuDetail menuDetail;
+
+  TraySettings copyWith({
+    TrayIconStyle? style,
+    TrayMetric? metric,
+    bool? showText,
+    TrayMenuDetail? menuDetail,
+  }) => TraySettings(
+    style: style ?? this.style,
+    metric: metric ?? this.metric,
+    showText: showText ?? this.showText,
+    menuDetail: menuDetail ?? this.menuDetail,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'style': style.name,
+    'metric': metric.name,
+    'showText': showText,
+    'menuDetail': menuDetail.name,
+  };
+
+  factory TraySettings.fromJson(Map<String, dynamic> j) => TraySettings(
+    style: TrayIconStyle.values.firstWhere(
+      (e) => e.name == j['style'],
+      orElse: () => TrayIconStyle.glyph,
+    ),
+    metric: TrayMetric.values.firstWhere(
+      (e) => e.name == j['metric'],
+      orElse: () => TrayMetric.hottest,
+    ),
+    showText: j['showText'] as bool? ?? false,
+    menuDetail: TrayMenuDetail.values.firstWhere(
+      (e) => e.name == j['menuDetail'],
+      orElse: () => TrayMenuDetail.compact,
+    ),
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is TraySettings &&
+      other.style == style &&
+      other.metric == metric &&
+      other.showText == showText &&
+      other.menuDetail == menuDetail;
+
+  @override
+  int get hashCode => Object.hash(style, metric, showText, menuDetail);
+}
+
 /// Automatic protection against sustained drive overheating.
 ///
 /// Detection and the explanatory alert are always on when [enabled]; the
@@ -302,6 +366,7 @@ class AppSettings {
     this.dashboardCompactView = false,
     this.thermalProtection = const ThermalProtectionSettings(),
     this.resourceGuardEnabled = true,
+    this.tray = const TraySettings(),
   });
 
   final Duration pollingInterval;
@@ -353,6 +418,8 @@ class AppSettings {
   /// the SSD, and tells the user which app is responsible.
   final bool resourceGuardEnabled;
 
+  final TraySettings tray;
+
   TemperatureThresholds thresholdsFor(String deviceId) =>
       perDeviceThresholds[deviceId] ?? globalThresholds;
 
@@ -396,6 +463,7 @@ class AppSettings {
     bool? dashboardCompactView,
     ThermalProtectionSettings? thermalProtection,
     bool? resourceGuardEnabled,
+    TraySettings? tray,
   }) {
     return AppSettings(
       pollingInterval: pollingInterval ?? this.pollingInterval,
@@ -440,6 +508,7 @@ class AppSettings {
       dashboardCompactView: dashboardCompactView ?? this.dashboardCompactView,
       thermalProtection: thermalProtection ?? this.thermalProtection,
       resourceGuardEnabled: resourceGuardEnabled ?? this.resourceGuardEnabled,
+      tray: tray ?? this.tray,
     );
   }
 
@@ -481,6 +550,7 @@ class AppSettings {
     'dashboardCompactView': dashboardCompactView,
     'thermalProtection': thermalProtection.toJson(),
     'resourceGuardEnabled': resourceGuardEnabled,
+    'tray': tray.toJson(),
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -594,6 +664,9 @@ class AppSettings {
             )
           : const ThermalProtectionSettings(),
       resourceGuardEnabled: json['resourceGuardEnabled'] as bool? ?? true,
+      tray: json['tray'] is Map<String, dynamic>
+          ? TraySettings.fromJson(json['tray'] as Map<String, dynamic>)
+          : const TraySettings(),
     );
   }
 }

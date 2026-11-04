@@ -42,7 +42,12 @@ class _ReportBody extends StatelessWidget {
         .toList();
 
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        AppSpacing.xs,
+        AppSpacing.page,
+        AppSpacing.page,
+      ),
       children: [
         // ── Summary header ──────────────────────────────────────────────
         _HeaderCard(incident: incident, primary: primary, isDark: isDark),

@@ -5,6 +5,8 @@ import '../../application/protection/process_controller.dart';
 import '../../application/protection/thermal_models.dart';
 import '../../application/providers.dart';
 import '../theme/app_theme.dart';
+import '../components/ui_kit.dart';
+import 'alert_card.dart';
 import 'process_actions.dart';
 
 /// Lists active memory/swap and heavy-write alerts, each with the offending
@@ -22,12 +24,17 @@ class ResourceAlertBanner extends ConsumerWidget {
       child: alerts.isEmpty
           ? const SizedBox(width: double.infinity)
           : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.page,
+                AppSpacing.gap,
+                AppSpacing.page,
+                0,
+              ),
               child: Column(
                 children: [
                   for (final a in alerts)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: AppSpacing.gap),
                       child: _AlertCard(
                         alert: a,
                         needsAdmin:
@@ -65,10 +72,6 @@ class _AlertCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark
-        ? AppColors.textSecondary
-        : AppColors.lightTextSecondary;
     final color = alert.severity == ResourceSeverity.critical
         ? AppColors.critical
         : AppColors.warning;
@@ -76,72 +79,27 @@ class _AlertCard extends StatelessWidget {
       ResourceAlertKind.heavyWrites => Icons.edit_note_rounded,
       _ => Icons.memory_rounded,
     };
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.10 : 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  alert.title,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            alert.detail,
-            style: TextStyle(fontSize: 12.5, height: 1.4, color: muted),
-          ),
-          if (alert.advice.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            for (final a in alert.advice)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.arrow_right_rounded, size: 18, color: color),
-                    Expanded(
-                      child: Text(a, style: const TextStyle(fontSize: 12.5)),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-          if (alert.culprit != null) ...[
-            const SizedBox(height: 12),
-            ProcessQuitButtons(
-              key: ValueKey('${alert.id}-${alert.culprit!.pid}'),
-              processName: alert.culprit!.name,
-              needsAdmin: needsAdmin,
-              onQuit: onQuit,
-              onFinished: onFinished,
-            ),
-          ],
+    return AlertCard(
+      color: color,
+      icon: icon,
+      title: alert.title,
+      children: [
+        Text(alert.detail, style: AppText.secondary(context)),
+        if (alert.advice.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          AdviceList(alert.advice),
         ],
-      ),
+        if (alert.culprit != null) ...[
+          const SizedBox(height: 16),
+          ProcessQuitButtons(
+            key: ValueKey('${alert.id}-${alert.culprit!.pid}'),
+            processName: alert.culprit!.name,
+            needsAdmin: needsAdmin,
+            onQuit: onQuit,
+            onFinished: onFinished,
+          ),
+        ],
+      ],
     );
   }
 }

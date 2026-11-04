@@ -19,6 +19,7 @@ import 'domain/entities/system_diagnostic_event.dart';
 import 'infrastructure/notifications/local_notifier_service.dart';
 import 'infrastructure/persistence/app_database.dart';
 import 'infrastructure/persistence/incident_repository.dart';
+import 'infrastructure/persistence/local_state_repository.dart';
 import 'infrastructure/persistence/settings_repository.dart';
 import 'infrastructure/storage/storage_monitor_factory.dart';
 import 'infrastructure/tray/desktop_window_controller.dart';
@@ -207,6 +208,7 @@ Future<void> _bootstrap() async {
         incidentRepositoryProvider.overrideWithValue(incidentRepository),
         sessionIdProvider.overrideWithValue(session.id),
         heartbeatServiceProvider.overrideWithValue(heartbeat),
+        localStateRepositoryProvider.overrideWithValue(LocalStateRepository()),
         startupIncidentProvider.overrideWithValue(startupIncident),
       ],
     );

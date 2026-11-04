@@ -4,267 +4,245 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/providers.dart';
 import '../../domain/entities/shutdown_incident.dart';
 import '../../domain/enums/incident_enums.dart';
+import '../components/app_shell.dart';
+import '../components/ui_kit.dart';
 import '../theme/app_theme.dart';
 import 'incident_report_screen.dart';
 
+/// Every time DriveGuard noticed the computer shut down unexpectedly, with
+/// how strongly drive temperature correlates with it.
 class IncidentHistoryScreen extends ConsumerWidget {
   const IncidentHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final incidentsAsync = ref.watch(incidentListProvider);
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
-      appBar: AppBar(
-        title: const Text('Incident History'),
-        backgroundColor: isDark ? AppColors.bg1 : AppColors.lightCard,
-        elevation: 0,
-      ),
-      body: incidentsAsync.when(
+    return AppShell(
+      section: AppSection.incidents,
+      child: incidentsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Failed to load incidents: $e')),
-        data: (incidents) {
-          if (incidents.isEmpty) {
-            return _EmptyState(isDark: isDark);
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            itemCount: incidents.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) =>
-                _IncidentTile(incident: incidents[index], isDark: isDark),
-          );
-        },
+        error: (e, _) => Center(
+          child: Text(
+            'Failed to load incidents: $e',
+            style: AppText.secondary(context),
+          ),
+        ),
+        data: (incidents) => Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PageHeader(
+                  title: 'Incidents',
+                  subtitle: incidents.isEmpty
+                      ? 'Unexpected shutdowns and crashes appear here'
+                      : '${incidents.length} recorded  ·  newest first',
+                ),
+                Expanded(
+                  child: incidents.isEmpty
+                      ? const _EmptyState()
+                      : ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.page,
+                            AppSpacing.xs,
+                            AppSpacing.page,
+                            AppSpacing.page,
+                          ),
+                          children: [
+                            Surface(
+                              padding: EdgeInsets.zero,
+                              clip: true,
+                              child: Column(
+                                children: [
+                                  for (var i = 0; i < incidents.length; i++)
+                                    _IncidentRow(
+                                      incident: incidents[i],
+                                      first: i == 0,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.isDark});
-  final bool isDark;
+  const _EmptyState();
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.verified_outlined,
-            size: 48,
-            color: isDark ? AppColors.textMuted : AppColors.lightTextSecondary,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'No incidents recorded',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.textPrimary : AppColors.lightText,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            'Every DriveGuard session so far has ended cleanly.',
-            style: TextStyle(
-              fontSize: 12.5,
-              color: isDark
-                  ? AppColors.textSecondary
-                  : AppColors.lightTextSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.verified_outlined, size: 32, color: AppColors.normal),
+        const SizedBox(height: AppSpacing.md),
+        Text('No incidents recorded', style: AppText.heading(context)),
+        const SizedBox(height: 4),
+        Text(
+          'Every DriveGuard session so far has ended cleanly.',
+          style: AppText.secondary(context),
+        ),
+      ],
+    ),
+  );
 }
 
-class _IncidentTile extends StatelessWidget {
-  const _IncidentTile({required this.incident, required this.isDark});
+class _IncidentRow extends StatefulWidget {
+  const _IncidentRow({required this.incident, required this.first});
   final ShutdownIncident incident;
-  final bool isDark;
+  final bool first;
 
-  Color _correlationColor() {
-    switch (incident.correlationLevel) {
-      case CorrelationLevel.high:
-        return AppColors.critical;
-      case CorrelationLevel.moderate:
-        return AppColors.warning;
-      case CorrelationLevel.low:
-        return AppColors.warm;
-      case CorrelationLevel.none:
-        return AppColors.normal;
-    }
-  }
+  @override
+  State<_IncidentRow> createState() => _IncidentRowState();
+}
 
-  String _classificationLabel() {
-    switch (incident.classification) {
-      case ShutdownClassification.cleanAppExit:
-        return 'Clean Exit';
-      case ShutdownClassification.appSessionEndedUnexpectedly:
-        return 'App Session Ended Unexpectedly';
-      case ShutdownClassification.osShutdownClean:
-        return 'Clean Shutdown';
-      case ShutdownClassification.osRebootClean:
-        return 'Clean Reboot';
-      case ShutdownClassification.osShutdownUnexpected:
-        return 'Unexpected Shutdown';
-      case ShutdownClassification.kernelPanic:
-        return 'Kernel Panic';
-      case ShutdownClassification.bsod:
-        return 'System Error (BSOD)';
-      case ShutdownClassification.possiblePowerLoss:
-        return 'Possible Power Loss';
-      case ShutdownClassification.unknown:
-        return 'Unknown Shutdown';
-    }
-  }
+class _IncidentRowState extends State<_IncidentRow> {
+  bool _hover = false;
+  ShutdownIncident get incident => widget.incident;
 
-  String _correlationLabel() {
-    switch (incident.correlationLevel) {
-      case CorrelationLevel.high:
-        return 'Strong thermal correlation';
-      case CorrelationLevel.moderate:
-        return 'Possible thermal correlation';
-      case CorrelationLevel.low:
-        return 'Slight temperature elevation';
-      case CorrelationLevel.none:
-        return 'No thermal correlation';
-    }
+  Color _color() => switch (incident.correlationLevel) {
+    CorrelationLevel.high => AppColors.critical,
+    CorrelationLevel.moderate => AppColors.warning,
+    CorrelationLevel.low => AppColors.warm,
+    CorrelationLevel.none => AppColors.normal,
+  };
+
+  String _classification() => switch (incident.classification) {
+    ShutdownClassification.cleanAppExit => 'Clean exit',
+    ShutdownClassification.appSessionEndedUnexpectedly =>
+      'App session ended unexpectedly',
+    ShutdownClassification.osShutdownClean => 'Clean shutdown',
+    ShutdownClassification.osRebootClean => 'Clean reboot',
+    ShutdownClassification.osShutdownUnexpected => 'Unexpected shutdown',
+    ShutdownClassification.kernelPanic => 'Kernel panic',
+    ShutdownClassification.bsod => 'System error (BSOD)',
+    ShutdownClassification.possiblePowerLoss => 'Possible power loss',
+    ShutdownClassification.unknown => 'Unknown shutdown',
+  };
+
+  String _correlation() => switch (incident.correlationLevel) {
+    CorrelationLevel.high => 'Strong thermal correlation',
+    CorrelationLevel.moderate => 'Possible thermal correlation',
+    CorrelationLevel.low => 'Slight temperature rise',
+    CorrelationLevel.none => 'No thermal correlation',
+  };
+
+  static String _date(DateTime dt) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  ·  $h:$m ${dt.hour >= 12 ? 'PM' : 'AM'}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final cardColor = isDark ? AppColors.bg1 : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.border : AppColors.lightBorder;
-    final primaryStat = incident.deviceStats.isEmpty
+    final dark = isDarkOf(context);
+    final stat = incident.deviceStats.isEmpty
         ? null
         : incident.deviceStats.firstWhere(
             (s) => s.deviceId == incident.primaryDeviceId,
             orElse: () => incident.deviceStats.first,
           );
+    final color = _color();
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => IncidentReportScreen(incidentId: incident.id),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => IncidentReportScreen(incidentId: incident.id),
+          ),
         ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: 44,
-              decoration: BoxDecoration(
-                color: _correlationColor(),
-                borderRadius: BorderRadius.circular(2),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.card,
+            vertical: 16,
+          ),
+          decoration: BoxDecoration(
+            color: _hover
+                ? (dark ? Colors.white : Colors.black).withValues(alpha: 0.03)
+                : Colors.transparent,
+            border: widget.first
+                ? null
+                : Border(top: BorderSide(color: hairlineOf(context))),
+          ),
+          child: Row(
+            children: [
+              StatusDot(color, size: 9),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_classification(), style: AppText.heading(context)),
+                    const SizedBox(height: 3),
+                    Text(
+                      [
+                        _date(
+                          incident.estimatedShutdownAt ?? incident.detectedAt,
+                        ),
+                        stat?.deviceName ?? 'No device data',
+                      ].join('  ·  '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.secondary(context),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    _formatDate(
-                      incident.estimatedShutdownAt ?? incident.detectedAt,
+                  if (stat?.lastCelsius != null)
+                    Text(
+                      '${stat!.lastCelsius!.round()}°C',
+                      style: AppText.heading(context).copyWith(
+                        fontSize: 16,
+                        color: color,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: isDark
-                          ? AppColors.textSecondary
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _classificationLabel(),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: isDark
-                          ? AppColors.textPrimary
-                          : AppColors.lightText,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    primaryStat?.deviceName ?? 'No device data',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: isDark
-                          ? AppColors.textSecondary
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
+                  const SizedBox(height: 3),
+                  Text(_correlation(), style: AppText.caption(context)),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (primaryStat?.lastCelsius != null)
-                  Text(
-                    '${primaryStat!.lastCelsius!.round()}°C',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: _correlationColor(),
-                    ),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  _correlationLabel(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _correlationColor(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: isDark
-                  ? AppColors.textMuted
-                  : AppColors.lightTextSecondary,
-            ),
-          ],
+              const SizedBox(width: 12),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: faintOf(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime dt) {
-    const months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final minute = dt.minute.toString().padLeft(2, '0');
-    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} · $hour12:$minute $ampm';
   }
 }

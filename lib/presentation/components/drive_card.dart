@@ -5,6 +5,7 @@ import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../theme/app_theme.dart';
 import 'device_presentation.dart';
+import 'ui_kit.dart';
 
 class DriveCard extends StatefulWidget {
   const DriveCard({
@@ -101,16 +102,6 @@ class _DriveCardState extends State<DriveCard> {
     return 'Active';
   }
 
-  IconData _usageStatIcon() {
-    if (widget.device.health.totalBytesWritten != null) {
-      return Icons.save_as_rounded;
-    }
-    if (widget.device.health.powerOnHours != null) {
-      return Icons.schedule_rounded;
-    }
-    return Icons.storage_rounded;
-  }
-
   String _healthLabel() {
     if (widget.device.health.percentageUsed != null) {
       final life = (100 - widget.device.health.percentageUsed!).clamp(0, 100);
@@ -162,7 +153,6 @@ class _DriveCardState extends State<DriveCard> {
       widget.unit,
     );
     final style = SeverityStyle.of(presentation.severity, context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Semantics(
       button: true,
@@ -170,167 +160,47 @@ class _DriveCardState extends State<DriveCard> {
           '${widget.device.displayName}, ${_typeLabel()}, '
           '${style.label}, ${presentation.valueText}',
       child: MouseRegion(
+        cursor: SystemMouseCursors.click,
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
-        child: widget.compactMode
-            ? _CompactRow(
-                device: widget.device,
-                presentation: presentation,
-                style: style,
-                isDark: isDark,
-                isHovered: _isHovered,
-                typeLabel: _typeLabel(),
-                typeIcon: _typeIcon(),
-                onTap: widget.onTap,
-              )
-            : _GridCard(
-                device: widget.device,
-                presentation: presentation,
-                style: style,
-                isDark: isDark,
-                isHovered: _isHovered,
-                typeLabel: _typeLabel(),
-                typeIcon: _typeIcon(),
-                healthLabel: _healthLabel(),
-                healthColor: _healthColor(context),
-                statLabel: _usageStatLabel(),
-                statText: _usageStatText(),
-                statIcon: _usageStatIcon(),
-                updatedText: _updatedText(),
-                onTap: widget.onTap,
-              ),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: widget.compactMode
+              ? _CompactRow(
+                  device: widget.device,
+                  presentation: presentation,
+                  style: style,
+                  hovered: _isHovered,
+                  typeLabel: _typeLabel(),
+                  healthLabel: _healthLabel(),
+                  healthColor: _healthColor(context),
+                  statText: _usageStatText(),
+                )
+              : _GridCard(
+                  device: widget.device,
+                  presentation: presentation,
+                  style: style,
+                  hovered: _isHovered,
+                  typeLabel: _typeLabel(),
+                  typeIcon: _typeIcon(),
+                  healthLabel: _healthLabel(),
+                  healthColor: _healthColor(context),
+                  statLabel: _usageStatLabel(),
+                  statText: _usageStatText(),
+                  updatedText: _updatedText(),
+                ),
+        ),
       ),
     );
   }
 }
 
-class _CompactRow extends StatelessWidget {
-  const _CompactRow({
-    required this.device,
-    required this.presentation,
-    required this.style,
-    required this.isDark,
-    required this.isHovered,
-    required this.typeLabel,
-    required this.typeIcon,
-    required this.onTap,
-  });
-
-  final StorageDevice device;
-  final DevicePresentation presentation;
-  final SeverityStyle style;
-  final bool isDark;
-  final bool isHovered;
-  final String typeLabel;
-  final IconData typeIcon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bgColor = isHovered
-        ? (isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted)
-        : (isDark ? AppColors.bg1 : AppColors.lightCard);
-
-    final showStatusLabel =
-        presentation.severity == TemperatureSeverity.warning ||
-        presentation.severity == TemperatureSeverity.critical;
-
-    return AnimatedContainer(
-      duration: AppDurations.fast,
-      height: 52,
-      decoration: BoxDecoration(
-        color: bgColor,
-        border: const Border(
-          bottom: BorderSide(color: AppColors.divider, width: 1),
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Row(
-          children: [
-            Container(width: 3, height: 52, color: style.color),
-
-            SizedBox(
-              width: 40,
-              child: Center(
-                child: Icon(
-                  typeIcon,
-                  size: 28,
-                  color: style.color.withValues(alpha: isDark ? 0.8 : 0.7),
-                ),
-              ),
-            ),
-
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    device.displayName,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    typeLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? AppColors.textSecondary
-                          : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    presentation.valueText,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: style.color,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  if (showStatusLabel) ...[
-                    const SizedBox(height: 1),
-                    Text(
-                      style.label,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: style.color.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const Padding(
-              padding: EdgeInsets.only(right: 10),
-              child: Icon(
-                Icons.chevron_right_rounded,
-                size: 14,
-                color: AppColors.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+/// Splits "42°C" into the number and its unit so the unit can be quieter.
+(String, String) _splitValue(String valueText) {
+  final m = RegExp(r'^(-?[\d.]+)(.*)$').firstMatch(valueText);
+  if (m == null) return (valueText, '');
+  return (m.group(1)!, m.group(2)!);
 }
 
 class _GridCard extends StatelessWidget {
@@ -338,188 +208,85 @@ class _GridCard extends StatelessWidget {
     required this.device,
     required this.presentation,
     required this.style,
-    required this.isDark,
-    required this.isHovered,
+    required this.hovered,
     required this.typeLabel,
     required this.typeIcon,
     required this.healthLabel,
     required this.healthColor,
     required this.statLabel,
     required this.statText,
-    required this.statIcon,
     required this.updatedText,
-    required this.onTap,
   });
 
   final StorageDevice device;
   final DevicePresentation presentation;
   final SeverityStyle style;
-  final bool isDark;
-  final bool isHovered;
+  final bool hovered;
   final String typeLabel;
   final IconData typeIcon;
   final String healthLabel;
   final Color healthColor;
   final String statLabel;
   final String statText;
-  final IconData statIcon;
   final String updatedText;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = isHovered
-        ? style.color.withValues(alpha: 0.4)
-        : (isDark ? AppColors.border : AppColors.lightBorder);
+    final dark = isDarkOf(context);
+    final available = presentation.tempCelsius != null;
+    final (number, unit) = _splitValue(presentation.valueText);
+    final statusColor = style.color;
 
     return AnimatedContainer(
       duration: AppDurations.fast,
+      padding: const EdgeInsets.all(AppSpacing.card),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg1 : AppColors.lightCard,
+        color: dark ? AppColors.bg1 : AppColors.lightCard,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: borderColor, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? AppColors.shadowDark : AppColors.lightShadow,
-            blurRadius: isHovered ? 22 : 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(
+          color: hovered
+              ? AppColors.accent.withValues(alpha: 0.55)
+              : (dark ? AppColors.border : AppColors.lightBorder),
+        ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: onTap,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Identity + status
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(height: 3, color: style.color),
-
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                ),
+              Icon(typeIcon, size: 18, color: mutedOf(context)),
+              const SizedBox(width: 10),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        _IconBadge(
-                          icon: typeIcon,
-                          color: style.color,
-                          isDark: isDark,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                device.displayName,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? AppColors.textPrimary
-                                      : AppColors.lightText,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                typeLabel,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDark
-                                      ? AppColors.textSecondary
-                                      : AppColors.lightTextSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Text(
+                      device.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.heading(context),
                     ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    Center(
-                      child: Text(
-                        presentation.valueText,
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: style.color,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.xs),
-
-                    _TempProgressBar(
-                      fraction: presentation.fraction,
-                      color: style.color,
-                      isDark: isDark,
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: isDark ? AppColors.divider : AppColors.lightBorder,
-                    ),
-
-                    const SizedBox(height: AppSpacing.sm),
-
-                    Row(
-                      children: [
-                        _StatCard(
-                          label: 'Health',
-                          value: healthLabel,
-                          valueColor: healthColor,
-                          icon: Icons.favorite_rounded,
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        _StatCard(
-                          label: statLabel,
-                          value: statText,
-                          icon: statIcon,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: AppSpacing.xs),
-
-                    Center(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.access_time_rounded,
-                            size: 11,
-                            color: isDark
-                                ? AppColors.textMuted
-                                : AppColors.lightTextSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Updated $updatedText',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: isDark
-                                  ? AppColors.textMuted
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 2),
+                    Text(typeLabel, style: AppText.caption(context)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    StatusDot(statusColor, size: 7),
+                    const SizedBox(width: 6),
+                    Text(
+                      style.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
                       ),
                     ),
                   ],
@@ -527,159 +294,189 @@ class _GridCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
+          const SizedBox(height: AppSpacing.lg),
 
-class _IconBadge extends StatelessWidget {
-  const _IconBadge({
-    required this.icon,
-    required this.color,
-    required this.isDark,
-  });
-
-  final IconData icon;
-  final Color color;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.12 : 0.08),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
-      ),
-      child: Icon(icon, size: 16, color: color),
-    );
-  }
-}
-
-class _TempProgressBar extends StatelessWidget {
-  const _TempProgressBar({
-    required this.fraction,
-    required this.color,
-    required this.isDark,
-  });
-
-  final double fraction;
-  final Color color;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final total = constraints.maxWidth;
-        final filled = (total * fraction.clamp(0.0, 1.0)).roundToDouble();
-        return Container(
-          height: 3,
-          width: total,
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.bg3 : AppColors.lightSurfaceMuted,
-            borderRadius: BorderRadius.circular(2),
-          ),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: AnimatedContainer(
-              duration: AppDurations.medium,
-              width: filled,
-              height: 3,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    this.valueColor,
-    this.icon,
-  });
-
-  final String label;
-  final String value;
-  final Color? valueColor;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-        decoration: BoxDecoration(
-          color: isDark
-              ? AppColors.bg0.withValues(alpha: 0.7)
-              : AppColors.lightSurfaceMuted.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-            color: isDark
-                ? AppColors.border.withValues(alpha: 0.7)
-                : AppColors.lightBorder,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
+          // Temperature
+          if (available)
             Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                if (icon != null) ...[
-                  Icon(
-                    icon,
-                    size: 12,
-                    color: isDark
-                        ? AppColors.textMuted
-                        : AppColors.lightTextSecondary,
-                  ),
-                  const SizedBox(width: 4),
-                ],
+                Text(number, style: AppText.metric(context, size: 38)),
+                const SizedBox(width: 2),
                 Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  unit,
                   style: TextStyle(
-                    fontSize: 10.5,
+                    fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.textMuted
-                        : AppColors.lightTextSecondary,
-                    letterSpacing: 0.2,
+                    color: mutedOf(context),
                   ),
                 ),
               ],
+            )
+          else
+            Text(
+              presentation.valueText,
+              style: AppText.metric(
+                context,
+                size: 22,
+              ).copyWith(color: faintOf(context), letterSpacing: -0.3),
             ),
-            const SizedBox(height: 3),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                value,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color:
-                      valueColor ??
-                      (isDark ? AppColors.textPrimary : AppColors.lightText),
-                ),
+          const SizedBox(height: AppSpacing.md),
+
+          // Gauge
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 4,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(
+                    color: dark ? AppColors.bg3 : AppColors.lightBorder,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      heightFactor: 1,
+                      widthFactor: available
+                          ? presentation.fraction.clamp(0.02, 1.0)
+                          : 0,
+                      child: ColoredBox(color: statusColor),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          const Spacer(),
+
+          // Secondary stats — plain columns, no boxes.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: _Stat(
+                  label: 'Health',
+                  value: healthLabel,
+                  valueColor: healthColor == AppColors.textMuted
+                      ? null
+                      : healthColor,
+                ),
+              ),
+              Expanded(
+                child: _Stat(label: statLabel, value: statText),
+              ),
+              Text(updatedText, style: AppText.caption(context)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value, this.valueColor});
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: AppText.caption(context)),
+      const SizedBox(height: 3),
+      Text(
+        value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppText.body(
+          context,
+        ).copyWith(fontWeight: FontWeight.w600, color: valueColor),
+      ),
+    ],
+  );
+}
+
+class _CompactRow extends StatelessWidget {
+  const _CompactRow({
+    required this.device,
+    required this.presentation,
+    required this.style,
+    required this.hovered,
+    required this.typeLabel,
+    required this.healthLabel,
+    required this.healthColor,
+    required this.statText,
+  });
+
+  final StorageDevice device;
+  final DevicePresentation presentation;
+  final SeverityStyle style;
+  final bool hovered;
+  final String typeLabel;
+  final String healthLabel;
+  final Color healthColor;
+  final String statText;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = isDarkOf(context);
+    return AnimatedContainer(
+      duration: AppDurations.fast,
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.card),
+      color: hovered
+          ? (dark ? Colors.white : Colors.black).withValues(alpha: 0.03)
+          : Colors.transparent,
+      child: Row(
+        children: [
+          StatusDot(style.color),
+          const SizedBox(width: 14),
+          Expanded(
+            flex: 4,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  device.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.heading(context),
+                ),
+                const SizedBox(height: 2),
+                Text(typeLabel, style: AppText.caption(context)),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              presentation.valueText,
+              style: AppText.heading(
+                context,
+              ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              healthLabel,
+              style: AppText.body(context).copyWith(
+                color: healthColor == AppColors.textMuted ? null : healthColor,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(statText, style: AppText.secondary(context)),
+          ),
+          Icon(Icons.chevron_right_rounded, size: 18, color: faintOf(context)),
+        ],
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,10 +16,13 @@ import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../../domain/enums/ui_enums.dart';
 import '../app_root.dart' show edgeDockActiveProvider, widgetModeActiveProvider;
+import '../../infrastructure/tray/tray_icon_painter.dart';
+import '../components/ui_kit.dart';
 import '../theme/app_theme.dart';
 import '../widget/edge_dock_view.dart' show resolveAccent;
 
 part 'parts/basic_sections.dart';
+part 'parts/tray_section.dart';
 part 'parts/widget_section.dart';
 part 'parts/advanced_section.dart';
 part 'parts/threshold_editor.dart';
@@ -30,6 +34,7 @@ enum _Section {
   protection,
   thresholds,
   appearance,
+  tray,
   widget,
   advanced;
 
@@ -40,8 +45,21 @@ enum _Section {
     _Section.protection => 'Protection',
     _Section.thresholds => 'Thresholds',
     _Section.appearance => 'Appearance',
+    _Section.tray => Platform.isMacOS ? 'Menu bar' : 'Tray',
     _Section.widget => 'Widget',
     _Section.advanced => 'Advanced',
+  };
+
+  String get description => switch (this) {
+    _Section.general => 'Startup and window behaviour',
+    _Section.monitoring => 'How often drives are read',
+    _Section.alerts => 'When and how you are notified',
+    _Section.protection => 'Overheating, memory and write protection',
+    _Section.thresholds => 'Temperature and free-space limits',
+    _Section.appearance => 'Theme and layout density',
+    _Section.tray => 'Icon style and menu options',
+    _Section.widget => 'Floating mini monitor and edge dock',
+    _Section.advanced => 'Diagnostics and data',
   };
 
   IconData get icon => switch (this) {
@@ -51,6 +69,7 @@ enum _Section {
     _Section.protection => Icons.shield_outlined,
     _Section.thresholds => Icons.device_thermostat_rounded,
     _Section.appearance => Icons.palette_outlined,
+    _Section.tray => Icons.dock_rounded,
     _Section.widget => Icons.widgets_outlined,
     _Section.advanced => Icons.build_outlined,
   };
@@ -106,101 +125,41 @@ class _SettingsSidebar extends StatelessWidget {
       width: AppLayout.sidebarWidth,
       decoration: BoxDecoration(
         color: isDark ? AppColors.bg1 : AppColors.lightCard,
-        border: Border(
-          right: BorderSide(
-            color: isDark ? AppColors.border : AppColors.lightBorder,
-            width: 1,
-          ),
-        ),
+        border: Border(right: BorderSide(color: hairlineOf(context))),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.sidebarPad,
-                AppSpacing.md,
-                AppSpacing.sidebarPad,
-                AppSpacing.sm,
-              ),
-              child: Row(
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 children: [
-                  _SidebarBackButton(isDark: isDark),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(
-                    'Settings',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? AppColors.textPrimary
-                          : AppColors.lightText,
+                  IconButton(
+                    tooltip: 'Back',
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 20,
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      color: mutedOf(context),
                     ),
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
+                  const SizedBox(width: 4),
+                  Text('Settings', style: AppText.heading(context)),
                 ],
               ),
-            ),
-          ),
-
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: isDark ? AppColors.divider : AppColors.lightBorder,
-          ),
-
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xs,
-                vertical: AppSpacing.sm,
-              ),
-              child: Column(
-                children: _Section.values.map((s) {
-                  return _SidebarNavItem(
-                    section: s,
-                    isSelected: s == selected,
-                    isDark: isDark,
-                    onTap: () => onSelect(s),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SidebarBackButton extends StatelessWidget {
-  const _SidebarBackButton({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => Navigator.of(context).pop(),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.bg2 : AppColors.lightSurfaceMuted,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: Border.all(
-              color: isDark ? AppColors.border : AppColors.lightBorder,
-            ),
-          ),
-          child: Icon(
-            Icons.arrow_back_rounded,
-            size: 14,
-            color: isDark
-                ? AppColors.textSecondary
-                : AppColors.lightTextSecondary,
+              const SizedBox(height: 16),
+              for (final s in _Section.values) ...[
+                _SidebarNavItem(
+                  section: s,
+                  isSelected: s == selected,
+                  isDark: isDark,
+                  onTap: () => onSelect(s),
+                ),
+                const SizedBox(height: 2),
+              ],
+            ],
           ),
         ),
       ),
@@ -230,55 +189,38 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = widget.isSelected;
-    final isDark = widget.isDark;
-
+    final sel = widget.isSelected;
+    final fg = (sel || _hovered) ? primaryTextOf(context) : mutedOf(context);
+    final tint = widget.isDark ? Colors.white : Colors.black;
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
           duration: AppDurations.fast,
-          margin: const EdgeInsets.only(bottom: 2),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sidebarPad,
-            vertical: 9,
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: sel
+                ? tint.withValues(alpha: 0.07)
+                : (_hovered
+                      ? tint.withValues(alpha: 0.04)
+                      : Colors.transparent),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-          decoration: isSelected
-              ? AppDecorations.sidebarItem(selected: true, isDark: isDark)
-              : BoxDecoration(
-                  color: _hovered
-                      ? (isDark
-                            ? AppColors.bg2.withValues(alpha: 0.6)
-                            : AppColors.lightSurfaceMuted.withValues(
-                                alpha: 0.7,
-                              ))
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
           child: Row(
             children: [
-              Icon(
-                widget.section.icon,
-                size: 15,
-                color: isSelected
-                    ? AppColors.accent
-                    : (isDark
-                          ? AppColors.textSecondary
-                          : AppColors.lightTextSecondary),
-              ),
-              const SizedBox(width: AppSpacing.sm),
+              Icon(widget.section.icon, size: 18, color: fg),
+              const SizedBox(width: 10),
               Text(
                 widget.section.label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected
-                      ? (isDark ? AppColors.textPrimary : AppColors.lightText)
-                      : (isDark
-                            ? AppColors.textSecondary
-                            : AppColors.lightTextSecondary),
+                  fontWeight: sel ? FontWeight.w600 : FontWeight.w500,
+                  color: fg,
                 ),
               ),
             ],
@@ -299,41 +241,34 @@ class _ContentPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ColoredBox(
       color: isDark ? AppColors.bg0 : AppColors.lightBg,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: isDark ? AppColors.divider : AppColors.lightBorder,
-                    width: 1,
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 780),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SafeArea(
+                bottom: false,
+                child: PageHeader(
+                  title: section.label,
+                  subtitle: section.description,
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.page,
+                    AppSpacing.xs,
+                    AppSpacing.page,
+                    AppSpacing.page,
                   ),
+                  child: _buildSection(context, ref, section),
                 ),
               ),
-              alignment: Alignment.centerLeft,
-              child: Text(
-                section.label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? AppColors.textPrimary : AppColors.lightText,
-                ),
-              ),
-            ),
+            ],
           ),
-
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: _buildSection(context, ref, section),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -346,6 +281,7 @@ class _ContentPanel extends ConsumerWidget {
       _Section.protection => _ProtectionSection(isDark: isDark),
       _Section.thresholds => _ThresholdsSection(isDark: isDark),
       _Section.appearance => _AppearanceSection(isDark: isDark),
+      _Section.tray => _TraySection(isDark: isDark),
       _Section.widget => _WidgetSection(isDark: isDark),
       _Section.advanced => _AdvancedSection(isDark: isDark),
     };
@@ -459,13 +395,6 @@ class _SectionGroup extends StatelessWidget {
         border: Border.all(
           color: isDark ? AppColors.border : AppColors.lightBorder,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? AppColors.shadowDark : AppColors.lightShadow,
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

@@ -68,114 +68,105 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cardColor = isDark ? AppColors.bg1 : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.border : AppColors.lightBorder;
-    final textColor = isDark ? AppColors.textPrimary : AppColors.lightText;
-    final secondary = isDark
-        ? AppColors.textSecondary
-        : AppColors.lightTextSecondary;
-
     final classColor = _classColor(incident.classification);
     final classLabel = _classLabel(incident.classification);
+    final text = primaryTextOf(context);
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: borderColor),
+    Widget cell(String label, String value, Color color) => Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.card),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: AppText.caption(context)),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: AppText.metric(context, size: 22).copyWith(color: color),
+            ),
+          ],
+        ),
       ),
+    );
+
+    final cells = <Widget>[
+      cell(
+        'Thermal correlation',
+        incident.correlationLevel.name[0].toUpperCase() +
+            incident.correlationLevel.name.substring(1),
+        _correlationColor(),
+      ),
+      if (primary?.lastCelsius != null)
+        cell('Last temperature', '${primary!.lastCelsius!.round()}°C', text),
+      if (primary?.maxCelsius != null)
+        cell(
+          'Peak temperature',
+          '${primary!.maxCelsius!.round()}°C',
+          primary!.criticalExceeded
+              ? AppColors.critical
+              : (primary!.warningExceeded ? AppColors.warning : text),
+        ),
+      if (primary != null && primary!.criticalDuration > Duration.zero)
+        cell(
+          'Time critical',
+          _fmtDuration(primary!.criticalDuration),
+          AppColors.critical,
+        ),
+    ];
+
+    return Surface(
+      padding: EdgeInsets.zero,
+      clip: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Classification badge row
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: classColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: classColor.withValues(alpha: 0.30)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.card),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      incident.classification == ShutdownClassification.bsod ||
-                              incident.classification ==
-                                  ShutdownClassification.kernelPanic
-                          ? Icons.report_rounded
-                          : incident.classification ==
-                                ShutdownClassification.possiblePowerLoss
-                          ? Icons.power_off_rounded
-                          : Icons.warning_amber_rounded,
-                      size: 13,
-                      color: classColor,
-                    ),
-                    const SizedBox(width: 5),
+                    StatusDot(classColor, size: 9),
+                    const SizedBox(width: 10),
                     Text(
                       classLabel,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: classColor,
-                      ),
+                      style: AppText.heading(context).copyWith(fontSize: 16),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            incident.summary,
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.45,
-              fontWeight: FontWeight.w500,
-              color: textColor,
+                const SizedBox(height: 8),
+                Text(incident.summary, style: AppText.secondary(context)),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.lg,
-            runSpacing: AppSpacing.sm,
-            children: [
-              _StatBlock(
-                label: 'Thermal Correlation',
-                value: incident.correlationLevel.name.toUpperCase(),
-                color: _correlationColor(),
+          Divider(height: 1, color: hairlineOf(context)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.card),
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  for (var i = 0; i < cells.length; i++) ...[
+                    if (i > 0)
+                      VerticalDivider(width: 1, color: hairlineOf(context)),
+                    cells[i],
+                  ],
+                ],
               ),
-              if (primary?.lastCelsius != null)
-                _StatBlock(
-                  label: 'Last Temp',
-                  value: '${primary!.lastCelsius!.round()}°C',
-                  color: textColor,
-                ),
-              if (primary?.maxCelsius != null)
-                _StatBlock(
-                  label: 'Peak Temp',
-                  value: '${primary!.maxCelsius!.round()}°C',
-                  color: primary!.criticalExceeded
-                      ? AppColors.critical
-                      : primary!.warningExceeded
-                      ? AppColors.warning
-                      : textColor,
-                ),
-              if (primary != null && primary!.criticalDuration > Duration.zero)
-                _StatBlock(
-                  label: 'Time Critical',
-                  value: _fmtDuration(primary!.criticalDuration),
-                  color: AppColors.critical,
-                ),
-            ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            '${_fmtFull(incident.estimatedShutdownAt)} → shutdown   '
-            '${_fmtFull(incident.startupAt)} → startup',
-            style: TextStyle(fontSize: 11.5, color: secondary),
+          Divider(height: 1, color: hairlineOf(context)),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.card,
+              vertical: AppSpacing.sm,
+            ),
+            child: Column(
+              children: [
+                KeyValueRow('Shutdown', _fmtFull(incident.estimatedShutdownAt)),
+                KeyValueRow('Startup', _fmtFull(incident.startupAt)),
+              ],
+            ),
           ),
         ],
       ),
@@ -197,38 +188,5 @@ class _HeaderCard extends StatelessWidget {
       return '${d.inMinutes}m ${d.inSeconds.remainder(60)}s';
     }
     return '${d.inSeconds}s';
-  }
-}
-
-class _StatBlock extends StatelessWidget {
-  const _StatBlock({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: color,
-          ),
-        ),
-      ],
-    );
   }
 }

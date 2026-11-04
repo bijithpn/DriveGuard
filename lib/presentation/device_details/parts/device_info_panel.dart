@@ -26,19 +26,6 @@ class _DeviceInfoPanel extends StatelessWidget {
     }
   }
 
-  IconData _typeIcon() {
-    switch (device.type) {
-      case StorageDeviceType.nvme:
-        return Icons.memory_rounded;
-      case StorageDeviceType.ssd:
-        return Icons.storage_rounded;
-      case StorageDeviceType.hdd:
-        return Icons.album_rounded;
-      case StorageDeviceType.unknown:
-        return Icons.device_unknown_rounded;
-    }
-  }
-
   String _capacityText() {
     final bytes = device.capacityBytes;
     if (bytes == null) return 'Unknown capacity';
@@ -77,301 +64,174 @@ class _DeviceInfoPanel extends StatelessWidget {
     return '${diff.inHours}h ago';
   }
 
-  void _exportReport(BuildContext context) {
-    final health = device.health;
-    final primaryTemp = device.primaryTemperature;
-    final report = StringBuffer();
-    report.writeln('========================================');
-    report.writeln('DriveGuard Storage Diagnostic Report');
-    report.writeln('Generated: ${DateTime.now().toIso8601String()}');
-    report.writeln('========================================\n');
-    report.writeln('DEVICE IDENTIFICATION:');
-    report.writeln('  Display Name:    ${device.displayName}');
-    report.writeln('  Device ID:       ${device.id}');
-    report.writeln('  Type:            ${_typeLabel()}');
-    report.writeln(
-      '  Interface:       ${device.interfaceType.name.toUpperCase()}',
-    );
-    report.writeln('  Serial Number:   ${device.serialNumber ?? "N/A"}');
-    report.writeln('  Firmware:        ${device.firmwareVersion ?? "N/A"}');
-    report.writeln('  Capacity:        ${_capacityText()}\n');
-    report.writeln('TEMPERATURE METRICS:');
-    report.writeln(
-      '  Current Temp:    ${primaryTemp != null ? "${primaryTemp.celsius.toStringAsFixed(1)} °C" : "Unavailable"}',
-    );
-    report.writeln(
-      '  Severity:        ${presentation.severity.name.toUpperCase()}',
-    );
-    report.writeln(
-      '  Sensor Source:   ${primaryTemp?.source.toString() ?? "N/A"}\n',
-    );
-    report.writeln('S.M.A.R.T. & HEALTH:');
-    report.writeln('  Health Status:   ${health.status.name.toUpperCase()}');
-    report.writeln(
-      '  SMART Passed:    ${health.smartPassed == null ? "N/A" : (health.smartPassed! ? "PASSED" : "FAILED")}',
-    );
-    report.writeln(
-      '  Percentage Used: ${health.percentageUsed != null ? "${health.percentageUsed}%" : "N/A"}',
-    );
-    report.writeln(
-      '  Life Remaining:  ${health.percentageUsed != null ? "${(100 - health.percentageUsed!).clamp(0, 100)}%" : "N/A"}',
-    );
-    report.writeln(
-      '  Available Spare: ${health.availableSparePercent != null ? "${health.availableSparePercent}%" : "N/A"}',
-    );
-    report.writeln('  Power Cycles:    ${health.powerCycles ?? "N/A"}');
-    report.writeln(
-      '  Power-On Hours:  ${health.powerOnHours != null ? "${health.powerOnHours} h" : "N/A"}',
-    );
-    report.writeln('  Media Errors:    ${health.mediaErrors ?? "0"}');
-    report.writeln(
-      '  Total Read:      ${health.totalBytesRead != null ? _formatBytes(health.totalBytesRead!) : "N/A"}',
-    );
-    report.writeln(
-      '  Total Written:   ${health.totalBytesWritten != null ? _formatBytes(health.totalBytesWritten!) : "N/A"}\n',
-    );
-    if (device.volumes.isNotEmpty) {
-      report.writeln('VOLUMES:');
-      for (final v in device.volumes) {
-        report.writeln(
-          '  - ${v.volumeName ?? v.mountPoint ?? v.id} (${v.filesystem ?? "Unknown FS"}, Total: ${v.totalBytes != null ? _formatBytes(v.totalBytes!) : "N/A"})',
-        );
-      }
-    }
-    report.writeln('\n========================================');
-
-    Clipboard.setData(ClipboardData(text: report.toString()));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Diagnostic report copied to clipboard!'),
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 3),
-        backgroundColor: AppColors.accent,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final style = SeverityStyle.of(presentation.severity, context);
+    final available = presentation.tempCelsius != null;
+    final m = RegExp(r'^(-?[\d.]+)(.*)$').firstMatch(presentation.valueText);
+    final number = m?.group(1) ?? presentation.valueText;
+    final unit = m?.group(2) ?? '';
+
+    Color? healthColor;
+    switch (device.health.status) {
+      case DeviceHealthStatus.healthy:
+        healthColor = AppColors.normal;
+      case DeviceHealthStatus.warning:
+        healthColor = AppColors.warning;
+      case DeviceHealthStatus.critical:
+        healthColor = AppColors.critical;
+      default:
+        healthColor = null;
+    }
+    final monitoring =
+        device.monitoringStatus.name[0].toUpperCase() +
+        device.monitoringStatus.name.substring(1);
+
+    Widget row(String label, String value, {Color? color}) => Container(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: hairlineOf(context))),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: AppText.secondary(context)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.body(
+                context,
+              ).copyWith(fontWeight: FontWeight.w600, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.bg1 : AppColors.lightCard,
-        border: Border(
-          right: BorderSide(
-            color: isDark ? AppColors.divider : AppColors.lightBorder,
-            width: 1,
-          ),
-        ),
+        border: Border(right: BorderSide(color: hairlineOf(context))),
       ),
       child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-              child: Row(
+            Row(
+              children: [
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  iconSize: 20,
+                  icon: Icon(Icons.arrow_back_rounded, color: mutedOf(context)),
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Back',
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              device.displayName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppText.title(context),
+            ),
+            const SizedBox(height: 4),
+            Text(_typeLabel(), style: AppText.secondary(context)),
+            const SizedBox(height: AppSpacing.lg),
+
+            if (available)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      iconSize: 18,
-                      icon: Icon(
-                        Icons.arrow_back_rounded,
-                        color: isDark
-                            ? AppColors.textSecondary
-                            : AppColors.lightTextSecondary,
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      tooltip: 'Back',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      device.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? AppColors.textPrimary
-                            : AppColors.lightText,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      iconSize: 18,
-                      icon: Icon(
-                        Icons.file_download_outlined,
-                        color: isDark
-                            ? AppColors.textSecondary
-                            : AppColors.lightTextSecondary,
-                      ),
-                      onPressed: () => _exportReport(context),
-                      tooltip: 'Export Diagnostic Report',
+                  Text(number, style: AppText.metric(context, size: 48)),
+                  const SizedBox(width: 3),
+                  Text(
+                    unit,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: mutedOf(context),
                     ),
                   ),
                 ],
+              )
+            else
+              Text(
+                presentation.valueText,
+                style: AppText.metric(
+                  context,
+                  size: 28,
+                ).copyWith(color: faintOf(context)),
               ),
-            ),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: isDark ? AppColors.divider : AppColors.lightBorder,
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.topCenter,
-                    radius: 1.2,
-                    colors: [
-                      style.color.withValues(alpha: isDark ? 0.16 : 0.10),
-                      style.color.withValues(alpha: 0.0),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadius.xl),
-                  border: Border.all(
-                    color: style.color.withValues(alpha: 0.18),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                StatusDot(style.color, size: 7),
+                const SizedBox(width: 8),
+                Text(
+                  style.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: style.color,
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: SizedBox(
+                height: 4,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text(
-                      presentation.valueText,
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w800,
-                        color: style.color,
-                        letterSpacing: -1.5,
-                        height: 1.0,
-                      ),
+                    ColoredBox(
+                      color: isDark ? AppColors.bg3 : AppColors.lightBorder,
                     ),
-                    const SizedBox(height: 6),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: style.color.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
-                        border: Border.all(
-                          color: style.color.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(style.icon, size: 11, color: style.color),
-                          const SizedBox(width: 5),
-                          Text(
-                            style.label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: style.color,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    Center(
-                      child: TemperatureGauge(
-                        valueText: presentation.valueText,
-                        fraction: presentation.fraction,
-                        severity: presentation.severity,
-                        size: 148,
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        heightFactor: 1,
+                        widthFactor: available
+                            ? presentation.fraction.clamp(0.02, 1.0)
+                            : 0,
+                        child: ColoredBox(color: style.color),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: AppSpacing.lg),
 
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _HealthGrid(
-                entries: [
-                  _HealthEntry(
-                    label: 'Type',
-                    value: _typeLabel(),
-                    icon: _typeIcon(),
-                  ),
-                  _HealthEntry(
-                    label: 'Capacity',
-                    value: _capacityText(),
-                    icon: Icons.pie_chart_outline_rounded,
-                  ),
-                  _HealthEntry(
-                    label: 'Health',
-                    value: _healthLabel(),
-                    icon: Icons.favorite_rounded,
-                    statusColor:
-                        device.health.status == DeviceHealthStatus.healthy
-                        ? AppColors.normal
-                        : device.health.status == DeviceHealthStatus.warning
-                        ? AppColors.warning
-                        : device.health.status == DeviceHealthStatus.critical
+            Text('DETAILS', style: AppText.label(context)),
+            const SizedBox(height: 4),
+            row('Capacity', _capacityText()),
+            row('Health', _healthLabel(), color: healthColor),
+            row('Interface', device.interfaceType.name.toUpperCase()),
+            row(
+              'Monitoring',
+              monitoring,
+              color: device.monitoringStatus == MonitoringStatus.active
+                  ? AppColors.normal
+                  : (device.monitoringStatus == MonitoringStatus.error
                         ? AppColors.critical
-                        : null,
-                  ),
-                  _HealthEntry(
-                    label: 'Last Updated',
-                    value: _lastUpdatedText(),
-                    icon: Icons.schedule_rounded,
-                  ),
-                  _HealthEntry(
-                    label: 'Interface',
-                    value: device.interfaceType.name.toUpperCase(),
-                    icon: Icons.cable_rounded,
-                  ),
-                  _HealthEntry(
-                    label: 'Monitoring',
-                    value:
-                        device.monitoringStatus.name[0].toUpperCase() +
-                        device.monitoringStatus.name.substring(1),
-                    icon: Icons.monitor_heart_outlined,
-                    statusColor:
-                        device.monitoringStatus == MonitoringStatus.active
-                        ? AppColors.normal
-                        : device.monitoringStatus == MonitoringStatus.error
-                        ? AppColors.critical
-                        : null,
-                  ),
-                  _HealthEntry(
-                    label: 'Sensor Source',
-                    value:
-                        device.primaryTemperature?.source.toString() ?? 'N/A',
-                    icon: Icons.sensors_rounded,
-                  ),
-                  _HealthEntry(
-                    label: 'Serial Number',
-                    value: device.serialNumber ?? '--',
-                    icon: Icons.numbers_rounded,
-                  ),
-                ],
-                isDark: isDark,
-                minTileWidth: 110,
-              ),
+                        : null),
             ),
+            row('Serial', device.serialNumber ?? '--'),
+            row(
+              'Sensor',
+              device.primaryTemperature?.source.toString() ?? 'N/A',
+            ),
+            row('Updated', _lastUpdatedText()),
           ],
         ),
       ),
@@ -387,14 +247,9 @@ class _NativeTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page - 16),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.bg0 : AppColors.lightBg,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? AppColors.divider : AppColors.lightBorder,
-          ),
-        ),
+        border: Border(bottom: BorderSide(color: hairlineOf(context))),
       ),
       child: TabBar(
         controller: controller,
@@ -403,43 +258,21 @@ class _NativeTabBar extends StatelessWidget {
         dividerColor: Colors.transparent,
         indicatorSize: TabBarIndicatorSize.label,
         indicatorColor: AppColors.accent,
-        indicatorWeight: 2.5,
-        labelColor: AppColors.accent,
-        unselectedLabelColor: isDark
-            ? AppColors.textSecondary
-            : AppColors.lightTextSecondary,
-        labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        indicatorWeight: 2,
+        labelColor: primaryTextOf(context),
+        unselectedLabelColor: mutedOf(context),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         unselectedLabelStyle: const TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
         overlayColor: WidgetStateProperty.all(Colors.transparent),
         tabs: const [
-          Tab(
-            height: 44,
-            icon: Icon(Icons.thermostat_rounded, size: 16),
-            iconMargin: EdgeInsets.only(bottom: 2),
-            text: 'Temperature',
-          ),
-          Tab(
-            height: 44,
-            icon: Icon(Icons.favorite_rounded, size: 16),
-            iconMargin: EdgeInsets.only(bottom: 2),
-            text: 'Health',
-          ),
-          Tab(
-            height: 44,
-            icon: Icon(Icons.storage_rounded, size: 16),
-            iconMargin: EdgeInsets.only(bottom: 2),
-            text: 'Storage',
-          ),
-          Tab(
-            height: 44,
-            icon: Icon(Icons.build_rounded, size: 16),
-            iconMargin: EdgeInsets.only(bottom: 2),
-            text: 'Diagnostics',
-          ),
+          Tab(height: 52, text: 'Temperature'),
+          Tab(height: 52, text: 'Health'),
+          Tab(height: 52, text: 'Storage'),
+          Tab(height: 52, text: 'Diagnostics'),
         ],
       ),
     );

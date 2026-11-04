@@ -16,325 +16,216 @@ class _DiagnosticsTab extends StatelessWidget {
     final diff = DateTime.now().difference(t);
     if (diff.inSeconds < 5) return 'Just now';
     if (diff.inSeconds < 60) return '${diff.inSeconds}s ago';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    return '${diff.inHours}h ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    return '${diff.inHours} h ago';
+  }
+
+  String _titleCase(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+  /// One honest sentence about whether monitoring is healthy.
+  (Color, String, String) _verdict() {
+    final updated = _ago(device.lastUpdated);
+    if (device.sensorAvailability == SensorAvailability.permissionDenied) {
+      return (
+        AppColors.warning,
+        'Temperature needs extra permission',
+        'DriveGuard can see this drive but is not allowed to read its sensor.',
+      );
+    }
+    switch (device.monitoringStatus) {
+      case MonitoringStatus.active:
+        return (
+          AppColors.normal,
+          'Monitoring is working normally',
+          'Last reading $updated  ·  every ${settings.pollingInterval.inSeconds}s',
+        );
+      case MonitoringStatus.error:
+        return (
+          AppColors.critical,
+          'Something went wrong reading this drive',
+          device.lastError ?? 'The last read failed.',
+        );
+      case MonitoringStatus.disconnected:
+        return (
+          AppColors.warning,
+          'This drive is disconnected',
+          'Reconnect it and DriveGuard will resume automatically.',
+        );
+      case MonitoringStatus.sensorUnavailable:
+        return (
+          AppColors.warning,
+          'This drive has no temperature sensor',
+          'Health and capacity can still be monitored.',
+        );
+      case MonitoringStatus.staleData:
+        return (
+          AppColors.warning,
+          'Readings are out of date',
+          'Last successful reading $updated.',
+        );
+      case MonitoringStatus.permissionDenied:
+        return (
+          AppColors.warning,
+          'Temperature needs extra permission',
+          'DriveGuard can see this drive but is not allowed to read its sensor.',
+        );
+      case MonitoringStatus.paused:
+        return (
+          AppColors.warning,
+          'Monitoring is paused',
+          'Resume it from the sidebar.',
+        );
+      case MonitoringStatus.initializing:
+        return (
+          AppColors.accent,
+          'Starting up…',
+          'The first reading will arrive in a moment.',
+        );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final statusRows = <_DiagRow>[
-      _DiagRow(
-        label: 'Polling Interval',
-        value: '${settings.pollingInterval.inSeconds}s',
-        icon: Icons.schedule_rounded,
-        isDark: isDark,
+    final (verdictColor, verdictTitle, verdictSub) = _verdict();
+    final permDenied =
+        device.sensorAvailability == SensorAvailability.permissionDenied;
+    final avail = device.sensorAvailability;
+
+    final monitoring = <DetailRowData>[
+      DetailRowData(
+        'Status',
+        _titleCase(device.monitoringStatus.name),
+        dot: verdictColor,
       ),
-      _DiagRow(
-        label: 'Sensor Source',
-        value: device.primaryTemperature?.source.toString() ?? 'N/A',
-        icon: Icons.sensors_rounded,
-        isDark: isDark,
+      DetailRowData(
+        'Polling interval',
+        'Every ${settings.pollingInterval.inSeconds} seconds',
       ),
-      _DiagRow(
-        label: 'Sensor Availability',
-        value: device.sensorAvailability.name,
-        icon: Icons.thermostat_rounded,
-        isDark: isDark,
-        statusColor: device.sensorAvailability == SensorAvailability.available
+      DetailRowData(
+        'Sensor source',
+        device.primaryTemperature?.source.toString() ?? 'Not available',
+      ),
+      DetailRowData(
+        'Sensor access',
+        avail == SensorAvailability.available
+            ? 'Available'
+            : (permDenied ? 'Permission required' : _titleCase(avail.name)),
+        dot: avail == SensorAvailability.available
             ? AppColors.normal
-            : device.sensorAvailability == SensorAvailability.permissionDenied
-            ? AppColors.warning
-            : AppColors.textMuted,
+            : (permDenied ? AppColors.warning : null),
       ),
-      _DiagRow(
-        label: 'Monitoring Status',
-        value: device.monitoringStatus.name,
-        icon: Icons.monitor_heart_outlined,
-        isDark: isDark,
-        statusColor: device.monitoringStatus == MonitoringStatus.active
-            ? AppColors.normal
-            : device.monitoringStatus == MonitoringStatus.error
-            ? AppColors.critical
-            : AppColors.warning,
-      ),
-      _DiagRow(
-        label: 'Last Successful Reading',
-        value: _ago(device.lastUpdated),
-        icon: Icons.check_circle_outline_rounded,
-        isDark: isDark,
-      ),
-      _DiagRow(
-        label: 'Last Error',
-        value: device.lastError ?? 'None',
-        icon: Icons.error_outline_rounded,
-        isDark: isDark,
-        statusColor: device.lastError != null
-            ? AppColors.warning
-            : AppColors.normal,
-      ),
-      _DiagRow(
-        label: 'Permission Status',
-        value: device.sensorAvailability == SensorAvailability.permissionDenied
-            ? 'Additional permissions required'
-            : 'OK',
-        icon: Icons.security_rounded,
-        isDark: isDark,
-        statusColor:
-            device.sensorAvailability == SensorAvailability.permissionDenied
-            ? AppColors.warning
-            : AppColors.normal,
+      DetailRowData('Last reading', _ago(device.lastUpdated)),
+      DetailRowData(
+        'Last error',
+        device.lastError ?? 'None',
+        dot: device.lastError == null ? AppColors.normal : AppColors.warning,
       ),
     ];
 
-    final identifierRows = <_DiagRow>[
-      _DiagRow(
-        label: 'Device ID',
-        value: device.id,
-        icon: Icons.fingerprint_rounded,
-        isDark: isDark,
+    final identifiers = <DetailRowData>[
+      DetailRowData('Device ID', device.id, copyable: true),
+      DetailRowData(
+        'Serial number',
+        device.serialNumber ?? '--',
+        copyable: device.serialNumber != null,
       ),
-      _DiagRow(
-        label: 'Serial Number',
-        value: device.serialNumber ?? '--',
-        icon: Icons.numbers_rounded,
-        isDark: isDark,
-      ),
-      _DiagRow(
-        label: 'Firmware',
-        value: '--',
-        icon: Icons.system_update_alt_rounded,
-        isDark: isDark,
-      ),
-      _DiagRow(
-        label: 'Interface',
-        value: device.interfaceType.name.toUpperCase(),
-        icon: Icons.cable_rounded,
-        isDark: isDark,
-      ),
+      DetailRowData('Firmware', device.firmwareVersion ?? '--'),
+      DetailRowData('Interface', device.interfaceType.name.toUpperCase()),
     ];
+
+    final caps = DeviceCapabilities.derive(device).entries;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.page),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < statusRows.length; i++)
-            EntranceFade(index: i, child: statusRows[i]),
-
-          const SizedBox(height: AppSpacing.lg),
-          _SectionLabel(title: 'Capabilities', isDark: isDark),
-          const SizedBox(height: AppSpacing.sm),
-
-          _CapabilitiesGrid(
-            capabilities: DeviceCapabilities.derive(device),
-            startIndex: statusRows.length,
-            isDark: isDark,
-          ),
-
-          const SizedBox(height: AppSpacing.lg),
-          _SectionLabel(title: 'Device Identifiers', isDark: isDark),
-          const SizedBox(height: AppSpacing.sm),
-
-          for (var i = 0; i < identifierRows.length; i++)
-            EntranceFade(
-              index: statusRows.length + i,
-              child: identifierRows[i],
-            ),
-
-          if (device.sensorAvailability ==
-              SensorAvailability.permissionDenied) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(
-                  color: AppColors.warning.withValues(alpha: 0.22),
+          Surface(
+            child: Row(
+              children: [
+                StatusDot(verdictColor, size: 10),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(verdictTitle, style: AppText.heading(context)),
+                      const SizedBox(height: 3),
+                      Text(verdictSub, style: AppText.secondary(context)),
+                    ],
+                  ),
                 ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    color: AppColors.warning,
-                    size: 16,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Temperature Unavailable',
-                          style: TextStyle(
-                            color: AppColors.warning,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          device.lastError ??
-                              'This device requires additional permissions to '
-                                  'read temperature data. Check your system settings '
-                                  'or run the application with elevated privileges.',
-                          style: const TextStyle(
-                            color: AppColors.warning,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              ],
+            ),
+          ),
+          if (permDenied) ...[
+            const SizedBox(height: AppSpacing.gap),
+            AlertCard(
+              color: AppColors.warning,
+              icon: Icons.lock_outline_rounded,
+              title: 'Temperature unavailable',
+              children: [
+                Text(
+                  device.lastError ??
+                      'This drive needs additional permission to read temperature '
+                          'data. Check your system settings or run DriveGuard with '
+                          'elevated privileges.',
+                  style: AppText.secondary(context),
+                ),
+              ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DiagRow extends StatelessWidget {
-  const _DiagRow({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.isDark,
-    this.statusColor,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool isDark;
-  final Color? statusColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final badgeColor =
-        statusColor ??
-        (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: AppDecorations.card(isDark: isDark, radius: AppRadius.md),
-      child: Row(
-        children: [
-          IconBadge(icon: icon, color: badgeColor, size: 26, iconSize: 13),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: isDark
-                  ? AppColors.textSecondary
-                  : AppColors.lightTextSecondary,
+          const SizedBox(height: AppSpacing.section),
+          InfoSection(title: 'Monitoring', child: DetailTable(monitoring)),
+          const SizedBox(height: AppSpacing.section),
+          InfoSection(
+            title: 'Capabilities',
+            caption: 'What DriveGuard can read from this drive',
+            child: Surface(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final cols = c.maxWidth >= 520 ? 2 : 1;
+                  final w = (c.maxWidth - (cols - 1) * 16) / cols;
+                  return Wrap(
+                    spacing: 16,
+                    children: [
+                      for (final e in caps)
+                        SizedBox(
+                          width: w,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 7),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  e.$2
+                                      ? Icons.check_circle_rounded
+                                      : Icons.remove_circle_outline_rounded,
+                                  size: 16,
+                                  color: e.$2
+                                      ? AppColors.normal
+                                      : faintOf(context),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  e.$1,
+                                  style: e.$2
+                                      ? AppText.body(context)
+                                      : AppText.secondary(context),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color:
-                  statusColor ??
-                  (isDark ? AppColors.textPrimary : AppColors.lightText),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CapabilitiesGrid extends StatelessWidget {
-  const _CapabilitiesGrid({
-    required this.capabilities,
-    required this.startIndex,
-    required this.isDark,
-  });
-
-  final DeviceCapabilities capabilities;
-  final int startIndex;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final entries = capabilities.entries;
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        for (var i = 0; i < entries.length; i++)
-          EntranceFade(
-            index: startIndex + i,
-            child: _CapabilityChip(
-              label: entries[i].$1,
-              available: entries[i].$2,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _CapabilityChip extends StatelessWidget {
-  const _CapabilityChip({required this.label, required this.available});
-
-  final String label;
-  final bool available;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = available ? AppColors.normal : AppColors.textMuted;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 5,
-      ),
-      decoration: BoxDecoration(
-        color: available
-            ? AppColors.normal.withValues(alpha: isDark ? 0.1 : 0.07)
-            : (isDark ? AppColors.bg1 : AppColors.lightCard),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: available
-              ? AppColors.normal.withValues(alpha: 0.25)
-              : (isDark ? AppColors.border : AppColors.lightBorder),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            available
-                ? Icons.check_circle_outline_rounded
-                : Icons.remove_circle_outline_rounded,
-            size: 13,
-            color: color,
-          ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: available
-                  ? color
-                  : (isDark
-                        ? AppColors.textSecondary
-                        : AppColors.lightTextSecondary),
-            ),
-          ),
+          const SizedBox(height: AppSpacing.section),
+          InfoSection(title: 'Identifiers', child: DetailTable(identifiers)),
         ],
       ),
     );

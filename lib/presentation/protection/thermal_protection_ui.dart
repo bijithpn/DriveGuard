@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../components/ui_kit.dart';
+import 'alert_card.dart';
 import 'process_actions.dart';
 
 import '../../application/protection/thermal_models.dart';
@@ -27,7 +29,12 @@ class ThermalAlertBanner extends ConsumerWidget {
       child: !state.isActive
           ? const SizedBox(width: double.infinity)
           : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.page,
+                AppSpacing.lg,
+                AppSpacing.page,
+                0,
+              ),
               child: _ThermalCard(
                 state: state,
                 onCancel: svc.cancelShutdown,
@@ -64,156 +71,86 @@ class _ThermalCard extends StatelessWidget {
     final color = _stageColor(state.stage);
     final cause = state.cause;
     final culprit = cause?.culprit;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark
-        ? AppColors.textSecondary
-        : AppColors.lightTextSecondary;
+    final name = state.deviceName ?? 'Drive';
+    final reading = [
+      if (state.celsius != null) '${state.celsius!.toStringAsFixed(0)}°C',
+      ?state.message,
+    ].join('  ·  ');
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isDark ? 0.10 : 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.local_fire_department_rounded, color: color),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      state.stage == ThermalStage.emergency
-                          ? '${state.deviceName ?? 'Drive'} is overheating'
-                          : '${state.deviceName ?? 'Drive'} is running too hot',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      [
-                        if (state.celsius != null)
-                          '${state.celsius!.toStringAsFixed(0)}°C',
-                        ?state.message,
-                      ].join(' · '),
-                      style: TextStyle(fontSize: 12.5, color: muted),
-                    ),
-                  ],
-                ),
-              ),
-              if (state.countdown != null)
-                Text(
-                  '${state.countdown!.inSeconds}s',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-            ],
-          ),
-          if (cause != null) ...[
-            const SizedBox(height: 14),
-            Text(
-              'Main cause',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-                color: muted,
-              ),
+    return AlertCard(
+      color: color,
+      icon: Icons.local_fire_department_rounded,
+      title: state.stage == ThermalStage.emergency
+          ? '$name is overheating'
+          : '$name is running too hot',
+      subtitle: reading.isEmpty ? null : reading,
+      trailing: state.countdown == null
+          ? null
+          : Text(
+              '${state.countdown!.inSeconds}s',
+              style: AppText.metric(context, size: 28).copyWith(color: color),
             ),
-            const SizedBox(height: 4),
+      children: [
+        if (cause != null) ...[
+          Text('MAIN CAUSE', style: AppText.label(context)),
+          const SizedBox(height: 6),
+          Text(cause.headline, style: AppText.heading(context)),
+          const SizedBox(height: 4),
+          Text(cause.detail, style: AppText.secondary(context)),
+          if (culprit != null) ...[
+            const SizedBox(height: 10),
             Text(
-              cause.headline,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              '${cause.culpritMeasured ? 'Confirmed source' : 'Likely source'}: '
+              '${culprit.name} (${culprit.cpuPercent.toStringAsFixed(0)}% CPU'
+              '${culprit.rssBytes != null ? ', ${(culprit.rssBytes! / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB memory' : ''})',
+              style: AppText.body(
+                context,
+              ).copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 4),
-            Text(
-              cause.detail,
-              style: TextStyle(fontSize: 12.5, height: 1.4, color: muted),
-            ),
-            if (culprit != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                '${cause.culpritMeasured ? 'Confirmed source' : 'Likely source'}: '
-                '${culprit.name} (${culprit.cpuPercent.toStringAsFixed(0)}% CPU'
-                '${culprit.rssBytes != null ? ', ${(culprit.rssBytes! / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB memory' : ''})',
-                style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            if (cause.secondary.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Also: ${cause.secondary.join(' · ')}',
-                style: TextStyle(fontSize: 12, color: muted),
-              ),
-            ],
-            if (cause.advice.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              for (final a in cause.advice)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.arrow_right_rounded, size: 18, color: color),
-                      Expanded(
-                        child: Text(a, style: const TextStyle(fontSize: 12.5)),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
           ],
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              if (state.shutdownScheduled)
-                FilledButton.icon(
-                  onPressed: onCancel,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  label: const Text('Cancel shutdown'),
-                ),
-              if (culprit != null && onQuit != null)
-                ProcessQuitButtons(
-                  key: ValueKey('${state.deviceId}-${culprit.pid}'),
-                  processName: culprit.name,
-                  onQuit: onQuit!,
-                ),
-              if (state.stage == ThermalStage.emergency)
-                OutlinedButton.icon(
-                  onPressed: onShutdown,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.critical,
-                  ),
-                  icon: const Icon(Icons.power_settings_new_rounded, size: 18),
-                  label: const Text('Shut down now'),
-                ),
-            ],
-          ),
+          if (cause.secondary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Also: ${cause.secondary.join('  ·  ')}',
+              style: AppText.caption(context),
+            ),
+          ],
+          if (cause.advice.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            AdviceList(cause.advice),
+          ],
+          const SizedBox(height: 16),
         ],
-      ),
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (state.shutdownScheduled)
+              FilledButton(
+                onPressed: onCancel,
+                child: const Text('Cancel shutdown'),
+              ),
+            if (culprit != null && onQuit != null)
+              ProcessQuitButtons(
+                key: ValueKey('${state.deviceId}-${culprit.pid}'),
+                processName: culprit.name,
+                onQuit: onQuit!,
+              ),
+            if (state.stage == ThermalStage.emergency)
+              OutlinedButton(
+                onPressed: onShutdown,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.critical,
+                  side: BorderSide(
+                    color: AppColors.critical.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: const Text('Shut down now'),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

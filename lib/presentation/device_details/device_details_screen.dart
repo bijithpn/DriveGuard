@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/monitoring/temperature_history_store.dart';
@@ -19,7 +18,9 @@ import '../../domain/entities/temperature_thresholds.dart';
 import '../../domain/enums/storage_enums.dart';
 import '../components/animated_entrance.dart';
 import '../components/device_presentation.dart';
-import '../components/temperature_gauge.dart';
+import '../components/ui_kit.dart';
+import '../protection/alert_card.dart';
+import '../components/app_shell.dart';
 import '../theme/app_theme.dart';
 
 part 'parts/device_info_panel.dart';
@@ -128,9 +129,10 @@ class _DeviceDetailsScreenState extends ConsumerState<DeviceDetailsScreen>
     return Scaffold(
       backgroundColor: isDark ? AppColors.bg0 : AppColors.lightBg,
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 300,
+            width: 320,
             child: _DeviceInfoPanel(
               device: device,
               presentation: presentation,

@@ -5,7 +5,7 @@ import '../../domain/enums/storage_enums.dart';
 class AppLayout {
   const AppLayout._();
 
-  static const double sidebarWidth = 220.0;
+  static const double sidebarWidth = 216.0;
 
   static const double sidebarCollapsedWidth = 56.0;
 }
@@ -13,6 +13,7 @@ class AppLayout {
 class AppSpacing {
   const AppSpacing._();
 
+  // 4-pt scale. Use these and nothing else so rhythm stays consistent.
   static const double xxs = 2;
   static const double xs = 4;
   static const double sm = 8;
@@ -22,15 +23,25 @@ class AppSpacing {
   static const double xxl = 48;
 
   static const double sidebarPad = 12.0;
+
+  /// Outer margin of a page's content area.
+  static const double page = 28;
+
+  /// Inner padding of a card / surface.
+  static const double card = 20;
+
+  /// Gap between sibling cards and between page sections.
+  static const double gap = 16;
+  static const double section = 24;
 }
 
 class AppRadius {
   const AppRadius._();
 
-  static const double sm = 10;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 22;
+  static const double sm = 8;
+  static const double md = 10;
+  static const double lg = 12;
+  static const double xl = 16;
 
   static const Radius mdRadius = Radius.circular(md);
   static const Radius lgRadius = Radius.circular(lg);
@@ -48,10 +59,10 @@ class AppDurations {
 class AppColors {
   const AppColors._();
 
-  static const Color bg0 = Color(0xFF0A0D12);
-  static const Color bg1 = Color(0xFF11161D);
-  static const Color bg2 = Color(0xFF181E27);
-  static const Color bg3 = Color(0xFF242C38);
+  static const Color bg0 = Color(0xFF0C0E12);
+  static const Color bg1 = Color(0xFF13161B);
+  static const Color bg2 = Color(0xFF1A1E24);
+  static const Color bg3 = Color(0xFF252A32);
 
   static const Color accent = Color(0xFF5B8DFF);
   static const Color accentDim = Color(0xFF3568C4);
@@ -66,10 +77,10 @@ class AppColors {
 
   static const Color textPrimary = Color(0xFFF3F5F8);
   static const Color textSecondary = Color(0xFF9BA6B5);
-  static const Color textMuted = Color(0xFF5C6773);
+  static const Color textMuted = Color(0xFF6B7684);
 
-  static const Color divider = Color(0xFF1B222C);
-  static const Color border = Color(0xFF212934);
+  static const Color divider = Color(0xFF1C2026);
+  static const Color border = Color(0xFF22272E);
   static const Color shadowDark = Color(0x40000000);
 
   static const Color lightBg = Color(0xFFF3F5F9);
@@ -206,6 +217,7 @@ class AppTheme {
         contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
       ),
       switchTheme: SwitchThemeData(
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? Colors.white
@@ -231,6 +243,15 @@ class AppTheme {
       ),
       visualDensity: VisualDensity.standard,
       splashFactory: InkRipple.splashFactory,
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        side: const BorderSide(width: 1.5, color: AppColors.textMuted),
+        fillColor: WidgetStateProperty.resolveWith(
+          (st) => st.contains(WidgetState.selected)
+              ? AppColors.accent
+              : Colors.transparent,
+        ),
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.bg1,
         surfaceTintColor: Colors.transparent,
@@ -240,6 +261,7 @@ class AppTheme {
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(style: _filledStyle()),
+      textButtonTheme: TextButtonThemeData(style: _textStyle()),
       outlinedButtonTheme: OutlinedButtonThemeData(style: _outlinedStyle()),
       inputDecorationTheme: _inputTheme(AppColors.bg1),
       tooltipTheme: TooltipThemeData(
@@ -307,6 +329,7 @@ class AppTheme {
       ),
       iconTheme: const IconThemeData(color: AppColors.lightTextSecondary),
       switchTheme: SwitchThemeData(
+        trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? Colors.white
@@ -336,6 +359,15 @@ class AppTheme {
       ),
       visualDensity: VisualDensity.standard,
       splashFactory: InkRipple.splashFactory,
+      checkboxTheme: CheckboxThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        side: const BorderSide(width: 1.5, color: AppColors.lightTextSecondary),
+        fillColor: WidgetStateProperty.resolveWith(
+          (st) => st.contains(WidgetState.selected)
+              ? AppColors.accent
+              : Colors.transparent,
+        ),
+      ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.lightCard,
         surfaceTintColor: Colors.transparent,
@@ -345,6 +377,7 @@ class AppTheme {
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(style: _filledStyle()),
+      textButtonTheme: TextButtonThemeData(style: _textStyle()),
       outlinedButtonTheme: OutlinedButtonThemeData(style: _outlinedStyle()),
       inputDecorationTheme: _inputTheme(AppColors.lightSurfaceMuted),
       tooltipTheme: TooltipThemeData(
@@ -365,16 +398,35 @@ class AppTheme {
 
   static ButtonStyle _filledStyle() => FilledButton.styleFrom(
     elevation: 0,
-    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    textStyle: const TextStyle(
+      fontFamily: 'Manrope',
+      fontWeight: FontWeight.w600,
+      fontSize: 13,
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+    ),
+  );
+
+  static ButtonStyle _textStyle() => TextButton.styleFrom(
+    textStyle: const TextStyle(
+      fontFamily: 'Manrope',
+      fontWeight: FontWeight.w600,
+      fontSize: 13,
+    ),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppRadius.md),
     ),
   );
 
   static ButtonStyle _outlinedStyle() => OutlinedButton.styleFrom(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-    textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+    textStyle: const TextStyle(
+      fontFamily: 'Manrope',
+      fontWeight: FontWeight.w600,
+      fontSize: 13,
+    ),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(AppRadius.md),
     ),
@@ -424,9 +476,9 @@ class AppTheme {
       ),
       titleLarge: TextStyle(
         color: primary,
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: FontWeight.w600,
-        letterSpacing: -0.2,
+        letterSpacing: -0.3,
       ),
       titleMedium: TextStyle(
         color: primary,
@@ -478,7 +530,7 @@ class AppDecorations {
     double radius = AppRadius.lg,
     bool showBorder = true,
     bool isDark = true,
-    bool elevated = true,
+    bool elevated = false,
   }) => BoxDecoration(
     color: color ?? (isDark ? AppColors.bg1 : AppColors.lightCard),
     borderRadius: BorderRadius.circular(radius),
@@ -492,8 +544,8 @@ class AppDecorations {
         ? [
             BoxShadow(
               color: isDark ? AppColors.shadowDark : AppColors.lightShadow,
-              blurRadius: isDark ? 24 : 18,
-              offset: const Offset(0, 6),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
             ),
           ]
         : null,

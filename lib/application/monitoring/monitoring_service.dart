@@ -16,6 +16,7 @@ import '../../domain/enums/storage_enums.dart';
 import '../../domain/repositories/storage_monitor.dart';
 import '../../domain/entities/monitoring_session.dart';
 import '../../infrastructure/persistence/incident_repository.dart';
+import '../../infrastructure/persistence/local_state_repository.dart';
 import '../alerts/alert_engine.dart';
 import '../alerts/predictive_engine.dart';
 import '../alerts/ssd_life_advisor.dart';
@@ -40,6 +41,7 @@ class MonitoringService {
     IncidentRepository? incidentRepository,
     ThermalProtectionService? thermalProtection,
     ResourceGuardService? resourceGuard,
+    LocalStateRepository? localState,
     String? sessionId,
   }) : _backend = backend,
        _notifications = notifications,
@@ -47,6 +49,7 @@ class MonitoringService {
        _incidentRepository = incidentRepository,
        _thermalProtection = thermalProtection,
        _resourceGuard = resourceGuard,
+       _localState = localState,
        _sessionId = sessionId,
        _capacityHistoryStore =
            capacityHistoryStore ??
@@ -73,6 +76,9 @@ class MonitoringService {
   final IncidentRepository? _incidentRepository;
   final ThermalProtectionService? _thermalProtection;
   final ResourceGuardService? _resourceGuard;
+  final LocalStateRepository? _localState;
+  final Set<String> _capacityRestored = {};
+  final Map<String, DateTime> _capacitySavedAt = {};
   final SsdLifeAdvisor _advisor = const SsdLifeAdvisor();
   final Set<String> _advisoriesSent = {};
   final Map<String, int> _rejectedStreak = {};
@@ -133,6 +139,8 @@ class MonitoringService {
 
   Future<void> start(AppSettings settings) async {
     _settings = settings;
+    final saved = await _localState?.loadSentAdvisories();
+    if (saved != null) _advisoriesSent.addAll(saved);
     await _notifications.initialize();
     await _discoverDevices();
     _rescheduleTimers();
@@ -384,8 +392,15 @@ class MonitoringService {
             'volumes: ${volumes.length}',
           );
           final usagePercent = capacity.usagePercent;
+          if (_capacityRestored.add(id) && _localState != null) {
+            _capacityHistoryStore.restore(
+              id,
+              await _localState.loadCapacity(id),
+            );
+          }
           if (usagePercent != null) {
             _capacityHistoryStore.record(id, usagePercent);
+            _persistCapacity(id);
           }
           await _evaluatePredictiveCapacity(id, capacity, updated);
           await _evaluateCapacityAlert(id, capacity, updated);
@@ -399,6 +414,18 @@ class MonitoringService {
       }),
     );
     _emit();
+  }
+
+  /// Usage history is saved at most hourly — a handful of bytes, but there
+  /// is no reason to touch the SSD more often than that.
+  void _persistCapacity(String id) {
+    final repo = _localState;
+    if (repo == null) return;
+    final last = _capacitySavedAt[id];
+    final now = DateTime.now();
+    if (last != null && now.difference(last) < const Duration(hours: 1)) return;
+    _capacitySavedAt[id] = now;
+    unawaited(repo.saveCapacity(id, _capacityHistoryStore.pointsFor(id)));
   }
 
   Future<void> _evaluatePredictiveCapacity(
@@ -742,6 +769,9 @@ class MonitoringService {
     for (final a in _advisor.evaluate(device, previous: previousHealth)) {
       final key = '${device.id}:${a.id}';
       if (!_advisoriesSent.add(key)) continue;
+      unawaited(
+        _localState?.saveSentAdvisories(_advisoriesSent) ?? Future.value(),
+      );
       AppLogger.instance.info(_tag, 'Advisory for ${device.id}: ${a.id}');
       await _notifications.showAdvisory(
         id: key,

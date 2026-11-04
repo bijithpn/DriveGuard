@@ -32,6 +32,23 @@ class MetricHistoryStore {
     }
   }
 
+  /// Loads previously saved points (older than anything already recorded).
+  void restore(String deviceId, List<MetricPoint> saved) {
+    if (saved.isEmpty) return;
+    final points = _points.putIfAbsent(deviceId, () => Queue<MetricPoint>());
+    final firstLive = points.isEmpty ? null : points.first.timestamp;
+    final cutoff = DateTime.now().subtract(retention);
+    final older = [
+      for (final p in saved)
+        if (p.timestamp.isAfter(cutoff) &&
+            (firstLive == null || p.timestamp.isBefore(firstLive)))
+          p,
+    ];
+    for (final p in older.reversed) {
+      points.addFirst(p);
+    }
+  }
+
   List<MetricPoint> pointsFor(String deviceId) =>
       List.unmodifiable(_points[deviceId] ?? const <MetricPoint>[]);
 

@@ -34,115 +34,83 @@ class _TemperatureTab extends ConsumerWidget {
     );
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.page),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (stats.isElevated) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: AppSpacing.md),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(
-                  color: AppColors.warning.withValues(alpha: 0.4),
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.gap),
+              child: Surface(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.trending_up_rounded,
-                    color: AppColors.warning,
-                    size: 20,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      'Temperature is higher than usual (+${TemperatureUtils.convertDelta(stats.elevationDelta, unit).toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)} vs ${windowLabel.toLowerCase()} average)',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.warning,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
+                borderColor: AppColors.warning.withValues(alpha: 0.5),
+                child: Row(
                   children: [
-                    _StatCard(
-                      label: 'Current',
-                      value: device.primaryTemperature != null
-                          ? TemperatureUtils.format(
-                              device.primaryTemperature!.celsius,
-                              unit,
-                            )
-                          : 'N/A',
-                      icon: Icons.thermostat_rounded,
-                      isDark: isDark,
-                      color:
-                          presentation.severity ==
-                              TemperatureSeverity.unavailable
-                          ? AppColors.textMuted
-                          : SeverityStyle.of(
-                              presentation.severity,
-                              context,
-                            ).color,
+                    const Icon(
+                      Icons.trending_up_rounded,
+                      color: AppColors.warning,
+                      size: 18,
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _StatCard(
-                            label: 'Min',
-                            value: stats.min != null
-                                ? TemperatureUtils.format(stats.min!, unit)
-                                : '--',
-                            icon: Icons.arrow_downward_rounded,
-                            isDark: isDark,
-                            color: AppColors.normal,
-                            compact: true,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: _StatCard(
-                            label: 'Max',
-                            value: stats.max != null
-                                ? TemperatureUtils.format(stats.max!, unit)
-                                : '--',
-                            icon: Icons.arrow_upward_rounded,
-                            isDark: isDark,
-                            color: AppColors.warning,
-                            compact: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _StatCard(
-                      label: 'Average',
-                      value: stats.average != null
-                          ? TemperatureUtils.format(stats.average!, unit)
-                          : '--',
-                      icon: Icons.show_chart_rounded,
-                      isDark: isDark,
-                      compact: true,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Temperature is higher than usual (+${TemperatureUtils.convertDelta(stats.elevationDelta, unit).toStringAsFixed(1)}${TemperatureUtils.unitSuffix(unit)} vs ${windowLabel.toLowerCase()} average)',
+                        style: AppText.body(context),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
+          ],
+          Surface(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  _StatCell(
+                    label: 'Current',
+                    value: device.primaryTemperature != null
+                        ? TemperatureUtils.format(
+                            device.primaryTemperature!.celsius,
+                            unit,
+                          )
+                        : 'N/A',
+                    color:
+                        presentation.severity == TemperatureSeverity.unavailable
+                        ? null
+                        : SeverityStyle.of(
+                            presentation.severity,
+                            context,
+                          ).color,
+                  ),
+                  _StatDivider(color: hairlineOf(context)),
+                  _StatCell(
+                    label: 'Min',
+                    value: stats.min != null
+                        ? TemperatureUtils.format(stats.min!, unit)
+                        : '--',
+                  ),
+                  _StatDivider(color: hairlineOf(context)),
+                  _StatCell(
+                    label: 'Max',
+                    value: stats.max != null
+                        ? TemperatureUtils.format(stats.max!, unit)
+                        : '--',
+                  ),
+                  _StatDivider(color: hairlineOf(context)),
+                  _StatCell(
+                    label: 'Average',
+                    value: stats.average != null
+                        ? TemperatureUtils.format(stats.average!, unit)
+                        : '--',
+                  ),
+                ],
+              ),
+            ),
           ),
 
           const SizedBox(height: AppSpacing.md),
@@ -335,19 +303,7 @@ class _CollectingHistoryPlaceholderState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: const Icon(
-                Icons.show_chart_rounded,
-                size: 24,
-                color: AppColors.accent,
-              ),
-            ),
+            Icon(Icons.show_chart_rounded, size: 28, color: faintOf(context)),
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Collecting temperature history…',
@@ -378,118 +334,10 @@ class _CollectingHistoryPlaceholderState
                     )
                   : const Icon(Icons.refresh_rounded, size: 16),
               label: Text(_refreshing ? 'Refreshing…' : 'Refresh now'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.accent,
-                side: const BorderSide(color: AppColors.accent),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs + 2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                ),
-              ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.isDark,
-    this.color,
-    this.compact = false,
-  });
-
-  final String label;
-  final String value;
-  final IconData icon;
-  final bool isDark;
-  final Color? color;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final effectiveColor =
-        color ??
-        (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary);
-    return Container(
-      padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
-      decoration: AppDecorations.card(
-        isDark: isDark,
-        radius: AppRadius.md,
-        color: isDark ? AppColors.bg2 : AppColors.lightCard,
-      ),
-      child: compact
-          ? Row(
-              children: [
-                Icon(icon, size: 13, color: effectiveColor),
-                const SizedBox(width: 5),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.textMuted
-                        : AppColors.lightTextSecondary,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: effectiveColor,
-                  ),
-                ),
-              ],
-            )
-          : Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: effectiveColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: Icon(icon, size: 15, color: effectiveColor),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? AppColors.textMuted
-                              : AppColors.lightTextSecondary,
-                        ),
-                      ),
-                      Text(
-                        value,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: effectiveColor,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
     );
   }
 }
@@ -556,14 +404,40 @@ class _SectionLabel extends StatelessWidget {
   final bool isDark;
 
   @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: isDark ? AppColors.textPrimary : AppColors.lightText,
+  Widget build(BuildContext context) =>
+      Text(title, style: AppText.heading(context));
+}
+
+class _StatCell extends StatelessWidget {
+  const _StatCell({required this.label, required this.value, this.color});
+  final String label;
+  final String value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.card),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: AppText.caption(context)),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: AppText.metric(context, size: 24).copyWith(color: color),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider({required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) =>
+      VerticalDivider(width: 1, thickness: 1, color: color);
 }

@@ -379,15 +379,11 @@ class _HealthEntry {
 }
 
 class _HealthGrid extends StatelessWidget {
-  const _HealthGrid({
-    required this.entries,
-    required this.isDark,
-    this.minTileWidth = 170,
-  });
+  const _HealthGrid({required this.entries, required this.isDark});
 
   final List<_HealthEntry> entries;
   final bool isDark;
-  final double minTileWidth;
+  static const double minTileWidth = 180;
 
   @override
   Widget build(BuildContext context) {
@@ -425,42 +421,34 @@ class _HealthTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = entry.available
-        ? (entry.statusColor ??
-              (isDark ? AppColors.textSecondary : AppColors.lightTextSecondary))
-        : AppColors.textMuted;
-    return Container(
+    final valueColor = entry.available ? entry.statusColor : faintOf(context);
+    return Surface(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: AppDecorations.card(isDark: isDark, radius: AppRadius.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              IconBadge(icon: entry.icon, color: color, size: 24, iconSize: 12),
-              const SizedBox(width: AppSpacing.xs),
+              Icon(entry.icon, size: 14, color: faintOf(context)),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   entry.label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.textMuted
-                        : AppColors.lightTextSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.caption(context),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             entry.value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.heading(
+              context,
+            ).copyWith(fontSize: 16, color: valueColor),
           ),
         ],
       ),

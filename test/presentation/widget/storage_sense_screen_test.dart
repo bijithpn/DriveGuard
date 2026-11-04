@@ -2,7 +2,10 @@ import 'package:driveguard/application/providers.dart';
 import 'package:driveguard/application/storage_sense/storage_sense_controller.dart';
 import 'package:driveguard/domain/entities/cleanup_item.dart';
 import 'package:driveguard/domain/entities/storage_device.dart';
+import 'package:driveguard/infrastructure/storage/mock_storage_monitor.dart';
 import 'package:driveguard/presentation/storage_sense/storage_sense_screen.dart';
+
+import '../../mocks/fake_notification_service.dart';
 import 'package:driveguard/presentation/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -71,6 +74,14 @@ void main() {
           overrides: [
             storageSenseProvider.overrideWith(() => sense),
             devicesProvider.overrideWith(_NoDevices.new),
+            storageMonitorProvider.overrideWithValue(MockStorageMonitor()),
+            notificationServiceProvider.overrideWithValue(
+              FakeNotificationService(),
+            ),
+            storageMonitorProvider.overrideWithValue(MockStorageMonitor()),
+            notificationServiceProvider.overrideWithValue(
+              FakeNotificationService(),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.dark(),
@@ -80,8 +91,8 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 1));
 
-      expect(find.text('Storage Sense'), findsOneWidget);
-      expect(find.text('Select safe'), findsOneWidget);
+      expect(find.text('Storage Sense'), findsWidgets);
+      expect(find.text('Select all safe items'), findsOneWidget);
       if (size.height > 600) {
         expect(find.text('Developer tools'), findsOneWidget);
         expect(find.text('14.0 GB'), findsWidgets);
@@ -100,6 +111,10 @@ void main() {
         overrides: [
           storageSenseProvider.overrideWith(() => sense),
           devicesProvider.overrideWith(_NoDevices.new),
+          storageMonitorProvider.overrideWithValue(MockStorageMonitor()),
+          notificationServiceProvider.overrideWithValue(
+            FakeNotificationService(),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.dark(),

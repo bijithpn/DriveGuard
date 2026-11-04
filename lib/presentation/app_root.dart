@@ -13,6 +13,7 @@ import '../application/providers.dart';
 import '../application/settings/app_settings.dart' show kAllEdgeDockMetrics;
 import '../application/widget/mini_widget_snapshot.dart';
 import '../core/logging/app_logger.dart';
+import '../core/utils/temperature_utils.dart';
 import '../domain/entities/storage_device.dart';
 import '../domain/entities/storage_thresholds.dart';
 import '../domain/enums/storage_enums.dart';
@@ -28,6 +29,7 @@ import 'incidents/incident_report_screen.dart';
 import 'incidents/startup_incident_dialog.dart';
 import 'protection/thermal_protection_ui.dart';
 import 'settings/settings_screen.dart';
+import 'components/app_shell.dart';
 import 'theme/app_theme.dart';
 
 final widgetModeActiveProvider = StateProvider<bool>((ref) => false);
@@ -281,6 +283,16 @@ class _AppRootState extends ConsumerState<AppRoot>
       },
       onRescan: () => ref.read(monitoringServiceProvider).rescan(),
       onQuit: _quitApp,
+      onOpenStorageSense: () async {
+        await windowManager.show();
+        await windowManager.focus();
+        final nav = rootNavigatorKey.currentState;
+        if (nav != null) goToSection(nav, AppSection.storage);
+      },
+      onTraySettingsChanged: (t) => ref
+          .read(settingsProvider.notifier)
+          .updateWith((s) => s.copyWith(tray: t)),
+      settings: settings.tray,
     );
     try {
       await tray.initialize();
@@ -333,21 +345,43 @@ class _AppRootState extends ConsumerState<AppRoot>
     final deviceList = ref.read(devicesProvider);
     var worst = TemperatureSeverity.normal;
     final summaries = <TrayDeviceSummary>[];
+    var tempSum = 0.0;
+    var tempCount = 0;
+    var fracSum = 0.0;
     for (final d in deviceList) {
+      final thresholds = settings.thresholdsFor(d.id);
       final presentation = DevicePresentation.of(
         d,
-        settings.thresholdsFor(d.id),
+        thresholds,
         settings.temperatureUnit,
       );
       final severity = _combinedSeverity(d.id, presentation.severity);
+      final usage = d.capacity.usagePercent;
+      final label = switch (severity) {
+        TemperatureSeverity.critical => 'Critical',
+        TemperatureSeverity.warning => 'Warning',
+        TemperatureSeverity.unavailable => 'No sensor',
+        _ => 'Normal',
+      };
       summaries.add(
         TrayDeviceSummary(
           id: d.id,
           name: d.displayName,
           valueText: presentation.valueText,
           severity: severity,
+          celsius: presentation.tempCelsius,
+          fraction: presentation.fraction,
+          detail: [
+            label,
+            if (usage != null) '${usage.toStringAsFixed(0)}% used',
+          ].join(' · '),
         ),
       );
+      if (presentation.tempCelsius != null) {
+        tempSum += presentation.tempCelsius!;
+        fracSum += presentation.fraction;
+        tempCount++;
+      }
       if (severity == TemperatureSeverity.critical) {
         worst = TemperatureSeverity.critical;
       } else if (severity == TemperatureSeverity.warning &&
@@ -355,7 +389,16 @@ class _AppRootState extends ConsumerState<AppRoot>
         worst = TemperatureSeverity.warning;
       }
     }
-    await tray.updateDevices(summaries);
+    await tray.updateDevices(
+      summaries,
+      averageText: tempCount > 0
+          ? TemperatureUtils.format(
+              tempSum / tempCount,
+              settings.temperatureUnit,
+            )
+          : null,
+      averageFraction: tempCount > 0 ? fracSum / tempCount : 0,
+    );
     await tray.updateSeverity(worst);
   }
 
@@ -505,6 +548,11 @@ class _AppRootState extends ConsumerState<AppRoot>
     windowManager.removeListener(this);
     unawaited(_notificationClickSub?.cancel());
     super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    _tray?.onBrightnessChanged();
   }
 
   @override
@@ -670,6 +718,14 @@ class _AppRootState extends ConsumerState<AppRoot>
         }
       }
       _tray?.setPaused(!next.monitoringEnabled);
+      if (previous?.tray != next.tray ||
+          previous?.temperatureUnit != next.temperatureUnit) {
+        final t = _tray;
+        if (t != null) {
+          t.applySettings(next.tray);
+          _pushDeviceSummaryToTray(t);
+        }
+      }
       _pushSnapshotToMiniWindowIfActive();
       _pushSnapshotToEdgeDockIfActive();
     });
