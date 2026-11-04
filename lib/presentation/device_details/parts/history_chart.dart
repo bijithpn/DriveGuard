@@ -275,7 +275,7 @@ class _HistoryChartState extends State<_HistoryChart> {
                       }
 
                       return SideTitleWidget(
-                        axisSide: meta.axisSide,
+                        meta: meta,
                         space: 8,
                         fitInside: SideTitleFitInsideData.fromTitleMeta(
                           meta,
@@ -312,7 +312,7 @@ class _HistoryChartState extends State<_HistoryChart> {
                       }
 
                       return SideTitleWidget(
-                        axisSide: meta.axisSide,
+                        meta: meta,
                         space: 8,
                         fitInside: SideTitleFitInsideData.fromTitleMeta(
                           meta,
@@ -463,7 +463,7 @@ class _HistoryChartState extends State<_HistoryChart> {
                 touchTooltipData: LineTouchTooltipData(
                   getTooltipColor: (_) =>
                       widget.isDark ? const Color(0xFF1E1E26) : Colors.white,
-                  tooltipRoundedRadius: AppRadius.md,
+                  tooltipBorderRadius: BorderRadius.circular(AppRadius.md),
                   tooltipBorder: BorderSide(
                     color: widget.isDark
                         ? AppColors.border

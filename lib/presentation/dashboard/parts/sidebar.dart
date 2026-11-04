@@ -10,6 +10,7 @@ class _Sidebar extends StatelessWidget {
     required this.onRescan,
     required this.onOpenSettings,
     required this.onOpenIncidents,
+    required this.onOpenStorageSense,
   });
 
   final List<StorageDevice> devices;
@@ -20,6 +21,7 @@ class _Sidebar extends StatelessWidget {
   final VoidCallback onRescan;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenIncidents;
+  final VoidCallback onOpenStorageSense;
 
   TemperatureSeverity _overallSeverity() {
     if (devices.isEmpty) return TemperatureSeverity.unavailable;
@@ -149,6 +151,21 @@ class _Sidebar extends StatelessWidget {
               selected: true,
               isDark: isDark,
               onTap: () {},
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xs + 2,
+              AppSpacing.xxs,
+              AppSpacing.xs + 2,
+              0,
+            ),
+            child: _SidebarNavItem(
+              icon: Icons.cleaning_services_rounded,
+              label: 'Storage Sense',
+              selected: false,
+              isDark: isDark,
+              onTap: onOpenStorageSense,
             ),
           ),
 
@@ -312,18 +329,22 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                                 : AppColors.lightTextSecondary)),
               ),
               const SizedBox(width: AppSpacing.xs + 2),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: widget.selected
-                      ? FontWeight.w600
-                      : FontWeight.w400,
-                  color: widget.selected
-                      ? AppColors.accent
-                      : (widget.isDark
-                            ? AppColors.textSecondary
-                            : AppColors.lightTextSecondary),
+              Flexible(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: widget.selected
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                    color: widget.selected
+                        ? AppColors.accent
+                        : (widget.isDark
+                              ? AppColors.textSecondary
+                              : AppColors.lightTextSecondary),
+                  ),
                 ),
               ),
             ],

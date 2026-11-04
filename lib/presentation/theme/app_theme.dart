@@ -27,10 +27,10 @@ class AppSpacing {
 class AppRadius {
   const AppRadius._();
 
-  static const double sm = 8;
-  static const double md = 10;
-  static const double lg = 14;
-  static const double xl = 18;
+  static const double sm = 10;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 22;
 
   static const Radius mdRadius = Radius.circular(md);
   static const Radius lgRadius = Radius.circular(lg);
@@ -48,15 +48,15 @@ class AppDurations {
 class AppColors {
   const AppColors._();
 
-  static const Color bg0 = Color(0xFF0D1117);
-  static const Color bg1 = Color(0xFF161B22);
-  static const Color bg2 = Color(0xFF1F2630);
-  static const Color bg3 = Color(0xFF2B3440);
+  static const Color bg0 = Color(0xFF0A0D12);
+  static const Color bg1 = Color(0xFF11161D);
+  static const Color bg2 = Color(0xFF181E27);
+  static const Color bg3 = Color(0xFF242C38);
 
-  static const Color accent = Color(0xFF4F8CFF);
+  static const Color accent = Color(0xFF5B8DFF);
   static const Color accentDim = Color(0xFF3568C4);
 
-  static const Color normal = Color(0xFF35D68C);
+  static const Color normal = Color(0xFF3DDC84);
   static const Color normalDim = Color(0xFF22996A);
   static const Color warm = Color(0xFF8BD450);
   static const Color warning = Color(0xFFF5A623);
@@ -65,17 +65,17 @@ class AppColors {
   static const Color criticalDim = Color(0xFFD93B3B);
 
   static const Color textPrimary = Color(0xFFF3F5F8);
-  static const Color textSecondary = Color(0xFF99A3B0);
+  static const Color textSecondary = Color(0xFF9BA6B5);
   static const Color textMuted = Color(0xFF5C6773);
 
-  static const Color divider = Color(0xFF232B36);
-  static const Color border = Color(0xFF262E3A);
+  static const Color divider = Color(0xFF1B222C);
+  static const Color border = Color(0xFF212934);
   static const Color shadowDark = Color(0x40000000);
 
-  static const Color lightBg = Color(0xFFF5F7FA);
+  static const Color lightBg = Color(0xFFF3F5F9);
   static const Color lightCard = Color(0xFFFFFFFF);
   static const Color lightSurfaceMuted = Color(0xFFECF0F5);
-  static const Color lightBorder = Color(0xFFDCE2E9);
+  static const Color lightBorder = Color(0xFFE1E6EE);
   static const Color lightText = Color(0xFF12161C);
   static const Color lightTextSecondary = Color(0xFF5C6773);
   static const Color lightShadow = Color(0x14101820);
@@ -231,6 +231,30 @@ class AppTheme {
       ),
       visualDensity: VisualDensity.standard,
       splashFactory: InkRipple.splashFactory,
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.bg1,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          side: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(style: _filledStyle()),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: _outlinedStyle()),
+      inputDecorationTheme: _inputTheme(AppColors.bg1),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: AppColors.bg3,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        textStyle: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+        waitDuration: const Duration(milliseconds: 400),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: WidgetStateProperty.all(6),
+        radius: const Radius.circular(99),
+        thumbColor: WidgetStateProperty.all(AppColors.bg3),
+      ),
     );
   }
 
@@ -312,8 +336,62 @@ class AppTheme {
       ),
       visualDensity: VisualDensity.standard,
       splashFactory: InkRipple.splashFactory,
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.lightCard,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          side: const BorderSide(color: AppColors.lightBorder),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(style: _filledStyle()),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: _outlinedStyle()),
+      inputDecorationTheme: _inputTheme(AppColors.lightSurfaceMuted),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: AppColors.lightText,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+        waitDuration: const Duration(milliseconds: 400),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: WidgetStateProperty.all(6),
+        radius: const Radius.circular(99),
+        thumbColor: WidgetStateProperty.all(AppColors.lightBorder),
+      ),
     );
   }
+
+  static ButtonStyle _filledStyle() => FilledButton.styleFrom(
+    elevation: 0,
+    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+    textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+    ),
+  );
+
+  static ButtonStyle _outlinedStyle() => OutlinedButton.styleFrom(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+    textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+    ),
+  );
+
+  static InputDecorationTheme _inputTheme(Color fill) => InputDecorationTheme(
+    filled: true,
+    fillColor: fill,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      borderSide: const BorderSide(color: AppColors.accent, width: 1.2),
+    ),
+  );
 
   static String? _fontFamily() => 'Manrope';
 
@@ -414,8 +492,8 @@ class AppDecorations {
         ? [
             BoxShadow(
               color: isDark ? AppColors.shadowDark : AppColors.lightShadow,
-              blurRadius: isDark ? 16 : 12,
-              offset: const Offset(0, 4),
+              blurRadius: isDark ? 24 : 18,
+              offset: const Offset(0, 6),
             ),
           ]
         : null,
@@ -435,14 +513,11 @@ class AppDecorations {
     required bool isDark,
   }) {
     if (selected) {
-      return const BoxDecoration(
-        color: Colors.transparent,
-        border: Border(left: BorderSide(color: AppColors.accent, width: 2.5)),
+      return BoxDecoration(
+        color: AppColors.accent.withValues(alpha: isDark ? 0.14 : 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       );
     }
-    return const BoxDecoration(
-      color: Colors.transparent,
-      border: Border(left: BorderSide(color: Colors.transparent, width: 2.5)),
-    );
+    return BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.md));
   }
 }

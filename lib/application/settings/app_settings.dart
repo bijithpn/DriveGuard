@@ -215,6 +215,58 @@ class EdgeDockSettings {
       );
 }
 
+/// Automatic protection against sustained drive overheating.
+///
+/// Detection and the explanatory alert are always on when [enabled]; the
+/// automatic shutdown is opt-in ([shutdownEnabled]) and always gives the user
+/// [countdownSeconds] to cancel.
+class ThermalProtectionSettings {
+  const ThermalProtectionSettings({
+    this.enabled = true,
+    this.shutdownEnabled = false,
+    this.emergencyCelsius = 75,
+    this.countdownSeconds = 60,
+    this.sustainedReadings = 3,
+  });
+
+  final bool enabled;
+  final bool shutdownEnabled;
+  final double emergencyCelsius;
+  final int countdownSeconds;
+  final int sustainedReadings;
+
+  ThermalProtectionSettings copyWith({
+    bool? enabled,
+    bool? shutdownEnabled,
+    double? emergencyCelsius,
+    int? countdownSeconds,
+    int? sustainedReadings,
+  }) => ThermalProtectionSettings(
+    enabled: enabled ?? this.enabled,
+    shutdownEnabled: shutdownEnabled ?? this.shutdownEnabled,
+    emergencyCelsius: emergencyCelsius ?? this.emergencyCelsius,
+    countdownSeconds: countdownSeconds ?? this.countdownSeconds,
+    sustainedReadings: sustainedReadings ?? this.sustainedReadings,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'enabled': enabled,
+    'shutdownEnabled': shutdownEnabled,
+    'emergencyCelsius': emergencyCelsius,
+    'countdownSeconds': countdownSeconds,
+    'sustainedReadings': sustainedReadings,
+  };
+
+  factory ThermalProtectionSettings.fromJson(Map<String, dynamic> json) =>
+      ThermalProtectionSettings(
+        enabled: json['enabled'] as bool? ?? true,
+        shutdownEnabled: json['shutdownEnabled'] as bool? ?? false,
+        emergencyCelsius: (json['emergencyCelsius'] as num?)?.toDouble() ?? 75,
+        countdownSeconds: (json['countdownSeconds'] as num?)?.toInt() ?? 60,
+        sustainedReadings: (json['sustainedReadings'] as num?)?.toInt() ?? 3,
+      );
+}
+
 class AppSettings {
   const AppSettings({
     this.pollingInterval = AppConstants.defaultPollingInterval,
@@ -248,6 +300,8 @@ class AppSettings {
     this.edgeDock = const EdgeDockSettings(),
     this.mockBackendForced = false,
     this.dashboardCompactView = false,
+    this.thermalProtection = const ThermalProtectionSettings(),
+    this.resourceGuardEnabled = true,
   });
 
   final Duration pollingInterval;
@@ -293,6 +347,12 @@ class AppSettings {
 
   final bool dashboardCompactView;
 
+  final ThermalProtectionSettings thermalProtection;
+
+  /// Watches memory/swap pressure and heavy sustained writes, which wear
+  /// the SSD, and tells the user which app is responsible.
+  final bool resourceGuardEnabled;
+
   TemperatureThresholds thresholdsFor(String deviceId) =>
       perDeviceThresholds[deviceId] ?? globalThresholds;
 
@@ -334,6 +394,8 @@ class AppSettings {
     EdgeDockSettings? edgeDock,
     bool? mockBackendForced,
     bool? dashboardCompactView,
+    ThermalProtectionSettings? thermalProtection,
+    bool? resourceGuardEnabled,
   }) {
     return AppSettings(
       pollingInterval: pollingInterval ?? this.pollingInterval,
@@ -376,6 +438,8 @@ class AppSettings {
       edgeDock: edgeDock ?? this.edgeDock,
       mockBackendForced: mockBackendForced ?? this.mockBackendForced,
       dashboardCompactView: dashboardCompactView ?? this.dashboardCompactView,
+      thermalProtection: thermalProtection ?? this.thermalProtection,
+      resourceGuardEnabled: resourceGuardEnabled ?? this.resourceGuardEnabled,
     );
   }
 
@@ -415,6 +479,8 @@ class AppSettings {
     'edgeDock': edgeDock.toJson(),
     'mockBackendForced': mockBackendForced,
     'dashboardCompactView': dashboardCompactView,
+    'thermalProtection': thermalProtection.toJson(),
+    'resourceGuardEnabled': resourceGuardEnabled,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -522,6 +588,12 @@ class AppSettings {
           : const EdgeDockSettings(),
       mockBackendForced: json['mockBackendForced'] as bool? ?? false,
       dashboardCompactView: json['dashboardCompactView'] as bool? ?? false,
+      thermalProtection: json['thermalProtection'] is Map<String, dynamic>
+          ? ThermalProtectionSettings.fromJson(
+              json['thermalProtection'] as Map<String, dynamic>,
+            )
+          : const ThermalProtectionSettings(),
+      resourceGuardEnabled: json['resourceGuardEnabled'] as bool? ?? true,
     );
   }
 }

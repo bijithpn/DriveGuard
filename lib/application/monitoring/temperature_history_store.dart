@@ -74,7 +74,10 @@ class TemperatureHistoryStore {
   final TelemetryPersistenceRepository _persistence;
   final Map<String, Queue<HistoryPoint>> _raw = {};
   final Map<String, Queue<HistoryPoint>> _aggregated = {};
-  final Map<String, int> _writesSinceLastSave = {};
+  final Map<String, DateTime> _lastSavedAt = {};
+
+  /// Minimum time between writes of a device's history to disk.
+  static const Duration persistInterval = Duration(minutes: 5);
   bool _initialized = false;
 
   Future<void> initialize() async {
@@ -98,11 +101,16 @@ class TemperatureHistoryStore {
     raw.addLast(HistoryPoint(reading.timestamp, reading.celsius));
     _rollOff(deviceId);
 
-    final count = (_writesSinceLastSave[deviceId] ?? 0) + 1;
-    _writesSinceLastSave[deviceId] = count;
-
-    if (count >= 10) {
-      _writesSinceLastSave[deviceId] = 0;
+    // Persist at most every few minutes: rewriting the telemetry blob on every
+    // handful of readings is pointless SSD wear for a tool that exists to
+    // protect the SSD. A crash loses at most a few minutes of chart history;
+    // incident data is stored separately and flushed on shutdown/overheat.
+    final now = DateTime.now();
+    final last = _lastSavedAt[deviceId];
+    if (last == null) {
+      _lastSavedAt[deviceId] = now;
+    } else if (now.difference(last) >= persistInterval) {
+      _lastSavedAt[deviceId] = now;
       persistDevice(deviceId);
     }
   }
@@ -209,7 +217,7 @@ class TemperatureHistoryStore {
   void clearDevice(String deviceId) {
     _raw.remove(deviceId);
     _aggregated.remove(deviceId);
-    _writesSinceLastSave.remove(deviceId);
+    _lastSavedAt.remove(deviceId);
     _persistence.clearDevice(deviceId);
   }
 }

@@ -517,3 +517,113 @@ class _AppearanceSection extends ConsumerWidget {
     );
   }
 }
+
+class _ProtectionSection extends ConsumerWidget {
+  const _ProtectionSection({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
+    final cfg = settings.thermalProtection;
+    void update(
+      ThermalProtectionSettings Function(ThermalProtectionSettings) f,
+    ) => notifier.updateWith(
+      (s) => s.copyWith(thermalProtection: f(s.thermalProtection)),
+    );
+
+    final minLimit = settings.globalThresholds.criticalCelsius;
+    final limits = <double>{
+      for (final v in const [70.0, 72.0, 75.0, 78.0, 80.0, 85.0])
+        if (v >= minLimit) v,
+      cfg.emergencyCelsius,
+    }.toList()..sort();
+
+    TextStyle label() =>
+        TextStyle(color: isDark ? AppColors.textPrimary : AppColors.lightText);
+
+    return _SectionGroup(
+      isDark: isDark,
+      children: [
+        _SettingRow(
+          label: 'Overheat protection',
+          subtitle:
+              'Detects sustained or fast-rising heat, finds the cause and '
+              'alerts you before the drive is damaged',
+          isDark: isDark,
+          trailing: Switch(
+            value: cfg.enabled,
+            onChanged: (v) => update((c) => c.copyWith(enabled: v)),
+          ),
+        ),
+        _SettingRow(
+          label: 'Memory & write protection',
+          subtitle:
+              'Warns when low memory (swapping) or heavy sustained writes are '
+              'wearing the SSD, and names the app responsible',
+          isDark: isDark,
+          trailing: Switch(
+            value: settings.resourceGuardEnabled,
+            onChanged: (v) =>
+                notifier.updateWith((s) => s.copyWith(resourceGuardEnabled: v)),
+          ),
+        ),
+        _SettingRow(
+          label: 'Shut down automatically',
+          subtitle:
+              'Off by default. When on, the computer shuts down after a '
+              'countdown if a drive stays dangerously hot. You can cancel.',
+          isDark: isDark,
+          trailing: Switch(
+            value: cfg.shutdownEnabled && cfg.enabled,
+            onChanged: cfg.enabled
+                ? (v) => update((c) => c.copyWith(shutdownEnabled: v))
+                : null,
+          ),
+        ),
+        _SettingRow(
+          label: 'Emergency temperature',
+          subtitle: 'Must be at or above the critical threshold',
+          isDark: isDark,
+          trailing: _NativeDropdown<double>(
+            value: cfg.emergencyCelsius,
+            items: [
+              for (final v in limits)
+                DropdownMenuItem(
+                  value: v,
+                  child: Text('${v.toStringAsFixed(0)}°C', style: label()),
+                ),
+            ],
+            onChanged: (v) {
+              if (v != null) update((c) => c.copyWith(emergencyCelsius: v));
+            },
+            isDark: isDark,
+          ),
+        ),
+        _SettingRow(
+          label: 'Cancel window',
+          subtitle: 'Time you have to cancel before shutting down',
+          isDark: isDark,
+          isLast: true,
+          trailing: _NativeDropdown<int>(
+            value: const [30, 60, 90, 120].contains(cfg.countdownSeconds)
+                ? cfg.countdownSeconds
+                : 60,
+            items: [
+              for (final v in const [30, 60, 90, 120])
+                DropdownMenuItem(
+                  value: v,
+                  child: Text('${v}s', style: label()),
+                ),
+            ],
+            onChanged: (v) {
+              if (v != null) update((c) => c.copyWith(countdownSeconds: v));
+            },
+            isDark: isDark,
+          ),
+        ),
+      ],
+    );
+  }
+}

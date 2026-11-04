@@ -78,4 +78,22 @@ abstract class NotificationService {
     required String deviceName,
     required String etaText,
   });
+
+  /// Thermal-protection alert that names the cause of the overheating and
+  /// what is being done about it.
+  Future<void> showThermalProtection({
+    required String deviceId,
+    required String deviceName,
+    required String title,
+    required String body,
+  });
+
+  /// General-purpose heads-up (resource pressure, SSD life advice).
+  Future<void> showAdvisory({
+    required String id,
+    required String title,
+    required String body,
+    String? deviceId,
+    bool urgent = false,
+  });
 }

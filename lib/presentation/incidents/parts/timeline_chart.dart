@@ -135,7 +135,7 @@ class _TimelineChart extends StatelessWidget {
                       getTitlesWidget: (value, meta) {
                         final t = start.add(Duration(seconds: value.round()));
                         return SideTitleWidget(
-                          axisSide: meta.axisSide,
+                          meta: meta,
                           child: Text(
                             '${t.hour.toString().padLeft(2, '0')}:'
                             '${t.minute.toString().padLeft(2, '0')}',

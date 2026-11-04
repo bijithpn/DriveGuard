@@ -13,7 +13,10 @@ import '../components/drive_card.dart';
 
 import '../device_details/device_details_screen.dart';
 import '../incidents/incident_history_screen.dart';
+import '../protection/resource_alert_banner.dart';
+import '../protection/thermal_protection_ui.dart';
 import '../settings/settings_screen.dart';
+import '../storage_sense/storage_sense_screen.dart';
 import '../theme/app_theme.dart';
 
 part 'parts/sidebar.dart';
@@ -68,19 +71,32 @@ class DashboardScreen extends ConsumerWidget {
               onOpenIncidents: () => Navigator.of(
                 context,
               ).push(_slideRoute(const IncidentHistoryScreen())),
+              onOpenStorageSense: () => Navigator.of(
+                context,
+              ).push(_slideRoute(const StorageSenseScreen())),
             ),
           ),
 
           Expanded(
-            child: _DriveListPane(
-              settings: settings,
-              isDark: isDark,
-              onOpenDevice: (deviceId) => Navigator.of(
-                context,
-              ).push(_slideRoute(DeviceDetailsScreen(deviceId: deviceId))),
-              onToggleCompactView: (value) => ref
-                  .read(settingsProvider.notifier)
-                  .updateWith((s) => s.copyWith(dashboardCompactView: value)),
+            child: Column(
+              children: [
+                const ThermalAlertBanner(),
+                const ResourceAlertBanner(),
+                Expanded(
+                  child: _DriveListPane(
+                    settings: settings,
+                    isDark: isDark,
+                    onOpenDevice: (deviceId) => Navigator.of(context).push(
+                      _slideRoute(DeviceDetailsScreen(deviceId: deviceId)),
+                    ),
+                    onToggleCompactView: (value) => ref
+                        .read(settingsProvider.notifier)
+                        .updateWith(
+                          (s) => s.copyWith(dashboardCompactView: value),
+                        ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

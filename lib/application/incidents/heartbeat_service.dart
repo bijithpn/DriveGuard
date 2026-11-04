@@ -6,7 +6,7 @@ class HeartbeatService {
   HeartbeatService({
     required IncidentRepository repository,
     required String sessionId,
-    this.interval = const Duration(seconds: 30),
+    this.interval = const Duration(seconds: 60),
   }) : _repository = repository,
        _sessionId = sessionId;
 

@@ -121,4 +121,3 @@ class SafeProcessRunner {
     return ProcessResult2(stdoutStr, stderrStr, exitCode);
   }
 }
-

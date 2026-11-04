@@ -14,7 +14,14 @@ import 'incidents/heartbeat_service.dart';
 import 'monitoring/metric_history_store.dart';
 import 'monitoring/monitoring_service.dart';
 import 'monitoring/temperature_history_store.dart';
+import '../infrastructure/system/os_privileged_runner.dart';
+import '../infrastructure/system/system_actions.dart';
 import 'notifications/notification_service.dart';
+import 'protection/privileged_runner.dart';
+import 'protection/system_actions.dart';
+import 'protection/resource_guard_service.dart';
+import 'protection/thermal_models.dart';
+import 'protection/thermal_protection_service.dart';
 import 'settings/app_settings.dart';
 
 final incidentRepositoryProvider = Provider<IncidentRepository?>((ref) => null);
@@ -61,19 +68,74 @@ final healthHistoryStoreProvider = Provider<MetricHistoryStore>(
   ),
 );
 
-final monitoringServiceProvider = Provider<MonitoringService>((ref) {
-  final service = MonitoringService(
-    backend: ref.watch(storageMonitorProvider),
-    notifications: ref.watch(notificationServiceProvider),
-    historyStore: ref.watch(historyStoreProvider),
-    capacityHistoryStore: ref.watch(capacityHistoryStoreProvider),
-    healthHistoryStore: ref.watch(healthHistoryStoreProvider),
-    incidentRepository: ref.watch(incidentRepositoryProvider),
-    sessionId: ref.watch(sessionIdProvider),
-  );
-  ref.onDispose(service.dispose);
-  return service;
+final privilegedRunnerProvider = Provider<PrivilegedRunner>(
+  (ref) => OsPrivilegedRunner(),
+);
+
+final systemActionsProvider = Provider<SystemActions>(
+  (ref) => OsSystemActions(privileged: ref.watch(privilegedRunnerProvider)),
+);
+
+final Provider<ThermalProtectionService> thermalProtectionServiceProvider =
+    Provider<ThermalProtectionService>((ref) {
+      final service = ThermalProtectionService(
+        actions: ref.watch(systemActionsProvider),
+        notifications: ref.watch(notificationServiceProvider),
+        beforeShutdown: () =>
+            ref.read(monitoringServiceProvider).flushForShutdown(),
+      );
+      ref.onDispose(service.dispose);
+      return service;
+    });
+
+/// Live thermal-protection state (cause, countdown) for banners/dialogs.
+final thermalProtectionStateProvider = StreamProvider<ThermalProtectionState>((
+  ref,
+) async* {
+  final service = ref.watch(thermalProtectionServiceProvider);
+  yield service.state;
+  yield* service.stream;
 });
+
+final Provider<ResourceGuardService> resourceGuardProvider =
+    Provider<ResourceGuardService>((ref) {
+      final service = ResourceGuardService(
+        actions: ref.watch(systemActionsProvider),
+        notifications: ref.watch(notificationServiceProvider),
+        devices: () => ref.read(monitoringServiceProvider).currentDevices,
+        settings: () => ref.read(settingsProvider),
+        onMemory: (m) =>
+            ref.read(thermalProtectionServiceProvider).latestMemory = m,
+      );
+      ref.onDispose(service.dispose);
+      return service;
+    });
+
+/// Active memory/write-pressure alerts for the dashboard banner.
+final resourceAlertsProvider = StreamProvider<List<ResourceAlert>>((
+  ref,
+) async* {
+  final service = ref.watch(resourceGuardProvider);
+  yield service.current;
+  yield* service.stream;
+});
+
+final Provider<MonitoringService> monitoringServiceProvider =
+    Provider<MonitoringService>((ref) {
+      final service = MonitoringService(
+        backend: ref.watch(storageMonitorProvider),
+        notifications: ref.watch(notificationServiceProvider),
+        historyStore: ref.watch(historyStoreProvider),
+        capacityHistoryStore: ref.watch(capacityHistoryStoreProvider),
+        healthHistoryStore: ref.watch(healthHistoryStoreProvider),
+        incidentRepository: ref.watch(incidentRepositoryProvider),
+        thermalProtection: ref.watch(thermalProtectionServiceProvider),
+        resourceGuard: ref.watch(resourceGuardProvider),
+        sessionId: ref.watch(sessionIdProvider),
+      );
+      ref.onDispose(service.dispose);
+      return service;
+    });
 
 class SettingsNotifier extends Notifier<AppSettings> {
   SettingsNotifier([this.initial]);

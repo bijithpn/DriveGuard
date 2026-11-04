@@ -26,6 +26,7 @@ import 'dashboard/dashboard_screen.dart';
 import 'device_details/device_details_screen.dart';
 import 'incidents/incident_report_screen.dart';
 import 'incidents/startup_incident_dialog.dart';
+import 'protection/thermal_protection_ui.dart';
 import 'settings/settings_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -49,6 +50,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   AppTrayService? _tray;
   bool _widgetModeSyncInFlight = false;
   bool _edgeDockSyncInFlight = false;
+  bool _thermalDialogOpen = false;
   StreamSubscription<String>? _notificationClickSub;
   MiniWidgetSnapshot? _lastPushedSnapshot;
   MiniWidgetSnapshot? _lastPushedEdgeDockSnapshot;
@@ -676,6 +678,21 @@ class _AppRootState extends ConsumerState<AppRoot>
       if (tray != null) _pushDeviceSummaryToTray(tray);
       _pushSnapshotToMiniWindowIfActive();
       _pushSnapshotToEdgeDockIfActive();
+    });
+
+    ref.listen(thermalProtectionStateProvider, (previous, next) {
+      final st = next.value;
+      if (st == null || !st.shutdownScheduled || _thermalDialogOpen) return;
+      _thermalDialogOpen = true;
+      () async {
+        try {
+          await windowManager.show();
+          await windowManager.focus();
+        } catch (_) {}
+        final ctx = rootNavigatorKey.currentContext;
+        if (ctx != null && ctx.mounted) await showThermalShutdownDialog(ctx);
+        _thermalDialogOpen = false;
+      }();
     });
 
     ref.listen(activityProvider, (previous, next) {

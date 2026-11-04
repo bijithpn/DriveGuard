@@ -18,7 +18,10 @@ import '../../domain/entities/monitoring_session.dart';
 import '../../infrastructure/persistence/incident_repository.dart';
 import '../alerts/alert_engine.dart';
 import '../alerts/predictive_engine.dart';
+import '../alerts/ssd_life_advisor.dart';
 import '../notifications/notification_service.dart';
+import '../protection/resource_guard_service.dart';
+import '../protection/thermal_protection_service.dart';
 import '../prediction/trend_analyzer.dart';
 import '../settings/app_settings.dart';
 import 'metric_history_store.dart';
@@ -35,11 +38,15 @@ class MonitoringService {
     MetricHistoryStore? healthHistoryStore,
     PredictiveEngine predictiveEngine = const PredictiveEngine(),
     IncidentRepository? incidentRepository,
+    ThermalProtectionService? thermalProtection,
+    ResourceGuardService? resourceGuard,
     String? sessionId,
   }) : _backend = backend,
        _notifications = notifications,
        _historyStore = historyStore,
        _incidentRepository = incidentRepository,
+       _thermalProtection = thermalProtection,
+       _resourceGuard = resourceGuard,
        _sessionId = sessionId,
        _capacityHistoryStore =
            capacityHistoryStore ??
@@ -64,6 +71,12 @@ class MonitoringService {
   final MetricHistoryStore _healthHistoryStore;
   final PredictiveEngine _predictiveEngine;
   final IncidentRepository? _incidentRepository;
+  final ThermalProtectionService? _thermalProtection;
+  final ResourceGuardService? _resourceGuard;
+  final SsdLifeAdvisor _advisor = const SsdLifeAdvisor();
+  final Set<String> _advisoriesSent = {};
+  final Map<String, int> _rejectedStreak = {};
+  bool _hotCadence = false;
   final String? _sessionId;
 
   static const _spinDownRiskMinPollInterval = Duration(seconds: 30);
@@ -126,6 +139,7 @@ class MonitoringService {
     _listenForHotplugEvents();
     _listenForActivity();
     unawaited(_pollHealthAll());
+    _resourceGuard?.start();
     _started = true;
     AppLogger.instance.info(_tag, 'Monitoring started');
   }
@@ -134,6 +148,7 @@ class MonitoringService {
     _activitySub = _backend.watchActivity().listen(
       (activity) {
         _latestActivity[activity.deviceId] = activity;
+        _resourceGuard?.recordActivity(activity);
         if (!_activityController.isClosed) {
           _activityController.add(activity);
         }
@@ -172,6 +187,7 @@ class MonitoringService {
   /// edge dock) is currently showing live data. When nothing is, polling is
   /// throttled to save CPU and battery.
   void setUiActive(bool active) {
+    _resourceGuard?.setUiActive(active);
     if (_uiActive == active) return;
     _uiActive = active;
     if (_started) {
@@ -180,9 +196,21 @@ class MonitoringService {
     }
   }
 
-  Duration get _effectivePollInterval => _uiActive
-      ? _settings.pollingInterval
-      : _max(_settings.pollingInterval, _backgroundMinPollInterval);
+  /// Idle drives are polled slowly (and very slowly when nothing is
+  /// visible) to keep CPU and SMART reads minimal. As soon as any drive is
+  /// hot, polling speeds up — even with the window hidden — so a thermal
+  /// emergency is caught within seconds instead of minutes.
+  Duration get _effectivePollInterval {
+    final base = _settings.pollingInterval;
+    final guard = _thermalProtection;
+    if (guard != null && _settings.thermalProtection.enabled) {
+      if (guard.anyEmergency) return _min(base, const Duration(seconds: 2));
+      if (guard.anyElevated) return _min(base, const Duration(seconds: 5));
+    }
+    return _uiActive ? base : _max(base, _backgroundMinPollInterval);
+  }
+
+  static Duration _min(Duration a, Duration b) => a <= b ? a : b;
 
   Duration get _effectiveHealthInterval => _uiActive
       ? _settings.healthPollingInterval
@@ -240,6 +268,7 @@ class MonitoringService {
 
   Future<void> reinitializeAfterResume() async {
     AppLogger.instance.info(_tag, 'Reinitializing after system resume');
+    _thermalProtection?.onSystemResume();
     await _discoverDevices();
     await _pollAll();
   }
@@ -290,6 +319,7 @@ class MonitoringService {
       if (discoveredIds.contains(id)) continue;
       if (_disconnectedOnce.contains(id)) {
         _devices.remove(id);
+        _thermalProtection?.forget(id);
         _alertStates.remove(id);
         _capacityAlertStates.remove(id);
         _rapidRiseArmed.remove(id);
@@ -359,6 +389,7 @@ class MonitoringService {
           }
           await _evaluatePredictiveCapacity(id, capacity, updated);
           await _evaluateCapacityAlert(id, capacity, updated);
+          await _evaluateAdvisories(updated, null);
         } catch (e) {
           AppLogger.instance.debug(
             _tag,
@@ -512,8 +543,10 @@ class MonitoringService {
       if (wear != null) {
         _healthHistoryStore.record(id, wear.toDouble());
       }
+      final previousHealth = _lastKnownHealth[id];
       await _evaluatePredictiveHealthWear(id, health, updated);
       await _evaluateHealthAlert(id, health, updated);
+      await _evaluateAdvisories(updated, previousHealth);
     } catch (e) {
       AppLogger.instance.debug(_tag, 'Health read failed for $id: $e');
     }
@@ -697,6 +730,29 @@ class MonitoringService {
     }
   }
 
+  /// SSD-longevity advice (wear, spare blocks, unsafe shutdowns, free space).
+  /// Each advisory is announced once per session, again only if it worsens.
+  Future<void> _evaluateAdvisories(
+    StorageDevice device,
+    DeviceHealth? previousHealth,
+  ) async {
+    if (!_settings.notificationsEnabled || !_settings.healthAlertsEnabled) {
+      return;
+    }
+    for (final a in _advisor.evaluate(device, previous: previousHealth)) {
+      final key = '${device.id}:${a.id}';
+      if (!_advisoriesSent.add(key)) continue;
+      AppLogger.instance.info(_tag, 'Advisory for ${device.id}: ${a.id}');
+      await _notifications.showAdvisory(
+        id: key,
+        deviceId: device.id,
+        title: a.title,
+        body: a.body,
+        urgent: a.severity == AdvisorySeverity.critical,
+      );
+    }
+  }
+
   Future<void> _pollAll() async {
     if (_paused || !_settings.monitoringEnabled) return;
     if (_polling || _disposed) return;
@@ -713,6 +769,12 @@ class MonitoringService {
       _polling = false;
     }
     _emit();
+    final hot =
+        (_thermalProtection?.anyElevated ?? false) && !_disposed && _started;
+    if (hot != _hotCadence) {
+      _hotCadence = hot;
+      _rescheduleTimers();
+    }
   }
 
   bool _recentlyPredicted(DateTime? at) =>
@@ -756,6 +818,7 @@ class MonitoringService {
       if (current == null) return;
 
       if (reading == null) {
+        _thermalProtection?.onSensorLost(id);
         _devices[id] = current.copyWith(
           sensorAvailability: SensorAvailability.unsupported,
           monitoringStatus: MonitoringStatus.sensorUnavailable,
@@ -770,7 +833,17 @@ class MonitoringService {
             previousReading.celsius,
             reading.celsius,
           );
+          if (!plausible) {
+            // A sensor can legitimately jump (waking from sleep, a stalled
+            // poll). Only discard a few consecutive outliers; if the new
+            // level persists it IS the truth, otherwise we would stay stuck
+            // on the old value forever.
+            final streak = (_rejectedStreak[id] ?? 0) + 1;
+            _rejectedStreak[id] = streak;
+            if (streak >= 3) plausible = true;
+          }
         }
+        if (plausible) _rejectedStreak.remove(id);
 
         if (!plausible) {
           AppLogger.instance.warning(
@@ -792,12 +865,23 @@ class MonitoringService {
             clearLastError: true,
           );
           _devices[id] = updated;
+          await _thermalProtection?.onReading(
+            device: updated,
+            celsius: reading.celsius,
+            recent: _historyStore
+                .pointsFor(id, const Duration(minutes: 2))
+                .map((p) => TrendPoint(p.timestamp, p.celsius))
+                .toList(),
+            activity: _latestActivity[id],
+            settings: _settings,
+          );
           await _evaluatePredictiveTemperature(id, reading.celsius, updated);
           await _evaluateAlert(id, reading.celsius, updated);
           await _evaluateRapidRise(id, reading.celsius, updated);
         }
       }
     } on PermissionDeniedException catch (e) {
+      _thermalProtection?.onSensorLost(id);
       final current = _devices[id];
       if (current != null) {
         _devices[id] = current.copyWith(
@@ -808,6 +892,7 @@ class MonitoringService {
       }
     } on StorageMonitorException catch (e) {
       AppLogger.instance.warning(_tag, 'Read failed for $id: ${e.message}');
+      _thermalProtection?.onSensorLost(id);
       final current = _devices[id];
       if (current != null) {
         _devices[id] = current.copyWith(
@@ -1107,6 +1192,8 @@ class MonitoringService {
         '${usagePercent != null ? ' (${usagePercent.toStringAsFixed(0)}% used)' : ''}',
       );
     }
+    final cause = _thermalProtection?.causeHeadlineFor(device.id);
+    if (cause != null) parts.add('Cause: $cause');
     if (parts.isEmpty) return null;
     return parts.join(' · ');
   }

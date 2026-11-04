@@ -240,7 +240,9 @@ class _CompactRow extends StatelessWidget {
       height: 52,
       decoration: BoxDecoration(
         color: bgColor,
-        border: const Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+        border: const Border(
+          bottom: BorderSide(color: AppColors.divider, width: 1),
+        ),
       ),
       child: InkWell(
         onTap: onTap,

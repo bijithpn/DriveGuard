@@ -237,4 +237,25 @@ class LocalNotifierService implements NotificationService {
       deviceId,
     );
   }
+
+  @override
+  Future<void> showThermalProtection({
+    required String deviceId,
+    required String deviceName,
+    required String title,
+    required String body,
+  }) {
+    return _show(title, '$deviceName\n$body', deviceId);
+  }
+
+  @override
+  Future<void> showAdvisory({
+    required String id,
+    required String title,
+    required String body,
+    String? deviceId,
+    bool urgent = false,
+  }) {
+    return _show(title, body, deviceId ?? '');
+  }
 }

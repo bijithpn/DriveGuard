@@ -134,4 +134,25 @@ class FakeNotificationService implements NotificationService {
   }) async {
     shown.add('predictive-health:$deviceName:$etaText');
   }
+
+  @override
+  Future<void> showThermalProtection({
+    required String deviceId,
+    required String deviceName,
+    required String title,
+    required String body,
+  }) async {
+    shown.add('thermal:$deviceName:$title:$body');
+  }
+
+  @override
+  Future<void> showAdvisory({
+    required String id,
+    required String title,
+    required String body,
+    String? deviceId,
+    bool urgent = false,
+  }) async {
+    shown.add('advisory:$id:$title:$body');
+  }
 }
