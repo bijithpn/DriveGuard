@@ -93,11 +93,13 @@ void main() {
   });
 
   test('reads NVMe temperature from smartctl JSON', () async {
-    useRunner((exe, _) => exe == 'smartctl'
-        ? {
-            'nvme_smart_health_information_log': {'temperature': 47},
-          }
-        : _profiler);
+    useRunner(
+      (exe, _) => exe == 'smartctl'
+          ? {
+              'nvme_smart_health_information_log': {'temperature': 47},
+            }
+          : _profiler,
+    );
     final monitor = MacOSStorageMonitor();
     await monitor.getDevices();
     final reading = await monitor.readTemperature('macos-disk0');
@@ -105,11 +107,13 @@ void main() {
   });
 
   test('falls back to ATA temperature.current', () async {
-    useRunner((exe, _) => exe == 'smartctl'
-        ? {
-            'temperature': {'current': 36},
-          }
-        : _profiler);
+    useRunner(
+      (exe, _) => exe == 'smartctl'
+          ? {
+              'temperature': {'current': 36},
+            }
+          : _profiler,
+    );
     final reading = await MacOSStorageMonitor().readTemperature('macos-disk2');
     expect(reading?.celsius, 36.0);
   });
@@ -125,13 +129,18 @@ void main() {
   });
 
   test('permission errors from smartctl surface as PermissionDenied', () async {
-    useRunner((_, _) => {
-      'smartctl': {
-        'messages': [
-          {'string': 'Smartctl open device: /dev/disk0 failed: Operation not permitted'},
-        ],
+    useRunner(
+      (_, _) => {
+        'smartctl': {
+          'messages': [
+            {
+              'string':
+                  'Smartctl open device: /dev/disk0 failed: Operation not permitted',
+            },
+          ],
+        },
       },
-    });
+    );
     expect(
       MacOSStorageMonitor().readTemperature('macos-disk0'),
       throwsA(isA<PermissionDeniedException>()),
@@ -139,9 +148,11 @@ void main() {
   });
 
   test('implausible temperatures are rejected', () async {
-    useRunner((_, _) => {
-      'temperature': {'current': 500},
-    });
+    useRunner(
+      (_, _) => {
+        'temperature': {'current': 500},
+      },
+    );
     expect(
       MacOSStorageMonitor().readTemperature('macos-disk2'),
       throwsA(isA<InvalidReadingException>()),
@@ -149,9 +160,11 @@ void main() {
   });
 
   test('rejects device ids that are not plain diskN names', () async {
-    useRunner((_, _) => {
-      'temperature': {'current': 30},
-    });
+    useRunner(
+      (_, _) => {
+        'temperature': {'current': 30},
+      },
+    );
     expect(
       await MacOSStorageMonitor().readTemperature('macos-../../etc/passwd'),
       isNull,

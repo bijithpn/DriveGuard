@@ -1,0 +1,8 @@
+# DriveGuard: let members of the "disk" group read NVMe controller nodes so
+# `nvme smart-log` works without root. SATA/SCSI block devices (/dev/sdX) are
+# already root:disk 0660 on most distributions.
+#
+# Install:  sudo cp 99-driveguard.rules /etc/udev/rules.d/
+#           sudo udevadm control --reload && sudo udevadm trigger
+#           sudo usermod -aG disk "$USER"   # then log out and back in
+SUBSYSTEM=="nvme", KERNEL=="nvme[0-9]*", GROUP="disk", MODE="0660"

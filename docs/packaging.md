@@ -26,6 +26,10 @@ Keep `build/symbols` per release; it is needed to symbolicate crash stacks.
   (install via apt; do not commit `.deb` files).
 - SMART access needs elevated rights. Either add the user to the `disk` group or ship a
   udev rule / polkit helper so `smartctl` and `nvme` can read `/dev/*` without root.
+- `linux/packaging/99-driveguard.rules` grants the `disk` group access to NVMe controller
+  nodes (install steps are in the file). It has **not** been verified on real hardware.
+  `smartctl` on SATA may additionally need `CAP_SYS_RAWIO` (e.g. `setcap cap_sys_rawio+ep
+  $(which smartctl)`) or running via a polkit helper; test per distribution.
 - Package as `.deb` or AppImage. Flatpak/Snap sandboxes block raw `/dev` access and need
   explicit device permissions.
 - Wayland: window positioning and always-on-top are limited; verify the edge dock on

@@ -13,10 +13,14 @@ import '../../domain/repositories/storage_monitor.dart';
 import 'ata_smart_attributes.dart';
 
 class LinuxStorageMonitor extends StorageMonitor {
+  /// [sysRoot] is overridable so tests can point at a fake sysfs tree.
+  LinuxStorageMonitor({String sysRoot = '/sys'}) : _sysRoot = sysRoot;
+
   static const _tag = 'LinuxStorageMonitor';
+  final String _sysRoot;
 
   @override
-  Future<bool> isAvailable() async => Directory('/sys/block').existsSync();
+  Future<bool> isAvailable() async => Directory('$_sysRoot/block').existsSync();
 
   @override
   Future<BackendCapabilities> getCapabilities() async {
@@ -42,32 +46,34 @@ class LinuxStorageMonitor extends StorageMonitor {
   @override
   Future<List<StorageDevice>> getDevices() async {
     final devices = <StorageDevice>[];
-    final blockDir = Directory('/sys/block');
+    final blockDir = Directory('$_sysRoot/block');
     if (!blockDir.existsSync()) return devices;
 
     for (final entry in blockDir.listSync()) {
       final name = entry.uri.pathSegments.where((s) => s.isNotEmpty).last;
       if (RegExp(r'^(loop|ram|zram|dm-|sr|fd)').hasMatch(name)) continue;
 
-      final removableFile = File('/sys/block/$name/removable');
+      final removableFile = File('$_sysRoot/block/$name/removable');
       final isRemovable =
           removableFile.existsSync() &&
           removableFile.readAsStringSync().trim() == '1';
 
       final isNvme = name.startsWith('nvme');
       final model =
-          _readSysfsString('/sys/block/$name/device/model') ??
+          _readSysfsString('$_sysRoot/block/$name/device/model') ??
           _readSysfsString(
-            '/sys/class/nvme/${_nvmeControllerName(name)}/model',
+            '$_sysRoot/class/nvme/${_nvmeControllerName(name)}/model',
           );
-      final serial = _readSysfsString('/sys/block/$name/device/serial');
-      final sizeSectors = _readSysfsString('/sys/block/$name/size');
+      final serial = _readSysfsString('$_sysRoot/block/$name/device/serial');
+      final sizeSectors = _readSysfsString('$_sysRoot/block/$name/size');
 
       final parsedSectors = sizeSectors != null
           ? int.tryParse(sizeSectors)
           : null;
       final capacityBytes = parsedSectors != null ? parsedSectors * 512 : null;
-      final rotational = _readSysfsString('/sys/block/$name/queue/rotational');
+      final rotational = _readSysfsString(
+        '$_sysRoot/block/$name/queue/rotational',
+      );
 
       StorageDeviceType type;
       StorageInterfaceType interfaceType;
@@ -134,8 +140,8 @@ class LinuxStorageMonitor extends StorageMonitor {
 
   Future<double?> _readHwmonCelsius(String sysName) async {
     final searchDirs = [
-      Directory('/sys/block/$sysName/device'),
-      Directory('/sys/class/nvme/${_nvmeControllerName(sysName)}'),
+      Directory('$_sysRoot/block/$sysName/device'),
+      Directory('$_sysRoot/class/nvme/${_nvmeControllerName(sysName)}'),
     ];
     for (final root in searchDirs) {
       if (!root.existsSync()) continue;
@@ -281,8 +287,8 @@ class LinuxStorageMonitor extends StorageMonitor {
 
     final sysName = _sysName(deviceId);
     final searchDirs = [
-      Directory('/sys/block/$sysName/device'),
-      Directory('/sys/class/nvme/${_nvmeControllerName(sysName)}'),
+      Directory('$_sysRoot/block/$sysName/device'),
+      Directory('$_sysRoot/class/nvme/${_nvmeControllerName(sysName)}'),
     ];
     for (final root in searchDirs) {
       if (!root.existsSync()) continue;
