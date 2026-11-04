@@ -20,6 +20,11 @@ class DesktopWindowController with WindowListener {
 
   WindowController? _miniWindow;
   WindowController? _edgeDockWindow;
+  // In-flight creation guards: two rapid settings changes used to each pass
+  // the "no window yet" check while the first create was still awaiting,
+  // spawning duplicate dock/widget windows (the stray black bars).
+  Future<void>? _miniOpening;
+  Future<void>? _edgeDockOpening;
   Future<void> Function()? onCloseHandler;
   Future<void> Function()? onMinimizeHandler;
 
@@ -77,7 +82,17 @@ class DesktopWindowController with WindowListener {
   Future<void> enterWidgetMode(
     WidgetSettings widgetSettings, {
     MiniWidgetSnapshot? initialSnapshot,
-  }) async {
+  }) {
+    return _miniOpening ??= _enterWidgetMode(
+      widgetSettings,
+      initialSnapshot,
+    ).whenComplete(() => _miniOpening = null);
+  }
+
+  Future<void> _enterWidgetMode(
+    WidgetSettings widgetSettings,
+    MiniWidgetSnapshot? initialSnapshot,
+  ) async {
     if (_miniWindow != null) {
       try {
         final windows = await WindowController.getAll();
@@ -100,7 +115,7 @@ class DesktopWindowController with WindowListener {
         args['snapshot'] = initialSnapshot.toJson();
       }
       _miniWindow = await WindowController.create(
-        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: false),
+        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: true),
       );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Failed opening mini widget window', e);
@@ -162,7 +177,35 @@ class DesktopWindowController with WindowListener {
     List<String> visibleMetrics = const [],
     double positionOffset = 0,
     MiniWidgetSnapshot? initialSnapshot,
-  }) async {
+  }) {
+    return _edgeDockOpening ??= _enterEdgeDockMode(
+      edgeName,
+      accentName,
+      opacity,
+      displayId,
+      backgroundColor,
+      textColor,
+      warningColor,
+      criticalColor,
+      visibleMetrics,
+      positionOffset,
+      initialSnapshot,
+    ).whenComplete(() => _edgeDockOpening = null);
+  }
+
+  Future<void> _enterEdgeDockMode(
+    String edgeName,
+    String accentName,
+    double opacity,
+    String? displayId,
+    int? backgroundColor,
+    int? textColor,
+    int? warningColor,
+    int? criticalColor,
+    List<String> visibleMetrics,
+    double positionOffset,
+    MiniWidgetSnapshot? initialSnapshot,
+  ) async {
     if (_edgeDockWindow != null) {
       try {
         final windows = await WindowController.getAll();
@@ -197,7 +240,7 @@ class DesktopWindowController with WindowListener {
         args['snapshot'] = initialSnapshot.toJson();
       }
       _edgeDockWindow = await WindowController.create(
-        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: false),
+        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: true),
       );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Failed opening edge dock window', e);

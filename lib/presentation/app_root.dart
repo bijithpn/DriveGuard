@@ -51,8 +51,10 @@ class _AppRootState extends ConsumerState<AppRoot>
   static const _tag = 'AppRoot';
 
   AppTrayService? _tray;
-  bool _widgetModeSyncInFlight = false;
-  bool _edgeDockSyncInFlight = false;
+  // Set when the user drags the dock onto another screen edge: the live
+  // window already sits there, so the settings change that follows must not
+  // tear the window down and re-create it.
+  ScreenEdge? _dragSnappedEdge;
   bool _thermalDialogOpen = false;
   StreamSubscription<String>? _notificationClickSub;
   MiniWidgetSnapshot? _lastPushedSnapshot;
@@ -237,12 +239,23 @@ class _AppRootState extends ConsumerState<AppRoot>
             ? jsonDecode(raw) as Map<String, dynamic>
             : null;
         final offset = (payload?['offset'] as num?)?.toDouble();
+        final edgeName = payload?['edge'] as String?;
+        final edge = ScreenEdge.values
+            .where((e) => e.name == edgeName)
+            .firstOrNull;
         if (offset != null) {
+          if (edge != null &&
+              edge != ref.read(settingsProvider).edgeDock.edge) {
+            _dragSnappedEdge = edge;
+          }
           ref
               .read(settingsProvider.notifier)
               .updateWith(
                 (s) => s.copyWith(
-                  edgeDock: s.edgeDock.copyWith(positionOffset: offset),
+                  edgeDock: s.edgeDock.copyWith(
+                    positionOffset: offset,
+                    edge: edge,
+                  ),
                 ),
               );
         }
@@ -251,6 +264,15 @@ class _AppRootState extends ConsumerState<AppRoot>
   }
 
   Future<void> _initTray() async {
+    // Saved settings could have both floating widgets enabled; keep one.
+    final saved = ref.read(settingsProvider);
+    if (saved.widget.enabled && saved.edgeDock.enabled) {
+      ref
+          .read(settingsProvider.notifier)
+          .updateWith(
+            (s) => s.copyWith(widget: s.widget.copyWith(enabled: false)),
+          );
+    }
     final settings = ref.read(settingsProvider);
     if (!settings.showTrayIcon) {
       await _syncWidgetMode(settings.widget.enabled);
@@ -508,6 +530,13 @@ class _AppRootState extends ConsumerState<AppRoot>
     await widget.windowController.updateEdgeDockSnapshot(snapshot);
   }
 
+  // Window open/close requests are queued, never dropped: a toggle that
+  // arrived while a previous open/close was still in flight used to be
+  // ignored, leaving the real window state out of step with the settings
+  // (and, with rapid toggles, stray extra windows).
+  Future<void> _edgeDockQueue = Future<void>.value();
+  Future<void> _widgetQueue = Future<void>.value();
+
   Future<void> _syncEdgeDockMode(
     bool shouldBeActive,
     ScreenEdge edge, {
@@ -520,11 +549,41 @@ class _AppRootState extends ConsumerState<AppRoot>
     int? criticalColor,
     Set<EdgeDockMetric> visibleMetrics = kAllEdgeDockMetrics,
     double positionOffset = 0,
+  }) {
+    return _edgeDockQueue = _edgeDockQueue
+        .catchError((_) {})
+        .then(
+          (_) => _syncEdgeDockModeNow(
+            shouldBeActive,
+            edge,
+            accent: accent,
+            opacity: opacity,
+            displayId: displayId,
+            backgroundColor: backgroundColor,
+            textColor: textColor,
+            warningColor: warningColor,
+            criticalColor: criticalColor,
+            visibleMetrics: visibleMetrics,
+            positionOffset: positionOffset,
+          ),
+        );
+  }
+
+  Future<void> _syncEdgeDockModeNow(
+    bool shouldBeActive,
+    ScreenEdge edge, {
+    EdgeDockAccent accent = EdgeDockAccent.auto,
+    double opacity = 1.0,
+    String? displayId,
+    int? backgroundColor,
+    int? textColor,
+    int? warningColor,
+    int? criticalColor,
+    Set<EdgeDockMetric> visibleMetrics = kAllEdgeDockMetrics,
+    double positionOffset = 0,
   }) async {
-    if (_edgeDockSyncInFlight) return;
     final alreadyActive = ref.read(edgeDockActiveProvider);
     if (shouldBeActive == alreadyActive) return;
-    _edgeDockSyncInFlight = true;
     try {
       if (shouldBeActive) {
         final initialSnapshot = _buildSnapshot();
@@ -548,8 +607,8 @@ class _AppRootState extends ConsumerState<AppRoot>
         await widget.windowController.exitEdgeDockMode();
         ref.read(edgeDockActiveProvider.notifier).state = false;
       }
-    } finally {
-      _edgeDockSyncInFlight = false;
+    } catch (e) {
+      AppLogger.instance.warning(_tag, 'Edge dock sync failed: $e');
     }
   }
 
@@ -599,11 +658,18 @@ class _AppRootState extends ConsumerState<AppRoot>
   Future<void> _syncWidgetMode(
     bool shouldBeActive, {
     Map<String, dynamic>? geometry,
+  }) {
+    return _widgetQueue = _widgetQueue
+        .catchError((_) {})
+        .then((_) => _syncWidgetModeNow(shouldBeActive, geometry: geometry));
+  }
+
+  Future<void> _syncWidgetModeNow(
+    bool shouldBeActive, {
+    Map<String, dynamic>? geometry,
   }) async {
-    if (_widgetModeSyncInFlight) return;
     final alreadyActive = ref.read(widgetModeActiveProvider);
     if (shouldBeActive == alreadyActive) return;
-    _widgetModeSyncInFlight = true;
     try {
       final settings = ref.read(settingsProvider);
       if (shouldBeActive) {
@@ -628,8 +694,8 @@ class _AppRootState extends ConsumerState<AppRoot>
             );
         ref.read(widgetModeActiveProvider.notifier).state = false;
       }
-    } finally {
-      _widgetModeSyncInFlight = false;
+    } catch (e) {
+      AppLogger.instance.warning(_tag, 'Widget sync failed: $e');
     }
   }
 
@@ -639,7 +705,18 @@ class _AppRootState extends ConsumerState<AppRoot>
 
     ref.listen<bool>(
       settingsProvider.select((s) => s.widget.enabled),
-      (previous, enabled) => _syncWidgetMode(enabled),
+      (previous, enabled) {
+        // Only one floating widget at a time: the mini monitor and the
+        // edge dock are alternatives, not layers.
+        if (enabled && ref.read(settingsProvider).edgeDock.enabled) {
+          ref
+              .read(settingsProvider.notifier)
+              .updateWith(
+                (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(enabled: false)),
+              );
+        }
+        _syncWidgetMode(enabled);
+      },
     );
     ref.listen<
       (
@@ -675,6 +752,10 @@ class _AppRootState extends ConsumerState<AppRoot>
         ),
       ),
       (previous, next) async {
+        if (_dragSnappedEdge != null && next.$2 == _dragSnappedEdge) {
+          _dragSnappedEdge = null;
+          return;
+        }
         final (
           enabled,
           edge,
@@ -687,6 +768,13 @@ class _AppRootState extends ConsumerState<AppRoot>
           criticalColor,
           _,
         ) = next;
+        if (enabled && ref.read(settingsProvider).widget.enabled) {
+          ref
+              .read(settingsProvider.notifier)
+              .updateWith(
+                (s) => s.copyWith(widget: s.widget.copyWith(enabled: false)),
+              );
+        }
         final currentEdgeDock = ref.read(settingsProvider).edgeDock;
         final dockedConfigChanged =
             previous != null && previous.$1 && enabled && previous != next;

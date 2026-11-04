@@ -262,19 +262,26 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   int? get _displayedIndex => _pinnedIndex ?? _hoveredIndex;
 
   Rect? get _panelRect {
+    if (_dragging) return null;
     final index = _displayedIndex;
     if (index == null) return null;
     final devices = _snapshot.devices;
     if (index >= devices.length) return null;
     final center = EdgeDockGeometry.ringCenter(_railRect, _edge, index);
-    final rowCount = edgeDockDetailRows(devices[index], _visibleMetrics).length;
+    // Temperature is the card's hero value, not a list row.
+    final rowCount =
+        edgeDockDetailRows(devices[index], _visibleMetrics).length - 1;
     return EdgeDockGeometry.panelRectFor(
       _railRect,
       _edge,
       center,
       _displayPosition,
       _displaySize,
-      panelHeight: EdgeDockGeometry.panelHeightFor(rowCount),
+      panelHeight: EdgeDockGeometry.panelHeightFor(
+        rowCount,
+        maxHeight: _displaySize.height - 8,
+        horizontalDock: _edge == ScreenEdge.top || _edge == ScreenEdge.bottom,
+      ),
     );
   }
 
@@ -334,6 +341,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   }
 
   void _onHover(int? index) {
+    if (_dragging) return;
     if (index != null) {
       _collapseDebouncer.cancel();
       _isHoveredDock = true;
@@ -391,25 +399,113 @@ class _EdgeDockAppState extends State<EdgeDockApp>
     _onHover(next);
   }
 
-  void _onDragStart() {
+  // --- Drag-to-reposition -------------------------------------------------
+  //
+  // The dock follows the *screen-space* cursor rather than accumulating the
+  // pointer deltas Flutter reports: those deltas are relative to a window
+  // that is itself moving under the pointer, which is what made dragging
+  // feel laggy and out of sync. While dragging, the detail panel is hidden
+  // so the OS window is exactly the rail and its content never has to
+  // re-map coordinates mid-drag. Dragging past the midpoint toward another
+  // screen edge re-docks to that edge (snap), which is how the dock is moved
+  // to the left/right/top/bottom.
+  bool _dragging = false;
+  bool _dragBusy = false;
+  Offset? _dragStartCursor;
+  static const double _edgeSwitchHysteresis = 120;
+
+  Future<void> _onDragStart() async {
+    _collapseDebouncer.cancel();
+    _dragging = true;
+    _dragBusy = false;
     _dragStartOffset = _alongOffset;
+    setState(() {
+      _pinnedIndex = null;
+      _hoveredIndex = null;
+    });
+    try {
+      _dragStartCursor = await screenRetriever.getCursorScreenPoint();
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'getCursorScreenPoint failed: $e');
+      _dragging = false;
+      return;
+    }
+    // Panel is gone now - shrink the window to just the rail.
+    await _applyWindowBounds();
   }
 
-  void _onDragUpdate(double delta) {
-    setState(() => _alongOffset += delta);
-    unawaited(_applyWindowBounds());
+  double _distanceToEdge(ScreenEdge edge, Offset cursor) {
+    switch (edge) {
+      case ScreenEdge.left:
+        return cursor.dx - _displayPosition.dx;
+      case ScreenEdge.right:
+        return _displayPosition.dx + _displaySize.width - cursor.dx;
+      case ScreenEdge.top:
+        return cursor.dy - _displayPosition.dy;
+      case ScreenEdge.bottom:
+        return _displayPosition.dy + _displaySize.height - cursor.dy;
+    }
+  }
+
+  void _followCursor(Offset cursor) {
+    var nearest = _edge;
+    var nearestDistance = _distanceToEdge(_edge, cursor);
+    for (final candidate in ScreenEdge.values) {
+      final d = _distanceToEdge(candidate, cursor);
+      if (d + _edgeSwitchHysteresis < nearestDistance) {
+        nearest = candidate;
+        nearestDistance = d;
+      }
+    }
+    final start = _dragStartCursor!;
+    if (nearest != _edge) {
+      _edge = nearest;
+      final center = _displayPosition.translate(
+        _displaySize.width / 2,
+        _displaySize.height / 2,
+      );
+      _alongOffset = isVerticalEdge(_edge)
+          ? cursor.dy - center.dy
+          : cursor.dx - center.dx;
+      _dragStartCursor = cursor;
+      _dragStartOffset = _alongOffset;
+      return;
+    }
+    final delta = isVerticalEdge(_edge)
+        ? cursor.dy - start.dy
+        : cursor.dx - start.dx;
+    _alongOffset = _dragStartOffset + delta;
+  }
+
+  /// The delta Flutter passes is intentionally ignored - see above.
+  Future<void> _onDragUpdate(double _) async {
+    if (!_dragging || _dragBusy || _dragStartCursor == null) return;
+    _dragBusy = true;
+    try {
+      final cursor = await screenRetriever.getCursorScreenPoint();
+      if (!_dragging) return;
+      _followCursor(cursor);
+      await _applyWindowBounds();
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'drag update failed: $e');
+    } finally {
+      _dragBusy = false;
+    }
   }
 
   void _onDragEnd() {
-    if (_alongOffset == _dragStartOffset) return;
+    if (!_dragging) return;
+    _dragging = false;
+    _dragStartCursor = null;
     unawaited(
       kEdgeDockChannel
           .invokeMethod(
             'position_changed',
-            jsonEncode({'offset': _alongOffset}),
+            jsonEncode({'offset': _alongOffset, 'edge': _edge.name}),
           )
           .catchError((_) {}),
     );
+    if (mounted) setState(() {});
   }
 
   @override

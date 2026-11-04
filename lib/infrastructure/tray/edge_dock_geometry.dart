@@ -32,24 +32,37 @@ class EdgeDockGeometry {
   // window is sized to fit its content instead of overflowing it.
   static const double panelHeightDefault = 168;
 
-  // Matches edge_dock_view.dart's _DetailCard layout closely enough to
-  // avoid overflow: header padding+text, the content column's vertical
-  // padding, and one row's height (padding + single-line text), each with
-  // a small margin for font-metric variance across platforms.
-  static const double panelHeaderHeight = 48;
+  // Mirrors edge_dock_view.dart's _DetailCard, whose blocks all have *fixed*
+  // heights so this math is exact rather than font-dependent:
+  //   header 22 + gap 10 + hero temperature 34 + gap 10 + capacity bar block
+  //   25 = 101; a metrics list adds a 17px separator plus 24px per row.
+  static const double panelHeaderHeight = 101;
+  static const double panelRowsSeparator = 17;
   static const double panelContentVerticalPadding = 28;
-  static const double panelRowHeight = 26;
+  static const double panelRowHeight = 24;
   static const double panelMinHeight = 100;
 
-  /// The detail panel's height for a card that will render [rowCount] rows
-  /// (always >= 1 - temperature is always shown). Content-driven instead of
-  /// a fixed constant, since the number of optional rows varies with which
-  /// data a device has and which [EdgeDockMetric]s are enabled.
-  static double panelHeightFor(int rowCount) {
-    final rows = rowCount < 1 ? 1 : rowCount;
-    final height =
-        panelHeaderHeight + panelContentVerticalPadding + rows * panelRowHeight;
-    return height < panelMinHeight ? panelMinHeight : height;
+  /// Extra vertical space the speech-bubble arrow steals on top/bottom docks.
+  static const double panelArrowInset = 8;
+
+  /// The detail panel's height for a card listing [rowCount] metric rows
+  /// below its fixed header (temperature is the header's hero value, not a
+  /// row). When [maxHeight] is given (display height minus margins) the
+  /// result is capped to it; the card then scrolls its rows.
+  static double panelHeightFor(
+    int rowCount, {
+    double? maxHeight,
+    bool horizontalDock = false,
+  }) {
+    final rows = rowCount < 0 ? 0 : rowCount;
+    var height =
+        panelHeaderHeight +
+        panelContentVerticalPadding +
+        (horizontalDock ? panelArrowInset : 0) +
+        (rows > 0 ? panelRowsSeparator + rows * panelRowHeight : 0);
+    if (height < panelMinHeight) height = panelMinHeight;
+    if (maxHeight != null && height > maxHeight) height = maxHeight;
+    return height;
   }
 
   static double railLength(int deviceCount, {bool showPod = true}) {

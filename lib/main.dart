@@ -23,7 +23,10 @@ import 'infrastructure/persistence/local_state_repository.dart';
 import 'infrastructure/persistence/settings_repository.dart';
 import 'infrastructure/storage/storage_monitor_factory.dart';
 import 'infrastructure/tray/desktop_window_controller.dart';
+import 'application/settings/app_settings.dart';
+import 'domain/repositories/storage_monitor.dart';
 import 'presentation/app_root.dart';
+import 'presentation/theme/app_theme.dart';
 import 'presentation/widget/edge_dock_app.dart';
 import 'presentation/widget/mini_widget_app.dart';
 
@@ -136,55 +139,78 @@ Future<void> _bootstrap() async {
   }
 
   try {
-    final settingsRepository = SettingsRepository();
-    final settings = await settingsRepository.load();
-
+    // Only what's needed to show the window runs before the first frame:
+    // settings (tiny) and the window itself. Everything else initialises
+    // behind a themed splash, so the user sees UI immediately instead of
+    // an empty/hidden window while databases and backends spin up.
+    final settings = await SettingsRepository().load();
     AppLogger.instance.verboseDiagnostics = settings.diagnosticLoggingEnabled;
     AppLogger.instance.info('main', 'DriveGuard starting');
-
-    final backend = await StorageMonitorFactory.create(
-      forceMock: settings.mockBackendForced,
-    );
-    final notificationService = LocalNotifierService();
 
     final windowController = DesktopWindowController();
     await windowController.initialize(startMinimized: settings.startMinimized);
 
-    final historyStore = TemperatureHistoryStore();
-    await historyStore.initialize();
+    runApp(
+      _BootRoot(
+        init: _initServices(settings),
+        windowController: windowController,
+      ),
+    );
+  } catch (error, stack) {
+    AppLogger.instance.error('main', 'Bootstrap failed', error);
+    runApp(_BootstrapFailureApp(error: error, stack: stack));
+  }
+}
 
-    final appDb = await AppDatabase.open();
-    void pruneSamples() => unawaited(
-      appDb
-          .pruneOldSamples(DateTime.now().subtract(const Duration(days: 30)))
-          .catchError(
-            (Object e) =>
-                AppLogger.instance.debug('main', 'pruneOldSamples failed: $e'),
-          ),
-    );
-    pruneSamples();
-    // The app can run for weeks in the tray; don't rely on startup pruning.
-    Timer.periodic(const Duration(hours: 24), (_) => pruneSamples());
-    final incidentRepository = IncidentRepository(appDb);
-    final recoveryService = StartupRecoveryService(
-      repository: incidentRepository,
-    );
-    final session = await recoveryService.startNewSession(
-      appVersion: AppConstants.appVersion,
-      pollingInterval: settings.pollingInterval,
-    );
-    _crashRepository = incidentRepository;
-    _crashSessionId = session.id;
-    final startupIncident = await recoveryService.recoverPreviousSession(
-      currentSessionId: session.id,
-      warningCelsiusFor: (id) => settings.thresholdsFor(id).warningCelsius,
-      criticalCelsiusFor: (id) => settings.thresholdsFor(id).criticalCelsius,
-    );
-    final heartbeat = HeartbeatService(
-      repository: incidentRepository,
-      sessionId: session.id,
-    )..start();
+Future<ProviderContainer> _initServices(AppSettings settings) async {
+  // Independent, slow-ish initialisations run concurrently.
+  final results = await Future.wait<Object?>([
+    StorageMonitorFactory.create(forceMock: settings.mockBackendForced),
+    (() async {
+      final store = TemperatureHistoryStore();
+      await store.initialize();
+      return store;
+    })(),
+    AppDatabase.open(),
+  ]);
+  final backend = results[0]! as StorageMonitor;
+  final historyStore = results[1]! as TemperatureHistoryStore;
+  final appDb = results[2]! as AppDatabase;
+  final notificationService = LocalNotifierService();
 
+  void pruneSamples() => unawaited(
+    appDb
+        .pruneOldSamples(DateTime.now().subtract(const Duration(days: 30)))
+        .catchError(
+          (Object e) =>
+              AppLogger.instance.debug('main', 'pruneOldSamples failed: $e'),
+        ),
+  );
+  pruneSamples();
+  // The app can run for weeks in the tray; don't rely on startup pruning.
+  Timer.periodic(const Duration(hours: 24), (_) => pruneSamples());
+  final incidentRepository = IncidentRepository(appDb);
+  final recoveryService = StartupRecoveryService(
+    repository: incidentRepository,
+  );
+  final session = await recoveryService.startNewSession(
+    appVersion: AppConstants.appVersion,
+    pollingInterval: settings.pollingInterval,
+  );
+  _crashRepository = incidentRepository;
+  _crashSessionId = session.id;
+  final startupIncident = await recoveryService.recoverPreviousSession(
+    currentSessionId: session.id,
+    warningCelsiusFor: (id) => settings.thresholdsFor(id).warningCelsius,
+    criticalCelsiusFor: (id) => settings.thresholdsFor(id).criticalCelsius,
+  );
+  final heartbeat = HeartbeatService(
+    repository: incidentRepository,
+    sessionId: session.id,
+  )..start();
+
+  // Login-item registration is not needed to render anything.
+  unawaited(() async {
     try {
       launchAtStartup.setup(
         appName: 'DriveGuard',
@@ -198,32 +224,23 @@ Future<void> _bootstrap() async {
     } catch (e) {
       AppLogger.instance.warning('main', 'launch-at-startup setup skipped: $e');
     }
+  }());
 
-    final container = ProviderContainer(
-      overrides: [
-        storageMonitorProvider.overrideWithValue(backend),
-        notificationServiceProvider.overrideWithValue(notificationService),
-        historyStoreProvider.overrideWithValue(historyStore),
-        settingsProvider.overrideWith(() => SettingsNotifier(settings)),
-        incidentRepositoryProvider.overrideWithValue(incidentRepository),
-        sessionIdProvider.overrideWithValue(session.id),
-        heartbeatServiceProvider.overrideWithValue(heartbeat),
-        localStateRepositoryProvider.overrideWithValue(LocalStateRepository()),
-        startupIncidentProvider.overrideWithValue(startupIncident),
-      ],
-    );
-    _armTerminationSignalHandlers(container);
-
-    runApp(
-      UncontrolledProviderScope(
-        container: container,
-        child: _Bootstrapper(windowController: windowController),
-      ),
-    );
-  } catch (error, stack) {
-    AppLogger.instance.error('main', 'Bootstrap failed', error);
-    runApp(_BootstrapFailureApp(error: error, stack: stack));
-  }
+  final container = ProviderContainer(
+    overrides: [
+      storageMonitorProvider.overrideWithValue(backend),
+      notificationServiceProvider.overrideWithValue(notificationService),
+      historyStoreProvider.overrideWithValue(historyStore),
+      settingsProvider.overrideWith(() => SettingsNotifier(settings)),
+      incidentRepositoryProvider.overrideWithValue(incidentRepository),
+      sessionIdProvider.overrideWithValue(session.id),
+      heartbeatServiceProvider.overrideWithValue(heartbeat),
+      localStateRepositoryProvider.overrideWithValue(LocalStateRepository()),
+      startupIncidentProvider.overrideWithValue(startupIncident),
+    ],
+  );
+  _armTerminationSignalHandlers(container);
+  return container;
 }
 
 void _armTerminationSignalHandlers(ProviderContainer container) {
@@ -294,6 +311,54 @@ class _BootstrapFailureApp extends StatelessWidget {
   }
 }
 
+/// Shows the themed splash while [init] runs, then hands over to the app.
+class _BootRoot extends StatefulWidget {
+  const _BootRoot({required this.init, required this.windowController});
+  final Future<ProviderContainer> init;
+  final DesktopWindowController windowController;
+
+  @override
+  State<_BootRoot> createState() => _BootRootState();
+}
+
+class _BootRootState extends State<_BootRoot> {
+  ProviderContainer? _container;
+  Object? _error;
+  StackTrace? _stack;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.init.then(
+      (c) {
+        if (mounted) setState(() => _container = c);
+      },
+      onError: (Object e, StackTrace st) {
+        AppLogger.instance.error('main', 'Bootstrap failed', e);
+        if (mounted) {
+          setState(() {
+            _error = e;
+            _stack = st;
+          });
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) {
+      return _BootstrapFailureApp(error: _error!, stack: _stack!);
+    }
+    final container = _container;
+    if (container == null) return const _SplashApp();
+    return UncontrolledProviderScope(
+      container: container,
+      child: _Bootstrapper(windowController: widget.windowController),
+    );
+  }
+}
+
 class _Bootstrapper extends ConsumerStatefulWidget {
   const _Bootstrapper({required this.windowController});
   final DesktopWindowController windowController;
@@ -319,73 +384,86 @@ class _BootstrapperState extends ConsumerState<_Bootstrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_started) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark(),
-        home: Scaffold(
-          backgroundColor: const Color(0xFF0D0B1A),
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF7E5FF0), Color(0xFF3D2D9E)],
+    if (!_started) return const _SplashApp();
+    return AppRoot(windowController: widget.windowController);
+  }
+}
+
+/// Startup screen built from the app's own design tokens so the hand-off to
+/// the dashboard doesn't change palette, font or surface.
+class _SplashApp extends StatelessWidget {
+  const _SplashApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark(),
+      home: Scaffold(
+        backgroundColor: AppColors.bg0,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.bg2,
+                  borderRadius: BorderRadius.circular(AppRadius.xl + 4),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.18),
+                      blurRadius: 32,
+                      spreadRadius: 2,
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      const BoxShadow(
-                        color: Color(0x665B3FCE),
-                        blurRadius: 20,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.storage_rounded,
-                    color: Colors.white,
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                padding: const EdgeInsets.all(14),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => const Icon(
+                    Icons.shield_outlined,
+                    color: AppColors.accent,
                     size: 32,
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'DriveGuard',
-                  style: TextStyle(
-                    color: Color(0xFFE8E3FF),
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.5,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              const Text(
+                'DriveGuard',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              const Text(
+                'Reading drive sensors…',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              SizedBox(
+                width: 140,
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  backgroundColor: AppColors.bg3,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.accent,
                   ),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Detecting storage devices…',
-                  style: TextStyle(color: Color(0xFF9990CC), fontSize: 13),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: 180,
-                  child: LinearProgressIndicator(
-                    backgroundColor: const Color(0xFF201E4D),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF7E5FF0),
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      );
-    }
-    return AppRoot(windowController: widget.windowController);
+      ),
+    );
   }
 }
 

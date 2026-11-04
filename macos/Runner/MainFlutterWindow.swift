@@ -27,6 +27,17 @@ class MainFlutterWindow: NSWindow {
     FlutterMultiWindowPlugin.setOnWindowCreatedCallback { controller in
       RegisterGeneratedPlugins(registry: controller)
 
+      // Secondary windows (edge dock / mini widget) draw their own shaped,
+      // translucent surfaces. Without this the NSWindow and the Flutter
+      // view keep an opaque black backing, which shows as a dark box around
+      // the dock's rail and card.
+      controller.backgroundColor = .clear
+      if let window = controller.view.window {
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.hasShadow = false
+      }
+
       // By default AppKit only delivers mouseMoved: events to the *key*
       // window, so hover-driven UI (the edge dock's MouseRegion-based
       // expand/detail-card behavior) silently did nothing until the user

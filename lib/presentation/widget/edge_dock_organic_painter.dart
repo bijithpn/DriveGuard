@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../domain/enums/ui_enums.dart';
@@ -27,6 +28,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
     this.filletRadius = 18.0,
     this.dockDepth = 52.0,
     this.collapsedDepth = 8.0,
+    this.glass = false,
     this.shadows = const [
       BoxShadow(
         color: Color(0x66000000),
@@ -50,98 +52,36 @@ class EdgeDockOrganicPainter extends CustomPainter {
   final double collapsedDepth;
   final List<BoxShadow>? shadows;
 
+  /// Adds a soft diagonal light sheen over the fill (frosted-glass look).
+  final bool glass;
+
   /// Builds and returns the calculated [Path] for the given [size].
   Path computePath(Size size) {
     return _transformPathForEdge(_computeCanonicalFillPath(), size);
   }
 
+  /// A clean pill flush to the screen edge (canonical orientation: docked to
+  /// the left, growing to the right): square where it meets the screen edge,
+  /// fully rounded on the free side. Same overall length as before, so all
+  /// window geometry stays valid; the old concave "ears" and pinched neck
+  /// toward the settings pod are gone.
   Path _computeCanonicalStrokePath() {
     final clamped = expansionProgress.clamp(0.0, 1.0);
     final d = collapsedDepth + (dockDepth - collapsedDepth) * clamped;
-    final rTop = math.min(filletRadius, 24.0);
-    final rBottom = math.min(filletRadius, 24.0);
+    final r = math.min(filletRadius, d / 2);
+    final yTotal =
+        filletRadius +
+        mainRailLength +
+        (showPod ? podSpacing + podDiameter : 0) +
+        filletRadius;
 
-    final path = Path();
-    // Start at top anchor on screen edge
-    path.moveTo(0, 0);
-
-    // 1. Top concave fillet S-curve from (0,0) to (d, rTop)
-    path.cubicTo(0, rTop * 0.55, d * 0.45, rTop, d, rTop);
-
-    // 2. Main rail body
-    final yRailEnd = rTop + mainRailLength;
-    path.lineTo(d, yRailEnd);
-
-    double yBottomStart;
-    double dLast;
-
-    if (showPod) {
-      final yPodTop = yRailEnd + podSpacing;
-      final yNeck = yRailEnd + podSpacing / 2;
-      final dNeck = math.max(collapsedDepth, d * 0.78);
-      final dPod = math.min(d, podDiameter > 0 ? podDiameter : d);
-
-      // Concave bridge from rail to pod neck
-      path.cubicTo(
-        d,
-        yRailEnd + podSpacing * 0.25,
-        dNeck,
-        yNeck - podSpacing * 0.25,
-        dNeck,
-        yNeck,
-      );
-
-      // Concave bridge expanding to pod top
-      final podCurveOffset = podDiameter * 0.15;
-      path.cubicTo(
-        dNeck,
-        yNeck + podSpacing * 0.25,
-        dPod,
-        yPodTop,
-        dPod,
-        yPodTop + podCurveOffset,
-      );
-
-      // Pod outer curve apex
-      final yPodCenter = yPodTop + podDiameter / 2;
-      final yPodBottom = yPodTop + podDiameter;
-      path.cubicTo(
-        dPod,
-        yPodCenter - podDiameter * 0.2,
-        dPod,
-        yPodCenter + podDiameter * 0.2,
-        dPod,
-        yPodBottom - podCurveOffset,
-      );
-
-      path.cubicTo(
-        dPod,
-        yPodBottom - podCurveOffset * 0.5,
-        dPod,
-        yPodBottom,
-        dPod,
-        yPodBottom,
-      );
-
-      yBottomStart = yPodBottom;
-      dLast = dPod;
-    } else {
-      yBottomStart = yRailEnd;
-      dLast = d;
-    }
-
-    // 3. Bottom concave fillet S-curve from (dLast, yBottomStart) to (0, yTotal)
-    final yTotal = yBottomStart + rBottom;
-    path.cubicTo(
-      dLast * 0.45,
-      yBottomStart,
-      0,
-      yTotal - rBottom * 0.55,
-      0,
-      yTotal,
-    );
-
-    return path;
+    return Path()
+      ..moveTo(0, 0)
+      ..lineTo(d - r, 0)
+      ..arcToPoint(Offset(d, r), radius: Radius.circular(r))
+      ..lineTo(d, yTotal - r)
+      ..arcToPoint(Offset(d - r, yTotal), radius: Radius.circular(r))
+      ..lineTo(0, yTotal);
   }
 
   Path _computeCanonicalFillPath() {
@@ -225,6 +165,22 @@ class EdgeDockOrganicPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawPath(fillPath, bgPaint);
 
+    if (glass) {
+      canvas.save();
+      canvas.clipPath(fillPath);
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset.zero,
+            Offset(size.width, size.height),
+            const [Color(0x2EFFFFFF), Color(0x08FFFFFF), Color(0x12FFFFFF)],
+            const [0.0, 0.55, 1.0],
+          ),
+      );
+      canvas.restore();
+    }
+
     // 3. Crisp outline border on curved screen-facing contours only
     if (borderWidth > 0 && borderColor.a > 0) {
       final borderPaint = Paint()
@@ -251,6 +207,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
         oldDelegate.filletRadius != filletRadius ||
         oldDelegate.dockDepth != dockDepth ||
         oldDelegate.collapsedDepth != collapsedDepth ||
+        oldDelegate.glass != glass ||
         oldDelegate.shadows != shadows;
   }
 }

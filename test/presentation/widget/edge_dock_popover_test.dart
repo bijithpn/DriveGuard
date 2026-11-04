@@ -63,7 +63,7 @@ void main() {
                 140,
                 50,
                 EdgeDockGeometry.panelWidth,
-                EdgeDockGeometry.panelHeightFor(7),
+                EdgeDockGeometry.panelHeightFor(6),
               ),
               theme: theme,
               visibleMetrics: visibleMetrics,
@@ -170,7 +170,10 @@ void main() {
         find.byType(LinearProgressIndicator),
       );
       expect(progressIndicator.value, closeTo(0.65, 0.001));
-      expect(progressIndicator.backgroundColor, const Color(0xFF1E1E28));
+      expect(
+        progressIndicator.backgroundColor,
+        Colors.white.withValues(alpha: 0.10),
+      );
       expect(progressIndicator.minHeight, 5.0);
     });
 
@@ -179,7 +182,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // 65% used -> 35% left
-      expect(find.text('65% Used · 35% left'), findsOneWidget);
+      expect(find.text('65% used · 35% free'), findsOneWidget);
     });
 
     testWidgets('telemetry rows render key-value metrics when enabled', (

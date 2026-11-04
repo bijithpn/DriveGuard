@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../domain/enums/ui_enums.dart';
@@ -18,6 +19,7 @@ class EdgeDockPopoverBubble extends StatelessWidget {
     this.arrowHeight = 14.0,
     this.borderWidth = 1.0,
     this.padding = const EdgeInsets.all(12.0),
+    this.glass = false,
     this.shadows = const [
       BoxShadow(
         color: Color(0x66000000),
@@ -38,6 +40,7 @@ class EdgeDockPopoverBubble extends StatelessWidget {
   final double borderWidth;
   final EdgeInsetsGeometry padding;
   final List<BoxShadow>? shadows;
+  final bool glass;
 
   EdgeInsetsGeometry _effectivePadding() {
     EdgeInsets arrowOffset;
@@ -71,6 +74,7 @@ class EdgeDockPopoverBubble extends StatelessWidget {
         arrowHeight: arrowHeight,
         borderWidth: borderWidth,
         shadows: shadows,
+        glass: glass,
       ),
       child: Padding(padding: _effectivePadding(), child: child),
     );
@@ -89,6 +93,7 @@ class EdgeDockSpeechBubblePainter extends CustomPainter {
     this.arrowWidth = 8.0,
     this.arrowHeight = 14.0,
     this.borderWidth = 1.0,
+    this.glass = false,
     this.shadows = const [
       BoxShadow(
         color: Color(0x66000000),
@@ -107,6 +112,9 @@ class EdgeDockSpeechBubblePainter extends CustomPainter {
   final double arrowHeight;
   final double borderWidth;
   final List<BoxShadow>? shadows;
+
+  /// Adds a soft diagonal light sheen over the fill (frosted-glass look).
+  final bool glass;
 
   /// Builds and returns the calculated [Path] for the given [size].
   Path computePath(Size size) {
@@ -229,6 +237,22 @@ class EdgeDockSpeechBubblePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, bgPaint);
 
+    if (glass) {
+      canvas.save();
+      canvas.clipPath(path);
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset.zero,
+            Offset(size.width, size.height),
+            const [Color(0x2EFFFFFF), Color(0x08FFFFFF), Color(0x12FFFFFF)],
+            const [0.0, 0.55, 1.0],
+          ),
+      );
+      canvas.restore();
+    }
+
     // 3. Crisp outline border
     if (borderWidth > 0 && borderColor.a > 0) {
       final borderPaint = Paint()
@@ -251,6 +275,7 @@ class EdgeDockSpeechBubblePainter extends CustomPainter {
         oldDelegate.arrowWidth != arrowWidth ||
         oldDelegate.arrowHeight != arrowHeight ||
         oldDelegate.borderWidth != borderWidth ||
+        oldDelegate.glass != glass ||
         oldDelegate.shadows != shadows;
   }
 }

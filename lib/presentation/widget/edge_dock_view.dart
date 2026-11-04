@@ -413,9 +413,10 @@ class _Rail extends StatelessWidget {
     final content = CustomPaint(
       painter: EdgeDockOrganicPainter(
         edge: edge,
-        backgroundColor: theme.background,
-        borderColor: Colors.transparent,
-        borderWidth: 0.0,
+        backgroundColor: theme.background.withValues(alpha: 0.90),
+        borderColor: Colors.white.withValues(alpha: 0.16),
+        borderWidth: 1.0,
+        glass: true,
         mainRailLength: mainRailLength,
         podDiameter: EdgeDockGeometry.podDiameter,
         podSpacing: EdgeDockGeometry.podSpacing,
@@ -431,7 +432,10 @@ class _Rail extends StatelessWidget {
             horizontal: isVerticalEdge(edge)
                 ? 12
                 : EdgeDockGeometry.filletRadius,
-            vertical: isVerticalEdge(edge) ? EdgeDockGeometry.filletRadius : 12,
+            // A ring block is 58px tall; on top/bottom docks the 68px rail
+            // leaves only 10px of slack, so 12px padding clipped the value
+            // labels there.
+            vertical: isVerticalEdge(edge) ? EdgeDockGeometry.filletRadius : 5,
           ),
           child: vertical
               ? SingleChildScrollView(
@@ -591,14 +595,20 @@ class _RingItem extends StatelessWidget {
                       selected: selected,
                     ),
                     child: Center(
-                      child: Icon(
-                        device.type == StorageDeviceType.nvme
-                            ? Icons.memory_rounded
-                            : device.type == StorageDeviceType.ssd
-                            ? Icons.storage_rounded
-                            : Icons.album_rounded,
-                        size: 15,
-                        color: color,
+                      // Soft tinted disc instead of a dark fill, so the icon
+                      // sits on the glass rather than on a black hole.
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: color.withValues(alpha: 0.16),
+                        ),
+                        child: Icon(
+                          _DetailCard._deviceIcon(device.type),
+                          size: 14,
+                          color: color,
+                        ),
                       ),
                     ),
                   ),
@@ -717,7 +727,7 @@ class _BottomActionPodState extends State<_BottomActionPod> {
                 border: Border.all(
                   color: _hovered
                       ? widget.theme.text.withValues(alpha: 0.3)
-                      : const Color(0xFF1E1E26),
+                      : Colors.white.withValues(alpha: 0.12),
                   width: 1.0,
                 ),
               ),
@@ -794,17 +804,19 @@ class _DetailCard extends StatelessWidget {
     final usedPercent = (device.fraction * 100).round();
     final leftPercent = (100 - usedPercent).clamp(0, 100);
 
+    final metricRows = rows.skip(1).toList(growable: false);
+    const tabular = [FontFeature.tabularFigures()];
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: reducedMotion
           ? Duration.zero
-          : const Duration(milliseconds: 180),
+          : const Duration(milliseconds: 160),
       curve: Curves.easeOutCubic,
       builder: (context, t, child) => Opacity(
         opacity: t,
-        child: Transform.scale(
-          scale: 0.94 + 0.06 * t,
-          alignment: Alignment.center,
+        child: Transform.translate(
+          offset: _enterOffset(edge, 8 * (1 - t)),
           child: child,
         ),
       ),
@@ -813,107 +825,176 @@ class _DetailCard extends StatelessWidget {
         child: EdgeDockPopoverBubble(
           edge: edge,
           targetArrowPosition: targetArrowPosition,
-          backgroundColor: theme.background,
-          borderColor: Colors.transparent,
+          backgroundColor: theme.background.withValues(alpha: 0.82),
+          borderColor: Colors.white.withValues(alpha: 0.14),
           borderRadius: 20.0,
-          borderWidth: 0.0,
+          borderWidth: 1.0,
           arrowWidth: 8.0,
           arrowHeight: 16.0,
+          glass: true,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          // Every block below has a fixed height (see
+          // EdgeDockGeometry.panelHeaderHeight) so the window is sized to
+          // exactly what is rendered - nothing can overflow.
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              // Header Section: Device icon + Bold name + Status badge
-              Row(
-                children: [
-                  Icon(
-                    device.type == StorageDeviceType.nvme
-                        ? Icons.memory_rounded
-                        : device.type == StorageDeviceType.ssd
-                        ? Icons.storage_rounded
-                        : Icons.album_rounded,
-                    size: 16,
-                    color: color,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      device.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: theme.text,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+              SizedBox(
+                height: 22,
+                child: Row(
+                  children: [
+                    Icon(_deviceIcon(device.type), size: 16, color: color),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        device.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.text,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(5),
-                      border: Border.all(
-                        color: color.withValues(alpha: 0.28),
-                        width: 0.8,
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 20,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        device.healthStatus.isNotEmpty
+                            ? device.healthStatus
+                            : 'OK',
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      device.healthStatus.isNotEmpty
-                          ? device.healthStatus
-                          : 'OK',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 10.0,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
-              // Linear Progress Bar
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 34,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          device.valueText,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: theme.text,
+                            fontSize: 26,
+                            height: 1.1,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            fontFeatures: tabular,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Spacer(),
+                    Text(
+                      'Temperature',
+                      style: TextStyle(
+                        color: theme.mutedText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(3),
                 child: LinearProgressIndicator(
                   value: device.fraction.clamp(0.0, 1.0),
-                  backgroundColor: const Color(0xFF1E1E28),
+                  backgroundColor: Colors.white.withValues(alpha: 0.10),
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                   minHeight: 5,
                 ),
               ),
-              const SizedBox(height: 4),
-              // Breakdown Label
-              Text(
-                '$usedPercent% Used · $leftPercent% left',
-                style: TextStyle(
-                  color: theme.mutedText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 14,
+                child: Text(
+                  '$usedPercent% used · $leftPercent% free',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: theme.mutedText,
+                    fontSize: 11,
+                    height: 1.2,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: tabular,
+                  ),
                 ),
               ),
-              const SizedBox(height: 7),
-              Container(
-                height: 1,
-                color: theme.mutedText.withValues(alpha: 0.14),
-              ),
-              const SizedBox(height: 4),
-              // Metrics List
-              for (final (label, value) in rows)
-                _DetailRow(label: label, value: value, theme: theme),
+              if (metricRows.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+                const SizedBox(height: 6),
+                // Scrolls when the panel is height-capped (many metrics on a
+                // short display) instead of overflowing.
+                Flexible(
+                  child: ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(
+                      context,
+                    ).copyWith(scrollbars: false),
+                    child: SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final (label, value) in metricRows)
+                            _DetailRow(
+                              label: label,
+                              value: value,
+                              theme: theme,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+
+  static IconData _deviceIcon(StorageDeviceType type) => switch (type) {
+    StorageDeviceType.nvme => Icons.memory_rounded,
+    StorageDeviceType.ssd => Icons.storage_rounded,
+    _ => Icons.album_rounded,
+  };
+
+  /// Small slide toward the card's resting position, from the dock side.
+  static Offset _enterOffset(ScreenEdge edge, double d) => switch (edge) {
+    ScreenEdge.left => Offset(-d, 0),
+    ScreenEdge.right => Offset(d, 0),
+    ScreenEdge.top => Offset(0, -d),
+    ScreenEdge.bottom => Offset(0, d),
+  };
 }
 
 class _DetailRow extends StatelessWidget {
@@ -929,26 +1010,32 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+    return SizedBox(
+      height: EdgeDockGeometry.panelRowHeight,
       child: Row(
         children: [
           Text(
             label,
+            maxLines: 1,
             style: TextStyle(
               color: theme.mutedText,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              color: theme.text,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                color: theme.text,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],
@@ -977,7 +1064,7 @@ class _RingPainter extends CustomPainter {
     const strokeWidth = 3.2;
 
     final track = Paint()
-      ..color = const Color(0xFF1A1A22)
+      ..color = Colors.white.withValues(alpha: 0.10)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius, track);

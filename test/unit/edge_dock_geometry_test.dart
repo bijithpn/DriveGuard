@@ -298,9 +298,31 @@ void main() {
       final height = EdgeDockGeometry.panelHeightFor(7);
       const requiredContent =
           EdgeDockGeometry.panelHeaderHeight +
+          EdgeDockGeometry.panelRowsSeparator +
           EdgeDockGeometry.panelContentVerticalPadding +
           7 * EdgeDockGeometry.panelRowHeight;
       expect(height, greaterThanOrEqualTo(requiredContent));
+    });
+  });
+
+  group('EdgeDockGeometry.panelHeightFor cap', () {
+    test('never exceeds maxHeight (card scrolls instead)', () {
+      expect(EdgeDockGeometry.panelHeightFor(40, maxHeight: 300), 300);
+    });
+
+    test('fits the real card: header 101 + sep 17 + 2*24 rows + 28 padding', () {
+      // Regression: the card overflowed by ~11px with the old constants.
+      expect(
+        EdgeDockGeometry.panelHeightFor(2),
+        greaterThanOrEqualTo(101 + 17 + 2 * 24 + 28),
+      );
+    });
+
+    test('top/bottom docks reserve room for the arrow', () {
+      expect(
+        EdgeDockGeometry.panelHeightFor(3, horizontalDock: true),
+        greaterThan(EdgeDockGeometry.panelHeightFor(3)),
+      );
     });
   });
 
