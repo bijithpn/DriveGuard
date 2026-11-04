@@ -39,15 +39,6 @@ flutter:
     - family: Manrope
       fonts:
         - asset: assets/fonts/Manrope-Variable.ttf
-          weight: 400
-        - asset: assets/fonts/Manrope-Variable.ttf
-          weight: 500
-        - asset: assets/fonts/Manrope-Variable.ttf
-          weight: 600
-        - asset: assets/fonts/Manrope-Variable.ttf
-          weight: 700
-        - asset: assets/fonts/Manrope-Variable.ttf
-          weight: 800
 
 flutter_launcher_icons:
   image_path: "assets/images/app_logo.png"
