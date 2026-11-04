@@ -544,8 +544,9 @@ class _BsodBannerState extends State<_BsodBanner> {
   };
 
   static String _descriptionFor(String? code) {
-    if (code == null)
+    if (code == null) {
       return 'A critical system error caused the computer to stop.';
+    }
     // For OOM events like 'OOM: firefox', give a generic OOM description
     if (code.startsWith('OOM:')) {
       final process = code.substring(4).trim();
@@ -1065,7 +1066,7 @@ class _TimelineChart extends StatelessWidget {
             spacing: AppSpacing.md,
             runSpacing: 4,
             children: [
-              _LegendItem(
+              const _LegendItem(
                 color: AppColors.warning,
                 label: 'Temperature',
                 dashed: false,
@@ -1081,7 +1082,7 @@ class _TimelineChart extends StatelessWidget {
                 dashed: true,
               ),
               if (shutdownIndex >= 0)
-                _LegendItem(
+                const _LegendItem(
                   color: AppColors.critical,
                   label: 'Shutdown',
                   dashed: true,

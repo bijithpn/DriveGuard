@@ -104,9 +104,9 @@ void main() {
   });
 
   group('EdgeDockGeometry.windowRectFor (collapsed / expanded / panel)', () {
-    final rail = Rect.fromLTWH(1852, 400, 68, 200);
-    final collapsedRail = Rect.fromLTWH(1906, 400, 14, 200);
-    final panel = Rect.fromLTWH(1604, 350, 240, 168);
+    const rail = Rect.fromLTWH(1852, 400, 68, 200);
+    const collapsedRail = Rect.fromLTWH(1906, 400, 14, 200);
+    const panel = Rect.fromLTWH(1604, 350, 240, 168);
 
     test(
       'returns collapsedRail when isExpanded is false and panel is null',

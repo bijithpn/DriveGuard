@@ -25,7 +25,7 @@ void main() {
     freeCapacityText: '700 GB free',
   );
 
-  final sampleSnapshot = const MiniWidgetSnapshot(
+  const sampleSnapshot = MiniWidgetSnapshot(
     devices: [sampleDevice],
     compact: false,
   );

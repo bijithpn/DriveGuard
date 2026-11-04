@@ -240,7 +240,7 @@ class _CompactRow extends StatelessWidget {
       height: 52,
       decoration: BoxDecoration(
         color: bgColor,
-        border: Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
+        border: const Border(bottom: BorderSide(color: AppColors.divider, width: 1)),
       ),
       child: InkWell(
         onTap: onTap,
@@ -316,8 +316,8 @@ class _CompactRow extends StatelessWidget {
               ),
             ),
 
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
+            const Padding(
+              padding: EdgeInsets.only(right: 10),
               child: Icon(
                 Icons.chevron_right_rounded,
                 size: 14,

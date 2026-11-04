@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final snapshot = const MiniWidgetSnapshot(
+  const snapshot = MiniWidgetSnapshot(
     devices: [
       MiniWidgetDeviceSnapshot(
         id: 'a',
@@ -131,9 +131,9 @@ void main() {
     expect(find.text('SATA SSD'), findsOneWidget);
   });
 
-  final snapshotWithAllFields = MiniWidgetSnapshot(
+  const snapshotWithAllFields = MiniWidgetSnapshot(
     devices: [
-      const MiniWidgetDeviceSnapshot(
+      MiniWidgetDeviceSnapshot(
         id: 'a',
         name: 'NVMe SSD',
         valueText: '47°C',

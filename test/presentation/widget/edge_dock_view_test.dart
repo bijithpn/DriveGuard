@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final testSnapshot = const MiniWidgetSnapshot(
+  const testSnapshot = MiniWidgetSnapshot(
     devices: [
       MiniWidgetDeviceSnapshot(
         id: 'nvme-1',

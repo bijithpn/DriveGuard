@@ -430,6 +430,7 @@ try {
 
   @override
   Stream<StorageActivity> watchActivity() {
+    // ignore: close_sinks -- closed in onCancel below
     late final StreamController<StorageActivity> controller;
     Timer? timer;
     bool inFlight = false;
@@ -438,7 +439,7 @@ try {
       if (inFlight) return;
       inFlight = true;
       try {
-        final script =
+        const script =
             r'Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk | '
             r'Select-Object Name, DiskReadBytesPerSec, DiskWriteBytesPerSec, PercentDiskTime | '
             r'ConvertTo-Json -Compress';

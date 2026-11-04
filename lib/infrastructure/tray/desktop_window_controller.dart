@@ -39,7 +39,7 @@ class DesktopWindowController with WindowListener {
   Future<void> initialize({required bool startMinimized}) async {
     await windowManager.ensureInitialized();
     windowManager.addListener(this);
-    final options = WindowOptions(
+    const options = WindowOptions(
       size: _defaultDashboardSize,
       minimumSize: _dashboardMinimumSize,
       center: true,

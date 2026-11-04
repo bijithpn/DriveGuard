@@ -153,7 +153,7 @@ Future<void> _bootstrap() async {
     await historyStore.initialize();
 
     final appDb = await AppDatabase.open();
-    unawaited(
+    void pruneSamples() => unawaited(
       appDb
           .pruneOldSamples(DateTime.now().subtract(const Duration(days: 30)))
           .catchError(
@@ -161,6 +161,9 @@ Future<void> _bootstrap() async {
                 AppLogger.instance.debug('main', 'pruneOldSamples failed: $e'),
           ),
     );
+    pruneSamples();
+    // The app can run for weeks in the tray; don't rely on startup pruning.
+    Timer.periodic(const Duration(hours: 24), (_) => pruneSamples());
     final incidentRepository = IncidentRepository(appDb);
     final recoveryService = StartupRecoveryService(
       repository: incidentRepository,
@@ -329,7 +332,7 @@ class _BootstrapperState extends ConsumerState<_Bootstrapper> {
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
-                      BoxShadow(
+                      const BoxShadow(
                         color: Color(0x665B3FCE),
                         blurRadius: 20,
                         offset: Offset(0, 8),
@@ -362,7 +365,7 @@ class _BootstrapperState extends ConsumerState<_Bootstrapper> {
                   width: 180,
                   child: LinearProgressIndicator(
                     backgroundColor: const Color(0xFF201E4D),
-                    valueColor: AlwaysStoppedAnimation<Color>(
+                    valueColor: const AlwaysStoppedAnimation<Color>(
                       Color(0xFF7E5FF0),
                     ),
                     borderRadius: BorderRadius.circular(4),

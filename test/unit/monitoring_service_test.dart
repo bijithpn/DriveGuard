@@ -489,7 +489,7 @@ void main() {
 
   test('a spinning HDD is never re-polled faster than the spin-down safety '
       'floor, even when reinitialized repeatedly', () async {
-    final hdd = StorageDevice(
+    const hdd = StorageDevice(
       id: 'hdd-1',
       type: StorageDeviceType.hdd,
       interfaceType: StorageInterfaceType.sata,

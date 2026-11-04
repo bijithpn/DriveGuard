@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../constants/app_constants.dart';
 import '../errors/storage_exceptions.dart';
@@ -14,7 +17,16 @@ class ProcessResult2 {
 
 class SafeProcessRunner {
   SafeProcessRunner._();
-  static final SafeProcessRunner instance = SafeProcessRunner._();
+
+  /// For tests that substitute canned command output.
+  @visibleForTesting
+  SafeProcessRunner.forTest();
+
+  static SafeProcessRunner _instance = SafeProcessRunner._();
+  static SafeProcessRunner get instance => _instance;
+
+  @visibleForTesting
+  static set instance(SafeProcessRunner runner) => _instance = runner;
 
   final Map<String, bool> _existenceCache = {};
 
@@ -70,10 +82,10 @@ class SafeProcessRunner {
     }
 
     final stdoutFuture = process.stdout
-        .transform(const _Utf8LenientDecoder())
+        .transform(const Utf8Decoder(allowMalformed: true))
         .join();
     final stderrFuture = process.stderr
-        .transform(const _Utf8LenientDecoder())
+        .transform(const Utf8Decoder(allowMalformed: true))
         .join();
 
     int exitCode;
@@ -110,10 +122,3 @@ class SafeProcessRunner {
   }
 }
 
-class _Utf8LenientDecoder extends StreamTransformerBase<List<int>, String> {
-  const _Utf8LenientDecoder();
-  @override
-  Stream<String> bind(Stream<List<int>> stream) {
-    return stream.map((bytes) => String.fromCharCodes(bytes));
-  }
-}

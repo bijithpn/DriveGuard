@@ -309,10 +309,10 @@ class _DeviceInfoPanel extends StatelessWidget {
 
     Clipboard.setData(ClipboardData(text: report.toString()));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Diagnostic report copied to clipboard!'),
+      const SnackBar(
+        content: Text('Diagnostic report copied to clipboard!'),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+        duration: Duration(seconds: 3),
         backgroundColor: AppColors.accent,
       ),
     );
@@ -2752,7 +2752,7 @@ class _CapacityBar extends StatelessWidget {
                 backgroundColor: isDark
                     ? AppColors.bg2
                     : AppColors.lightSurfaceMuted,
-                valueColor: AlwaysStoppedAnimation(AppColors.accent),
+                valueColor: const AlwaysStoppedAnimation(AppColors.accent),
               ),
             )
           else

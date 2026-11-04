@@ -125,6 +125,7 @@ class FallbackStorageMonitor extends StorageMonitor {
 
   @override
   Stream<StorageActivity> watchActivity() {
+    // ignore: close_sinks -- closed in onCancel below
     late final StreamController<StorageActivity> controller;
     StreamSubscription<StorageActivity>? nativeSub;
     StreamSubscription<StorageActivity>? legacySub;

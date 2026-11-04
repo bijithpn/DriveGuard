@@ -26,7 +26,7 @@ void main() {
       ),
     );
 
-    final stackTrace = 'Exception: boom\n#0 main (main.dart:10)\n#1 zone';
+    const stackTrace = 'Exception: boom\n#0 main (main.dart:10)\n#1 zone';
     await repo.recordDiagnosticEvents('s1', [
       SystemDiagnosticEvent(
         timestamp: DateTime(2026, 9, 7, 10, 6),

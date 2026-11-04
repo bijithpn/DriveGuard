@@ -40,7 +40,7 @@ Future<void> showStartupIncidentDialog(
             children: [
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.warning_amber_rounded,
                     color: AppColors.warning,
                     size: 28,

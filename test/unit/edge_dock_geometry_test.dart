@@ -265,13 +265,13 @@ void main() {
 
   group('EdgeDockGeometry.windowRectFor', () {
     test('equals the rail when no panel is open', () {
-      final rail = Rect.fromLTWH(0, 0, 64, 200);
+      const rail = Rect.fromLTWH(0, 0, 64, 200);
       expect(EdgeDockGeometry.windowRectFor(rail, null), rail);
     });
 
     test('is the bounding box of rail and panel when a panel is open', () {
-      final rail = Rect.fromLTWH(1880, 400, 40, 200);
-      final panel = Rect.fromLTWH(1600, 300, 240, 168);
+      const rail = Rect.fromLTWH(1880, 400, 40, 200);
+      const panel = Rect.fromLTWH(1600, 300, 240, 168);
       final union = EdgeDockGeometry.windowRectFor(rail, panel);
       expect(union.left, panel.left);
       expect(union.right, rail.right);
@@ -296,7 +296,7 @@ void main() {
       // optional detail rows (health/smart/powerOnHours/read/write/free,
       // plus the always-shown temperature) were shown at once.
       final height = EdgeDockGeometry.panelHeightFor(7);
-      final requiredContent =
+      const requiredContent =
           EdgeDockGeometry.panelHeaderHeight +
           EdgeDockGeometry.panelContentVerticalPadding +
           7 * EdgeDockGeometry.panelRowHeight;

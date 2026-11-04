@@ -1,3 +1,5 @@
+// ignore_for_file: unawaited_futures -- UI callbacks here are intentionally
+// fire-and-forget (navigator pushes, settings saves).
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

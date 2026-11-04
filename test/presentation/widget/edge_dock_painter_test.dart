@@ -104,9 +104,9 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(
+        const MaterialApp(
           home: Scaffold(
-            body: CustomPaint(size: const Size(60, 300), painter: painter),
+            body: CustomPaint(size: Size(60, 300), painter: painter),
           ),
         ),
       );
