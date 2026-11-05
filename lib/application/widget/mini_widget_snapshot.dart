@@ -15,6 +15,7 @@ class MiniWidgetDeviceSnapshot {
     this.writeSpeedText,
     this.tbwText,
     this.powerOnHoursText,
+    this.usedFraction,
   });
 
   final String id;
@@ -31,6 +32,10 @@ class MiniWidgetDeviceSnapshot {
   final String? tbwText;
   final String? powerOnHoursText;
 
+  /// Share of the drive's capacity in use (0..1), or null when unknown.
+  /// [fraction] is the *temperature* gauge, not capacity.
+  final double? usedFraction;
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
@@ -45,6 +50,7 @@ class MiniWidgetDeviceSnapshot {
     'writeSpeedText': writeSpeedText,
     'tbwText': tbwText,
     'powerOnHoursText': powerOnHoursText,
+    'usedFraction': usedFraction,
   };
 
   factory MiniWidgetDeviceSnapshot.fromJson(Map<String, dynamic> json) =>
@@ -68,6 +74,7 @@ class MiniWidgetDeviceSnapshot {
         writeSpeedText: json['writeSpeedText'] as String?,
         tbwText: json['tbwText'] as String?,
         powerOnHoursText: json['powerOnHoursText'] as String?,
+        usedFraction: (json['usedFraction'] as num?)?.toDouble(),
       );
 
   @override
@@ -87,7 +94,8 @@ class MiniWidgetDeviceSnapshot {
           readSpeedText == other.readSpeedText &&
           writeSpeedText == other.writeSpeedText &&
           tbwText == other.tbwText &&
-          powerOnHoursText == other.powerOnHoursText;
+          powerOnHoursText == other.powerOnHoursText &&
+          usedFraction == other.usedFraction;
 
   @override
   int get hashCode => Object.hash(
@@ -104,6 +112,7 @@ class MiniWidgetDeviceSnapshot {
     writeSpeedText,
     tbwText,
     powerOnHoursText,
+    usedFraction,
   );
 }
 

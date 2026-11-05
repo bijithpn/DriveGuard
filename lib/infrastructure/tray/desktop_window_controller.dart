@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 
@@ -13,6 +14,11 @@ const kEdgeDockChannel = WindowMethodChannel('driveguard.edgedock');
 
 const kWidgetMinimumSize = Size(260, 220);
 
+/// How often the main app re-sends state to the floating windows, and how
+/// long a window waits without hearing it before concluding it is orphaned.
+const kWidgetHeartbeat = Duration(seconds: 2);
+const kWidgetOrphanTimeout = Duration(seconds: 30);
+
 class DesktopWindowController with WindowListener {
   static const _tag = 'DesktopWindowController';
   static const Size _defaultDashboardSize = Size(1100, 760);
@@ -25,6 +31,7 @@ class DesktopWindowController with WindowListener {
   // spawning duplicate dock/widget windows (the stray black bars).
   Future<void>? _miniOpening;
   Future<void>? _edgeDockOpening;
+  bool _pendingMinimize = false;
   Future<void> Function()? onCloseHandler;
   Future<void> Function()? onMinimizeHandler;
 
@@ -56,11 +63,46 @@ class DesktopWindowController with WindowListener {
         await windowManager.show();
         await windowManager.focus();
       } else {
-        await windowManager.minimize();
+        // A minimised/hidden window gets no frames from macOS, and
+        // everything that opens the floating widgets and starts monitoring
+        // waits for a frame - so a minimised start used to stall (for
+        // minutes) until the user happened to bring the window up. Keep it
+        // technically on screen but fully transparent and click-through
+        // until startup is done, then minimise (completeStartMinimized).
+        _pendingMinimize = true;
+        await windowManager.setOpacity(0);
+        await windowManager.setIgnoreMouseEvents(true);
+        await windowManager.show(inactive: true);
+        Timer(const Duration(seconds: 30), completeStartMinimized);
       }
     });
 
     await windowManager.setPreventClose(true);
+  }
+
+  /// Ends the transparent "startup" state set up for a minimised start:
+  /// minimise the window for real and make it opaque / clickable again.
+  Future<void> completeStartMinimized() async {
+    if (!_pendingMinimize) return;
+    _pendingMinimize = false;
+    try {
+      await windowManager.minimize();
+      await windowManager.setIgnoreMouseEvents(false);
+      await windowManager.setOpacity(1);
+    } catch (e) {
+      AppLogger.instance.warning(_tag, 'completeStartMinimized failed: $e');
+    }
+  }
+
+  @override
+  void onWindowFocus() {
+    // The user (tray, dock icon, single-instance activation) brought the
+    // window up before startup finished: make it real straight away.
+    if (_pendingMinimize) {
+      _pendingMinimize = false;
+      unawaited(windowManager.setIgnoreMouseEvents(false));
+      unawaited(windowManager.setOpacity(1));
+    }
   }
 
   @override
@@ -109,13 +151,14 @@ class DesktopWindowController with WindowListener {
       } catch (_) {}
       return;
     }
+    await _closeStrayWindows(dock: false);
     try {
       final args = widgetSettings.toJson();
       if (initialSnapshot != null) {
         args['snapshot'] = initialSnapshot.toJson();
       }
       _miniWindow = await WindowController.create(
-        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: false),
+        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: true),
       );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Failed opening mini widget window', e);
@@ -150,19 +193,23 @@ class DesktopWindowController with WindowListener {
     );
   }
 
-  Future<void> updateMiniWindowSnapshot(MiniWidgetSnapshot snapshot) async {
-    if (_miniWindow == null) return;
+  /// Returns whether the window actually received the snapshot, so callers
+  /// can retry instead of assuming it arrived.
+  Future<bool> updateMiniWindowSnapshot(MiniWidgetSnapshot snapshot) async {
+    if (_miniWindow == null) return false;
     try {
       await kWidgetChannel.invokeMethod(
         'snapshot',
         jsonEncode(snapshot.toJson()),
       );
+      return true;
     } catch (e) {
       AppLogger.instance.warning(
         _tag,
         'Failed pushing snapshot to mini widget: $e',
       );
     }
+    return false;
   }
 
   Future<void> enterEdgeDockMode(
@@ -191,6 +238,50 @@ class DesktopWindowController with WindowListener {
       positionOffset,
       initialSnapshot,
     ).whenComplete(() => _edgeDockOpening = null);
+  }
+
+  /// Closes dock/widget windows this controller has no handle on.
+  ///
+  /// A hot restart (or crash-restart of the main isolate) resets this class
+  /// but leaves the native secondary windows - and their engines, still
+  /// showing their last snapshot - alive; the next open then stacked a second
+  /// window on top of the stale one ("multiple widgets"). Anything of the
+  /// right kind that exists before we create ours is, by definition, stray.
+  Future<void> _closeStrayWindows({required bool dock}) async {
+    try {
+      final self = await WindowController.fromCurrentEngine();
+      bool isStray(WindowController w) {
+        if (w.windowId == self.windowId) return false;
+        final isDock = w.arguments.contains('"mode":"edgeDock"');
+        final isMini = !isDock && w.arguments.contains('"alwaysOnTop"');
+        return dock ? isDock : isMini;
+      }
+
+      final channel = dock ? kEdgeDockChannel : kWidgetChannel;
+      var strays = (await WindowController.getAll()).where(isStray).toList();
+      for (var i = 0; i < strays.length; i++) {
+        // Their own isolate closes its window; no new window of this kind
+        // exists yet, so the call can only reach a stray.
+        try {
+          await channel.invokeMethod('close');
+        } catch (_) {}
+      }
+      if (strays.isEmpty) return;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      strays = (await WindowController.getAll()).where(isStray).toList();
+      for (final w in strays) {
+        try {
+          await w.hide();
+        } catch (_) {}
+      }
+      AppLogger.instance.info(
+        _tag,
+        'Closed stray ${dock ? 'edge dock' : 'widget'} window(s) left over '
+        'from a previous run',
+      );
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'Stray window cleanup failed: $e');
+    }
   }
 
   Future<void> _enterEdgeDockMode(
@@ -222,6 +313,7 @@ class DesktopWindowController with WindowListener {
       } catch (_) {}
       return;
     }
+    await _closeStrayWindows(dock: true);
     try {
       final args = <String, dynamic>{
         'mode': 'edgeDock',
@@ -240,7 +332,7 @@ class DesktopWindowController with WindowListener {
         args['snapshot'] = initialSnapshot.toJson();
       }
       _edgeDockWindow = await WindowController.create(
-        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: false),
+        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: true),
       );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Failed opening edge dock window', e);
@@ -269,19 +361,23 @@ class DesktopWindowController with WindowListener {
     _edgeDockWindow = null;
   }
 
-  Future<void> updateEdgeDockSnapshot(MiniWidgetSnapshot snapshot) async {
-    if (_edgeDockWindow == null) return;
+  /// Returns whether the window actually received the snapshot, so callers
+  /// can retry instead of assuming it arrived.
+  Future<bool> updateEdgeDockSnapshot(MiniWidgetSnapshot snapshot) async {
+    if (_edgeDockWindow == null) return false;
     try {
       await kEdgeDockChannel.invokeMethod(
         'snapshot',
         jsonEncode(snapshot.toJson()),
       );
+      return true;
     } catch (e) {
       AppLogger.instance.warning(
         _tag,
         'Failed pushing snapshot to edge dock: $e',
       );
     }
+    return false;
   }
 
   Future<void> minimizeToTray() => windowManager.hide();

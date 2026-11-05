@@ -13,7 +13,7 @@ import '../../application/widget/mini_widget_snapshot.dart';
 import '../../core/logging/app_logger.dart';
 import '../../domain/enums/ui_enums.dart';
 import '../../infrastructure/tray/desktop_window_controller.dart'
-    show kEdgeDockChannel;
+    show kEdgeDockChannel, kWidgetOrphanTimeout;
 import '../../infrastructure/tray/edge_dock_geometry.dart';
 import '../theme/app_theme.dart';
 import 'edge_dock_view.dart';
@@ -144,6 +144,19 @@ class _EdgeDockAppState extends State<EdgeDockApp>
           if (mounted) setState(() {});
         });
 
+    _orphanTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (DateTime.now().difference(_lastBeat) > kWidgetOrphanTimeout) {
+        AppLogger.instance.info(
+          _tag,
+          'No heartbeat from the main app - closing orphaned dock window',
+        );
+        _orphanTimer?.cancel();
+        unawaited(
+          windowManager.close().catchError((_) => widget.controller.hide()),
+        );
+      }
+    });
+
     kEdgeDockChannel.setMethodCallHandler(_handleMethodCall);
     unawaited(kEdgeDockChannel.invokeMethod('ready').catchError((_) {}));
     unawaited(_initWindow());
@@ -153,6 +166,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   void dispose() {
     _expansionController.dispose();
     _panelController.dispose();
+    _orphanTimer?.cancel();
     _collapseDebouncer.dispose();
     super.dispose();
   }
@@ -160,6 +174,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'snapshot':
+        _lastBeat = DateTime.now();
         final payload =
             jsonDecode(call.arguments as String) as Map<String, dynamic>;
         final newSnapshot = MiniWidgetSnapshot.fromJson(payload);
@@ -190,6 +205,12 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   }
 
   bool _windowReady = false;
+
+  // Proof-of-life from the main app (see kWidgetHeartbeat). If it stops - the
+  // main app was restarted or died - this window is an orphan and would show
+  // frozen numbers forever, so it closes itself.
+  DateTime _lastBeat = DateTime.now();
+  Timer? _orphanTimer;
 
   Future<void> _initWindow() async {
     try {

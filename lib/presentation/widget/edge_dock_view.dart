@@ -712,54 +712,115 @@ class _ShapeClipper extends CustomClipper<Path> {
       oldClipper.painter.edge != painter.edge;
 }
 
+/// ============================================================
+///  HINT ARC TUNING  - change these to adjust the two arcs.
+/// ============================================================
+/// The thin arcs drawn beyond each curved end of the rail (they fade out and
+/// the hand / gear button takes over on hover). All values are logical px.
+abstract final class DockArcTuning {
+  /// Length of the arc along the rail's end (the rail is 76 px wide).
+  static const double span = 30;
+
+  /// How far the middle of the arc sags toward the rail body.
+  /// Small = nearly flat line, large = deeper curve.
+  static const double depth = 4;
+
+  /// Line thickness.
+  static const double strokeWidth = 8;
+
+  /// Shifts the arc toward (+) or away from (-) the rail body. 0 centres it
+  /// in the margin between the rail's end and the dock window's edge.
+  static const double shiftTowardBody = 20;
+
+  /// Opacity of the arc's colour (it uses the rail's own fill colour).
+  static const double opacity = 0.9;
+
+  /// Smoothness of the draw-on / flatten animation.
+  static const Duration animation = Duration(milliseconds: 320);
+}
+
 /// The thin curved hint drawn at each end of the rail while its handle is
 /// hidden, so there is something to find with the pointer. [outward] is the
 /// direction the arc bulges (away from the rail body).
 class _ArcHintPainter extends CustomPainter {
-  _ArcHintPainter({required this.outward, required this.color});
+  _ArcHintPainter({
+    required this.outward,
+    required this.color,
+    this.flatten = 0,
+    this.reveal = 1,
+  });
 
+  /// The side the arc dips toward (toward the rail body).
   final AxisDirection outward;
   final Color color;
 
-  /// Same radius as the rail's concave end sweep, so the hint reads as part of
-  /// the same outline instead of a differently-curved decoration.
-  static const double radius = EdgeDockGeometry.filletRadius;
+  /// 0..1: how far the dip has flattened out (hover).
+  final double flatten;
+
+  /// 0..1: how much of the arc is drawn, growing from its centre outward.
+  final double reveal;
+
+  /// Length of the arc along the rail's end.
+  static const double span = DockArcTuning.span;
+  static const double _depth = DockArcTuning.depth;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.4
-      ..strokeCap = StrokeCap.butt;
-    final w = size.width;
-    final h = size.height;
-    const r = Radius.circular(radius);
-    final path = Path();
-    switch (outward) {
-      case AxisDirection.up:
-        path
-          ..moveTo(0, h)
-          ..arcToPoint(Offset(w, h), radius: r);
-      case AxisDirection.down:
-        path
-          ..moveTo(0, 0)
-          ..arcToPoint(Offset(w, 0), radius: r, clockwise: false);
-      case AxisDirection.left:
-        path
-          ..moveTo(w, 0)
-          ..arcToPoint(Offset(w, h), radius: r, clockwise: false);
-      case AxisDirection.right:
-        path
-          ..moveTo(0, 0)
-          ..arcToPoint(Offset(0, h), radius: r);
+    if (reveal <= 0 || flatten >= 1) return;
+    final horizontal =
+        outward == AxisDirection.up || outward == AxisDirection.down;
+    final along = horizontal ? size.width : size.height;
+    final across = horizontal ? size.height : size.width;
+    final depth = _depth * (1 - Curves.easeInOutCubic.transform(flatten));
+
+    // Map (u along the arc, v depth into the dip) to canvas coordinates.
+    Offset pt(double u, double v) => switch (outward) {
+      AxisDirection.down => Offset(u, 1 + v),
+      AxisDirection.up => Offset(u, across - 1 - v),
+      AxisDirection.right => Offset(1 + v, u),
+      AxisDirection.left => Offset(across - 1 - v, u),
+    };
+
+    // One wide, shallow circular arc through the chord (depth is small
+    // compared with the span, so the ends meet the line almost tangentially -
+    // no abrupt drop). Radius from chord/sagitta: r = (c^2/4 + s^2) / (2s).
+    final from0 = pt(0, 0);
+    final to0 = pt(along, 0);
+    final path = Path()..moveTo(from0.dx, from0.dy);
+    if (depth < 0.4) {
+      path.lineTo(to0.dx, to0.dy);
+    } else {
+      final r = (along * along / 4 + depth * depth) / (2 * depth);
+      final clockwise =
+          outward == AxisDirection.up || outward == AxisDirection.right;
+      path.arcToPoint(to0, radius: Radius.circular(r), clockwise: clockwise);
     }
-    canvas.drawPath(path, paint);
+
+    final metric = path.computeMetrics().first;
+    final len = metric.length;
+    final visible = Curves.easeOutCubic.transform(reveal) * len;
+    final from = (len - visible) / 2;
+    final drawn = metric.extractPath(from, from + visible);
+
+    canvas.drawPath(
+      drawn,
+      Paint()
+        ..color = color.withValues(
+          alpha: color.a * (1 - (flatten * 2).clamp(0.0, 1.0)),
+        )
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = DockArcTuning.strokeWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _ArcHintPainter old) =>
-      old.outward != outward || old.color != color;
+      old.outward != outward ||
+      old.color != color ||
+      old.flatten != flatten ||
+      old.reveal != reveal;
 }
 
 /// A round glass button that floats beyond a curved end of the rail and only
@@ -848,33 +909,60 @@ class _EdgeHandleButtonState extends State<_EdgeHandleButton> {
             height: 40,
             child: Stack(
               alignment: Alignment.center,
+              // The arc is longer than this hit box; never clip it.
+              clipBehavior: Clip.none,
               children: [
-                // Resting hint: a faint arc, replaced by the button on hover.
+                // Resting hint: a wide, shallow arc. On hover it flattens out
+                // and fades while the button grows in, so the two read as one
+                // motion instead of a swap.
                 IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _active ? 0 : widget.presence.clamp(0.0, 1.0),
-                    duration: duration,
-                    curve: Curves.easeOut,
-                    child: SizedBox(
-                      width:
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: _active ? 1.0 : 0.0),
+                    duration: widget.reducedMotion
+                        ? Duration.zero
+                        : DockArcTuning.animation,
+                    curve: Curves.easeInOutCubic,
+                    builder: (context, t, _) {
+                      final horizontal =
                           widget.outward == AxisDirection.up ||
-                              widget.outward == AxisDirection.down
-                          ? 28
-                          : 6,
-                      height:
-                          widget.outward == AxisDirection.up ||
-                              widget.outward == AxisDirection.down
-                          ? 6
-                          : 28,
-                      child: CustomPaint(
-                        painter: _ArcHintPainter(
-                          outward: widget.outward,
-                          // Exactly the rail's fill, so the hint is visibly the same
-                          // surface as the dock.
-                          color: widget.theme.background.withValues(alpha: 0.9),
+                          widget.outward == AxisDirection.down;
+                      final toward =
+                          DockArcTuning.shiftTowardBody *
+                          (widget.outward == AxisDirection.down ||
+                                  widget.outward == AxisDirection.right
+                              ? 1
+                              : -1);
+                      // OverflowBox: the Stack hands its children at most the
+                      // 52x40 hit box, which used to squeeze the 68 px arc
+                      // (and clip it on left/right docks) - deforming it.
+                      return OverflowBox(
+                        minWidth: 0,
+                        minHeight: 0,
+                        maxWidth: double.infinity,
+                        maxHeight: double.infinity,
+                        child: Transform.translate(
+                          offset: horizontal
+                              ? Offset(0, toward)
+                              : Offset(toward, 0),
+                          child: SizedBox(
+                            width: horizontal ? _ArcHintPainter.span : 10,
+                            height: horizontal ? 10 : _ArcHintPainter.span,
+                            child: CustomPaint(
+                              painter: _ArcHintPainter(
+                                outward: widget.outward,
+                                // Exactly the rail's fill, so the hint is visibly
+                                // the same surface as the dock.
+                                color: widget.theme.background.withValues(
+                                  alpha: DockArcTuning.opacity,
+                                ),
+                                flatten: t,
+                                reveal: widget.presence.clamp(0.0, 1.0),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
                 Center(
@@ -981,7 +1069,9 @@ class _DetailCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = accentOverride ?? severityColor(device.severity, theme);
     final rows = edgeDockDetailRows(device, visibleMetrics);
-    final usedPercent = (device.fraction * 100).round();
+    // Capacity, not temperature: [fraction] is the temperature gauge.
+    final used = device.usedFraction;
+    final usedPercent = ((used ?? 0) * 100).round();
     final leftPercent = (100 - usedPercent).clamp(0, 100);
 
     final metricRows = rows.skip(1).toList(growable: false);
@@ -1126,7 +1216,7 @@ class _DetailCard extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(3),
                     child: LinearProgressIndicator(
-                      value: device.fraction.clamp(0.0, 1.0) * stage(0.2, 0.95),
+                      value: (used ?? 0).clamp(0.0, 1.0) * stage(0.2, 0.95),
                       backgroundColor: Colors.white.withValues(alpha: 0.10),
                       valueColor: AlwaysStoppedAnimation<Color>(color),
                       minHeight: 5,
@@ -1139,7 +1229,9 @@ class _DetailCard extends StatelessWidget {
                     SizedBox(
                       height: 14,
                       child: Text(
-                        '$usedPercent% used · $leftPercent% free',
+                        used == null
+                            ? 'Capacity unavailable'
+                            : '$usedPercent% used · $leftPercent% free',
                         maxLines: 1,
                         style: TextStyle(
                           color: theme.mutedText,

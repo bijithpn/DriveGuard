@@ -10,10 +10,10 @@ void main() {
 
   group('EdgeDockGeometry Constants', () {
     test('thickness constants match design specifications', () {
-      expect(EdgeDockGeometry.railThickness, 68.0);
+      expect(EdgeDockGeometry.railThickness, 76.0);
       expect(EdgeDockGeometry.collapsedThickness, 14.0);
-      expect(EdgeDockGeometry.ringDiameter, 40.0);
-      expect(EdgeDockGeometry.itemBlockLength, 58.0);
+      expect(EdgeDockGeometry.ringDiameter, 44.0);
+      expect(EdgeDockGeometry.itemBlockLength, 66.0);
     });
   });
 

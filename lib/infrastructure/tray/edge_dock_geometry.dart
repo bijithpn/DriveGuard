@@ -16,11 +16,17 @@ class EdgeDockGeometry {
   static const double itemBlockLength =
       66; // ring (44) + spacing (6) + value label (16)
   static const double itemSpacing = 22;
-  static const double filletRadius = 22;
+
+  /// Depth of the concave end sweep (how far it reaches into the rail).
+  static const double filletRadius = 26;
+
+  /// Length of the end sweep along the screen edge - longer than it is deep,
+  /// so the curve is gradual instead of a tight corner.
+  static const double sweepLength = 44;
 
   /// Reserved space at each end of the rail, outside the body, where the
   /// concave sweep lives and the move / open handles float on hover.
-  static const double endMargin = 44;
+  static const double endMargin = 56;
 
   /// Inner breathing room between the rail body's ends and its first/last
   /// item (the body itself starts after the concave sweep margin).

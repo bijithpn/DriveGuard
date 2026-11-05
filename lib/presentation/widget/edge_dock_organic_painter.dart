@@ -27,6 +27,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
     this.showPod = true,
     this.filletRadius = 18.0,
     this.endMargin,
+    this.sweepLength,
     this.dockDepth = 52.0,
     this.collapsedDepth = 8.0,
     this.glass = false,
@@ -53,6 +54,10 @@ class EdgeDockOrganicPainter extends CustomPainter {
   /// Reserved length at each end of the rail that the body does not cover.
   /// Defaults to [filletRadius].
   final double? endMargin;
+
+  /// Length of the concave end sweep along the edge (defaults to
+  /// [filletRadius], i.e. a circular quarter). Longer = more gradual.
+  final double? sweepLength;
   final double dockDepth;
   final double collapsedDepth;
   final List<BoxShadow>? shadows;
@@ -90,23 +95,23 @@ class EdgeDockOrganicPainter extends CustomPainter {
     final margin = endMargin ?? filletRadius;
     final yTop = margin;
     final yb = length - margin; // body bottom
+    // The sweep shrinks in proportion while the rail is collapsed.
+    final sweepScale = filletRadius == 0 ? 1.0 : f / filletRadius;
+    final l = math.min((sweepLength ?? filletRadius) * sweepScale, margin);
+    // Cubic "continuous curvature" blend: handles 64% of the leg length
+    // (a circle would use ~45%), which flattens the ends of the curve into
+    // the edge and the body for a softer, more gradual transition.
+    const k = 0.64;
+
     return Path()
-      ..moveTo(0, yTop - f)
-      ..arcToPoint(
-        Offset(f, yTop),
-        radius: Radius.circular(f),
-        clockwise: false,
-      )
+      ..moveTo(0, yTop - l)
+      ..cubicTo(0, yTop - l * (1 - k), f * (1 - k), yTop, f, yTop)
       ..lineTo(d - rc, yTop)
       ..arcToPoint(Offset(d, yTop + rc), radius: Radius.circular(rc))
       ..lineTo(d, yb - rc)
       ..arcToPoint(Offset(d - rc, yb), radius: Radius.circular(rc))
       ..lineTo(f, yb)
-      ..arcToPoint(
-        Offset(0, yb + f),
-        radius: Radius.circular(f),
-        clockwise: false,
-      );
+      ..cubicTo(f * (1 - k), yb, 0, yb + l * (1 - k), 0, yb + l);
   }
 
   Path _computeCanonicalFillPath(double length) {
@@ -235,6 +240,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
         oldDelegate.showPod != showPod ||
         oldDelegate.filletRadius != filletRadius ||
         oldDelegate.endMargin != endMargin ||
+        oldDelegate.sweepLength != sweepLength ||
         oldDelegate.dockDepth != dockDepth ||
         oldDelegate.collapsedDepth != collapsedDepth ||
         oldDelegate.glass != glass ||

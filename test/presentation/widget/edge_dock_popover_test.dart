@@ -16,6 +16,7 @@ void main() {
     name: 'Samsung 990 PRO',
     valueText: '45°C',
     fraction: 0.65,
+    usedFraction: 0.65,
     severity: TemperatureSeverity.normal,
     type: StorageDeviceType.nvme,
     healthStatus: 'GOOD',

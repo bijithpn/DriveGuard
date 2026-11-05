@@ -21,7 +21,7 @@ import '../domain/enums/ui_enums.dart';
 import '../infrastructure/native/native_widget_bridge.dart';
 import '../infrastructure/tray/app_tray_service.dart';
 import '../infrastructure/tray/desktop_window_controller.dart'
-    show kEdgeDockChannel, kWidgetChannel;
+    show kEdgeDockChannel, kWidgetChannel, kWidgetHeartbeat;
 import 'components/device_presentation.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'device_details/device_details_screen.dart';
@@ -61,6 +61,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   MiniWidgetSnapshot? _lastPushedEdgeDockSnapshot;
   MiniWidgetSnapshot? _lastNativeWidgetSnapshot;
   DateTime? _lastNativeWidgetPushAt;
+  Timer? _widgetHeartbeat;
 
   static const _nativeWidgetPushInterval = Duration(seconds: 20);
 
@@ -78,6 +79,7 @@ class _AppRootState extends ConsumerState<AppRoot>
     kWidgetChannel.setMethodCallHandler(_handleWidgetChannelCall);
     kEdgeDockChannel.setMethodCallHandler(_handleEdgeDockChannelCall);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initTray());
+    _startWidgetHeartbeat();
 
     _notificationClickSub = ref
         .read(notificationServiceProvider)
@@ -267,6 +269,16 @@ class _AppRootState extends ConsumerState<AppRoot>
   }
 
   Future<void> _initTray() async {
+    try {
+      await _initTrayImpl();
+    } finally {
+      // A minimised start keeps the main window transparent until the
+      // floating widgets are up (see DesktopWindowController.initialize).
+      await widget.windowController.completeStartMinimized();
+    }
+  }
+
+  Future<void> _initTrayImpl() async {
     // Saved settings could have both floating widgets enabled; keep one.
     final saved = ref.read(settingsProvider);
     if (saved.widget.enabled && saved.edgeDock.enabled) {
@@ -461,6 +473,17 @@ class _AppRootState extends ConsumerState<AppRoot>
     await tray.updateSeverity(worst);
   }
 
+  /// Capacity in use as 0..1, from whatever the backend could read.
+  double? _usedFraction(StorageDevice d) {
+    final c = d.capacity;
+    final total = c.totalBytes;
+    if (total == null || total <= 0) return null;
+    final used =
+        c.usedBytes ?? (c.freeBytes != null ? total - c.freeBytes! : null);
+    if (used == null) return null;
+    return (used / total).clamp(0.0, 1.0);
+  }
+
   MiniWidgetSnapshot _buildSnapshot() {
     final settings = ref.read(settingsProvider);
     final deviceList = ref.read(devicesProvider);
@@ -509,6 +532,7 @@ class _AppRootState extends ConsumerState<AppRoot>
           writeSpeedText: writeSpeed,
           tbwText: tbwText,
           powerOnHoursText: powerOnHoursText,
+          usedFraction: _usedFraction(d),
         ),
       );
     }
@@ -539,21 +563,53 @@ class _AppRootState extends ConsumerState<AppRoot>
     final snapshot = _buildSnapshot();
 
     _maybePushNativeWidgetSnapshot(snapshot, force: force);
+    await _pushToMiniWindow(snapshot, force: force);
+  }
 
+  Future<void> _pushToMiniWindow(
+    MiniWidgetSnapshot snapshot, {
+    bool force = false,
+  }) async {
     if (!ref.read(widgetModeActiveProvider)) return;
     if (!force && _lastPushedSnapshot == snapshot) return;
-    _lastPushedSnapshot = snapshot;
-
-    await widget.windowController.updateMiniWindowSnapshot(snapshot);
+    // Only remember a snapshot as delivered once the window really got it. It
+    // used to be recorded first, so one dropped push (window still starting,
+    // channel briefly unreachable) made every identical follow-up a no-op and
+    // the widget sat on stale numbers.
+    final delivered = await widget.windowController.updateMiniWindowSnapshot(
+      snapshot,
+    );
+    _lastPushedSnapshot = delivered ? snapshot : null;
   }
 
   Future<void> _pushSnapshotToEdgeDockIfActive({bool force = false}) async {
     if (!ref.read(edgeDockActiveProvider)) return;
     final snapshot = _buildSnapshot();
     if (!force && _lastPushedEdgeDockSnapshot == snapshot) return;
-    _lastPushedEdgeDockSnapshot = snapshot;
+    final delivered = await widget.windowController.updateEdgeDockSnapshot(
+      snapshot,
+    );
+    _lastPushedEdgeDockSnapshot = delivered ? snapshot : null;
+  }
 
-    await widget.windowController.updateEdgeDockSnapshot(snapshot);
+  /// Re-sends the current snapshot to whichever floating window is open on a
+  /// fixed beat. It doubles as the windows' proof-of-life: a window that stops
+  /// hearing it (main app restarted, crashed) closes itself, so a stale
+  /// leftover can never sit on screen showing old numbers.
+  void _startWidgetHeartbeat() {
+    _widgetHeartbeat?.cancel();
+    _widgetHeartbeat = Timer.periodic(kWidgetHeartbeat, (_) {
+      if (!mounted) return;
+      final snapshot = _buildSnapshot();
+      unawaited(_pushToMiniWindow(snapshot, force: true));
+      if (ref.read(edgeDockActiveProvider)) {
+        unawaited(
+          widget.windowController
+              .updateEdgeDockSnapshot(snapshot)
+              .then((ok) => _lastPushedEdgeDockSnapshot = ok ? snapshot : null),
+        );
+      }
+    });
   }
 
   // Window open/close requests are queued, never dropped: a toggle that
@@ -640,6 +696,7 @@ class _AppRootState extends ConsumerState<AppRoot>
 
   @override
   void dispose() {
+    _widgetHeartbeat?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     windowManager.removeListener(this);
     unawaited(_notificationClickSub?.cancel());

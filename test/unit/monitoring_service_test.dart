@@ -575,6 +575,53 @@ void main() {
     await service.dispose();
   });
 
+  test(
+    'a few failed sensor reads keep the last temperature (marked stale) '
+    'instead of flashing N/A, and a sustained outage finally clears it',
+    () async {
+      final backend = _ScriptedMonitor([_device('nvme-1')]);
+      backend.nextReadingOrError['nvme-1'] = 40.0;
+      final service = MonitoringService(
+        backend: backend,
+        notifications: FakeNotificationService(),
+        historyStore: TemperatureHistoryStore(),
+      );
+      await service.start(
+        const AppSettings(pollingInterval: Duration(minutes: 5)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      StorageDevice device() =>
+          service.currentDevices.firstWhere((d) => d.id == 'nvme-1');
+      expect(device().primaryTemperature?.celsius, 40.0);
+
+      // The sensor goes quiet (readTemperature returns null).
+      backend.nextReadingOrError.remove('nvme-1');
+      for (var i = 0; i < 3; i++) {
+        await service.refreshNow(deviceId: 'nvme-1');
+        expect(
+          device().primaryTemperature?.celsius,
+          40.0,
+          reason: 'a transient miss (${i + 1}/3) must not wipe the reading',
+        );
+        expect(device().monitoringStatus, MonitoringStatus.staleData);
+      }
+
+      // Still silent: now it really is unavailable.
+      await service.refreshNow(deviceId: 'nvme-1');
+      expect(device().primaryTemperature, isNull);
+      expect(device().monitoringStatus, MonitoringStatus.sensorUnavailable);
+
+      // And it recovers as soon as a reading comes back.
+      backend.nextReadingOrError['nvme-1'] = 42.0;
+      await service.refreshNow(deviceId: 'nvme-1');
+      expect(device().primaryTemperature?.celsius, 42.0);
+      expect(device().monitoringStatus, MonitoringStatus.active);
+
+      await service.dispose();
+    },
+  );
+
   test('refreshNow works even while monitoring is paused', () async {
     final device = _device('nvme-1');
     final backend = _ScriptedMonitor([device]);

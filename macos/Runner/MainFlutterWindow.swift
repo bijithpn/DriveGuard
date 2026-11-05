@@ -36,6 +36,15 @@ class MainFlutterWindow: NSWindow {
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
+        // These windows are created with a normal title bar and only become
+        // frameless once Dart has run its setup. Strip the title bar
+        // immediately so even a first visible frame never shows the dark bar
+        // with traffic-light buttons.
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.standardWindowButton(.closeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
       }
 
       // By default AppKit only delivers mouseMoved: events to the *key*

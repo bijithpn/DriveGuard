@@ -10,7 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../application/widget/mini_widget_snapshot.dart';
 import '../../core/logging/app_logger.dart';
 import '../../infrastructure/tray/desktop_window_controller.dart'
-    show kWidgetChannel, kWidgetMinimumSize;
+    show kWidgetChannel, kWidgetMinimumSize, kWidgetOrphanTimeout;
 import '../theme/app_theme.dart';
 import 'mini_monitor_view.dart';
 
@@ -32,6 +32,10 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
   MiniWidgetSnapshot _snapshot = MiniWidgetSnapshot.empty;
   bool _closing = false;
 
+  // See _EdgeDockAppState: close ourselves if the main app stops talking.
+  DateTime _lastBeat = DateTime.now();
+  Timer? _orphanTimer;
+
   @override
   void initState() {
     super.initState();
@@ -41,15 +45,35 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
         _snapshot = MiniWidgetSnapshot.fromJson(snapJson);
       } catch (_) {}
     }
+    _orphanTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (DateTime.now().difference(_lastBeat) > kWidgetOrphanTimeout) {
+        AppLogger.instance.info(
+          'MiniWidgetApp',
+          'No heartbeat from the main app - closing orphaned widget window',
+        );
+        _orphanTimer?.cancel();
+        unawaited(
+          windowManager.close().catchError((_) => widget.controller.hide()),
+        );
+      }
+    });
+
     kWidgetChannel.setMethodCallHandler(_handleMethodCall);
 
     unawaited(kWidgetChannel.invokeMethod('ready').catchError((_) {}));
     unawaited(_applyInitialWindowState());
   }
 
+  @override
+  void dispose() {
+    _orphanTimer?.cancel();
+    super.dispose();
+  }
+
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'snapshot':
+        _lastBeat = DateTime.now();
         final payload =
             jsonDecode(call.arguments as String) as Map<String, dynamic>;
         final newSnapshot = MiniWidgetSnapshot.fromJson(payload);

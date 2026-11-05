@@ -82,6 +82,16 @@ class MonitoringService {
   final SsdLifeAdvisor _advisor = const SsdLifeAdvisor();
   final Set<String> _advisoriesSent = {};
   final Map<String, int> _rejectedStreak = {};
+
+  // A single failed sensor read (a smartctl hiccup, a busy bus) used to wipe
+  // the temperature at once, so every UI sampling at that instant - the dock
+  // and mini widget re-read every 2s - showed "N/A" while the dashboard,
+  // which re-reads a moment later, looked fine. Keep the last reading (marked
+  // stale) until the sensor has stayed silent for several polls in a row.
+  final Map<String, int> _nullReadStreak = {};
+  static const int _transientNullReadsAllowed = 3;
+  final Map<String, int> _healthUnavailableStreak = {};
+  static const int _transientHealthFailuresAllowed = 5;
   bool _hotCadence = false;
   final String? _sessionId;
 
@@ -572,6 +582,19 @@ class MonitoringService {
 
       final current = _devices[id];
       if (current == null) return;
+      // Same idea as temperature: a one-off failed SMART read must not
+      // replace good health data with "UNAVAILABLE".
+      final lostData =
+          health.status == DeviceHealthStatus.unavailable &&
+          current.health.status != DeviceHealthStatus.unavailable &&
+          current.health.status != DeviceHealthStatus.unknown;
+      if (lostData) {
+        final streak = (_healthUnavailableStreak[id] ?? 0) + 1;
+        _healthUnavailableStreak[id] = streak;
+        if (streak <= _transientHealthFailuresAllowed) return;
+      } else {
+        _healthUnavailableStreak.remove(id);
+      }
       final updated = current.copyWith(health: health);
       _devices[id] = updated;
       final wear = health.percentageUsed;
@@ -855,7 +878,14 @@ class MonitoringService {
       final current = _devices[id];
       if (current == null) return;
 
-      if (reading == null) {
+      if (reading == null &&
+          previousReading != null &&
+          (_nullReadStreak[id] = (_nullReadStreak[id] ?? 0) + 1) <=
+              _transientNullReadsAllowed) {
+        _devices[id] = current.copyWith(
+          monitoringStatus: MonitoringStatus.staleData,
+        );
+      } else if (reading == null) {
         _thermalProtection?.onSensorLost(id);
         _devices[id] = current.copyWith(
           sensorAvailability: SensorAvailability.unsupported,
@@ -865,6 +895,7 @@ class MonitoringService {
           clearLastError: true,
         );
       } else {
+        _nullReadStreak.remove(id);
         var plausible = TemperatureUtils.isPlausibleValue(reading.celsius);
         if (plausible && previousReading != null && previousReading.isValid) {
           plausible = TemperatureUtils.isPlausibleTransition(
