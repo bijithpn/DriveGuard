@@ -57,35 +57,54 @@ class EdgeDockOrganicPainter extends CustomPainter {
 
   /// Builds and returns the calculated [Path] for the given [size].
   Path computePath(Size size) {
-    return _transformPathForEdge(_computeCanonicalFillPath(), size);
+    return _transformPathForEdge(
+      _computeCanonicalFillPath(_alongLength(size)),
+      size,
+    );
   }
 
-  /// A clean pill flush to the screen edge (canonical orientation: docked to
-  /// the left, growing to the right): square where it meets the screen edge,
-  /// fully rounded on the free side. Same overall length as before, so all
-  /// window geometry stays valid; the old concave "ears" and pinched neck
-  /// toward the settings pod are gone.
-  Path _computeCanonicalStrokePath() {
+  /// The rail silhouette in canonical orientation (docked to the left edge,
+  /// growing to the right): the screen edge sweeps into the body through a
+  /// smooth concave quarter-circle at both ends, and the free side is a
+  /// wide, fully rounded face. Everything is built from circular arcs that
+  /// meet tangentially, so there are no kinks or pinched "necks".
+  ///
+  /// The body occupies y in [filletRadius, total - filletRadius]; the
+  /// concave sweeps live in the reserved filletRadius margins above/below
+  /// it, so ring positions never depend on the animation state.
+  double _alongLength(Size size) =>
+      (edge == ScreenEdge.left || edge == ScreenEdge.right)
+      ? size.height
+      : size.width;
+
+  Path _computeCanonicalStrokePath(double length) {
     final clamped = expansionProgress.clamp(0.0, 1.0);
     final d = collapsedDepth + (dockDepth - collapsedDepth) * clamped;
-    final r = math.min(filletRadius, d / 2);
-    final yTotal =
-        filletRadius +
-        mainRailLength +
-        (showPod ? podSpacing + podDiameter : 0) +
-        filletRadius;
-
+    final f = math.min(filletRadius, d * 0.45); // concave sweep radius
+    final rc = math.max(0.0, math.min(26.0, d - f)); // convex face radius
+    final yTop = filletRadius;
+    final yb = length - filletRadius; // body bottom
     return Path()
-      ..moveTo(0, 0)
-      ..lineTo(d - r, 0)
-      ..arcToPoint(Offset(d, r), radius: Radius.circular(r))
-      ..lineTo(d, yTotal - r)
-      ..arcToPoint(Offset(d - r, yTotal), radius: Radius.circular(r))
-      ..lineTo(0, yTotal);
+      ..moveTo(0, yTop - f)
+      ..arcToPoint(
+        Offset(f, yTop),
+        radius: Radius.circular(f),
+        clockwise: false,
+      )
+      ..lineTo(d - rc, yTop)
+      ..arcToPoint(Offset(d, yTop + rc), radius: Radius.circular(rc))
+      ..lineTo(d, yb - rc)
+      ..arcToPoint(Offset(d - rc, yb), radius: Radius.circular(rc))
+      ..lineTo(f, yb)
+      ..arcToPoint(
+        Offset(0, yb + f),
+        radius: Radius.circular(f),
+        clockwise: false,
+      );
   }
 
-  Path _computeCanonicalFillPath() {
-    final path = _computeCanonicalStrokePath();
+  Path _computeCanonicalFillPath(double length) {
+    final path = _computeCanonicalStrokePath(length);
     path.lineTo(0, 0);
     path.close();
     return path;
@@ -144,9 +163,13 @@ class EdgeDockOrganicPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
-    final fillPath = _transformPathForEdge(_computeCanonicalFillPath(), size);
+    final length = _alongLength(size);
+    final fillPath = _transformPathForEdge(
+      _computeCanonicalFillPath(length),
+      size,
+    );
     final strokePath = _transformPathForEdge(
-      _computeCanonicalStrokePath(),
+      _computeCanonicalStrokePath(length),
       size,
     );
 

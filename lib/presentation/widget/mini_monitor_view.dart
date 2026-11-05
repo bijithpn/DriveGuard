@@ -166,7 +166,7 @@ class _SingleDeviceCard extends StatelessWidget {
                   painter: _MiniGaugePainter(
                     fraction: device.fraction,
                     color: style.color,
-                    trackColor: AppColors.bg2,
+                    trackColor: Colors.white.withValues(alpha: 0.10),
                   ),
                   child: Center(
                     child: Column(
@@ -259,9 +259,9 @@ class _MiniStatChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
         decoration: BoxDecoration(
-          color: AppColors.bg2,
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: AppColors.border),
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -368,32 +368,31 @@ class _WidgetShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Frosted-glass surface matching the edge dock: translucent tinted fill,
+    // hairline light border and a soft diagonal sheen. No drop shadow - the
+    // window is exactly this size, so it could only be clipped into a dark
+    // band along the edges.
     return Container(
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.bg1,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.bg3, width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowDark,
-            blurRadius: 24,
-            spreadRadius: 0,
-            offset: Offset(0, 6),
-          ),
-
-          BoxShadow(
-            color: Color(0x0CFFFFFF),
-            blurRadius: 0,
-            spreadRadius: -1,
-            offset: Offset(0, 1),
-          ),
-        ],
+        color: AppColors.bg1.withValues(alpha: 0.90),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: child,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0x2EFFFFFF), Color(0x08FFFFFF), Color(0x12FFFFFF)],
+              stops: [0.0, 0.55, 1.0],
+            ),
+          ),
+          child: child,
+        ),
       ),
     );
   }
@@ -460,8 +459,8 @@ class _Header extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
               decoration: BoxDecoration(
-                color: AppColors.bg3,
-                borderRadius: BorderRadius.circular(3),
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 '$deviceCount',

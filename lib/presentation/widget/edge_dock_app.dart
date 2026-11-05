@@ -37,7 +37,7 @@ class EdgeDockApp extends StatefulWidget {
 }
 
 class _EdgeDockAppState extends State<EdgeDockApp>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _tag = 'EdgeDockApp';
 
   MiniWidgetSnapshot _snapshot = MiniWidgetSnapshot.empty;
@@ -56,6 +56,15 @@ class _EdgeDockAppState extends State<EdgeDockApp>
 
   late final AnimationController _expansionController;
   late final Animation<double> _expansionAnimation;
+
+  // The detail card animates in *and out*. [_panelIndex] is the device whose
+  // card is currently rendered - it outlives the hover/pin that opened it
+  // until the exit animation has finished, and only then is the OS window
+  // shrunk back (otherwise the card would be cut off mid-fade).
+  late final AnimationController _panelController;
+  late final Animation<double> _panelAnimation;
+  int? _panelIndex;
+  int? _lastWantedPanel;
 
   // Set by clicking a ring (or pressing Enter/Space while it's keyboard-
   // focused) - keeps the detail panel open without the pointer needing to
@@ -120,6 +129,20 @@ class _EdgeDockAppState extends State<EdgeDockApp>
           if (mounted) setState(() {});
         });
 
+    _panelController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+      reverseDuration: const Duration(milliseconds: 180),
+    );
+    _panelAnimation =
+        CurvedAnimation(
+          parent: _panelController,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
+
     kEdgeDockChannel.setMethodCallHandler(_handleMethodCall);
     unawaited(kEdgeDockChannel.invokeMethod('ready').catchError((_) {}));
     unawaited(_initWindow());
@@ -128,6 +151,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   @override
   void dispose() {
     _expansionController.dispose();
+    _panelController.dispose();
     _collapseDebouncer.dispose();
     super.dispose();
   }
@@ -147,7 +171,9 @@ class _EdgeDockAppState extends State<EdgeDockApp>
               _hoveredIndex = null;
             }
           });
-          unawaited(_applyWindowBounds());
+          // Before init finishes the display geometry is still a placeholder;
+          // _initWindow applies the real bounds itself.
+          if (_windowReady) unawaited(_applyWindowBounds());
         }
       case 'close':
         _collapseDebouncer.cancel();
@@ -162,63 +188,68 @@ class _EdgeDockAppState extends State<EdgeDockApp>
     return null;
   }
 
+  bool _windowReady = false;
+
   Future<void> _initWindow() async {
     try {
       await windowManager.ensureInitialized();
-      await windowManager.setAsFrameless();
-      await windowManager.setTitleBarStyle(
-        TitleBarStyle.hidden,
-        windowButtonVisibility: false,
-      );
-      if (!Platform.isLinux) {
-        await windowManager.setBackgroundColor(Colors.transparent);
-      } else {
-        await windowManager.setBackgroundColor(AppColors.bg1);
-      }
-      await windowManager.setAlwaysOnTop(true);
-      await windowManager.setSkipTaskbar(true);
-      await windowManager.setResizable(false);
-      try {
-        await windowManager.setOpacity(_opacity);
-      } catch (e) {
-        AppLogger.instance.debug(_tag, 'setOpacity failed: $e');
-      }
-      if (!Platform.isLinux) {
-        await windowManager.setHasShadow(false);
-      }
-      if (Platform.isMacOS) await _applyFullScreenAuxiliary();
+      // These native calls are independent - running them one after another
+      // (each a platform-channel round trip) was a large part of the delay
+      // before the dock appeared. Do them concurrently, together with the
+      // display lookup.
+      final displayFuture = _resolveDisplay();
+      await Future.wait<void>([
+        windowManager.setAsFrameless(),
+        windowManager.setTitleBarStyle(
+          TitleBarStyle.hidden,
+          windowButtonVisibility: false,
+        ),
+        windowManager.setBackgroundColor(
+          Platform.isLinux ? AppColors.bg1 : Colors.transparent,
+        ),
+        windowManager.setAlwaysOnTop(true),
+        windowManager.setSkipTaskbar(true),
+        windowManager.setResizable(false),
+        windowManager.setOpacity(_opacity).catchError((Object e) {
+          AppLogger.instance.debug(_tag, 'setOpacity failed: $e');
+        }),
+        if (!Platform.isLinux) windowManager.setHasShadow(false),
+        if (Platform.isMacOS) _applyFullScreenAuxiliary(),
+      ]);
 
-      final primary = await screenRetriever.getPrimaryDisplay();
-      var display = primary;
-      if (_displayId != null) {
-        try {
-          final all = await screenRetriever.getAllDisplays();
-          display = EdgeDockGeometry.pickDisplay(all, primary, _displayId);
-        } catch (e) {
-          AppLogger.instance.debug(_tag, 'getAllDisplays failed: $e');
-        }
-      }
+      final display = await displayFuture;
       _displayPosition = display.visiblePosition ?? Offset.zero;
       _displaySize = display.visibleSize ?? display.size;
 
+      _windowReady = true;
       await _applyWindowBounds();
     } catch (e) {
       AppLogger.instance.error(_tag, 'Error initializing edge dock window', e);
     } finally {
+      _windowReady = true;
+      AppLogger.instance.info(_tag, 'Edge dock window ready - showing');
+      // Show as soon as the bounds are set - one call is enough;
+      // windowManager.show() already orders the window front.
       try {
         await windowManager.show();
       } catch (_) {}
-      try {
-        await widget.controller.show();
-      } catch (_) {}
+      unawaited(widget.controller.show().catchError((_) {}));
       // Some macOS versions drop the fullscreen-auxiliary collection
-      // behavior applied earlier once `makeKeyAndOrderFront` runs (both
-      // `windowManager.show()` and `controller.show()` above call it) -
-      // reapplying once more after the window is actually on screen is
-      // what makes it stick, matching reports from other window_manager
-      // users hitting the same "dock disappears over fullscreen apps"
-      // symptom.
-      if (Platform.isMacOS) await _applyFullScreenAuxiliary();
+      // behavior once `makeKeyAndOrderFront` runs - reapply after the
+      // window is actually on screen so it sticks over fullscreen apps.
+      if (Platform.isMacOS) unawaited(_applyFullScreenAuxiliary());
+    }
+  }
+
+  Future<Display> _resolveDisplay() async {
+    final primary = await screenRetriever.getPrimaryDisplay();
+    if (_displayId == null) return primary;
+    try {
+      final all = await screenRetriever.getAllDisplays();
+      return EdgeDockGeometry.pickDisplay(all, primary, _displayId);
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'getAllDisplays failed: $e');
+      return primary;
     }
   }
 
@@ -261,9 +292,28 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   /// over merely hovered.
   int? get _displayedIndex => _pinnedIndex ?? _hoveredIndex;
 
+  /// Opens/closes the card to follow what the user wants shown
+  /// ([_displayedIndex]); called from build() whenever that changes.
+  void _syncPanel() {
+    final want = _dragging ? null : _displayedIndex;
+    if (want != null && want < _snapshot.devices.length) {
+      final changed = _panelIndex != want;
+      _panelIndex = want;
+      if (changed) unawaited(_applyWindowBounds());
+      _panelController.forward();
+    } else if (_panelIndex != null) {
+      _panelController.reverse().whenComplete(() {
+        if (!mounted) return;
+        final stillWanted = !_dragging && _displayedIndex != null;
+        if (stillWanted || _panelController.value > 0) return;
+        setState(() => _panelIndex = null);
+        unawaited(_applyWindowBounds());
+      });
+    }
+  }
+
   Rect? get _panelRect {
-    if (_dragging) return null;
-    final index = _displayedIndex;
+    final index = _panelIndex;
     if (index == null) return null;
     final devices = _snapshot.devices;
     if (index >= devices.length) return null;
@@ -512,6 +562,13 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   Widget build(BuildContext context) {
     final rail = _railRect;
     final panel = _panelRect;
+    final want = _dragging ? null : _displayedIndex;
+    if (want != _lastWantedPanel) {
+      _lastWantedPanel = want;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncPanel();
+      });
+    }
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
@@ -535,6 +592,8 @@ class _EdgeDockAppState extends State<EdgeDockApp>
           visibleMetrics: _visibleMetrics,
           isExpanded: _isExpanded,
           expansionProgress: _expansionAnimation.value,
+          panelIndex: _panelIndex,
+          panelProgress: _panelAnimation.value,
           onMouseEnterDock: _onMouseEnterDock,
           onMouseExitDock: _onMouseExitDock,
         ),

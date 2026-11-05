@@ -54,7 +54,7 @@ void main() {
               hoveredIndex: hoveredIndex,
               pinnedIndex: pinnedIndex,
               onHover: (_) {},
-              railLocalRect: const Rect.fromLTWH(400, 50, 64, 200),
+              railLocalRect: const Rect.fromLTWH(400, 50, 76, 288),
               // sampleDevice populates all 7 possible detail rows - size the
               // panel the same way production does (EdgeDockGeometry) rather
               // than a hardcoded guess, so this doesn't silently drift stale

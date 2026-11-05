@@ -47,7 +47,7 @@ void main() {
             accentOverride: null,
             hoveredIndex: hoveredIndex,
             onHover: onHover,
-            railLocalRect: const Rect.fromLTWH(300, 50, 64, 200),
+            railLocalRect: const Rect.fromLTWH(300, 50, 76, 288),
             panelLocalRect: hoveredIndex == null
                 ? null
                 : const Rect.fromLTWH(40, 50, 240, 168),
@@ -69,7 +69,7 @@ void main() {
     await tester.pump();
 
     // The first ring sits near the top of the rail rect (300,50,64,200).
-    await gesture.moveTo(const Offset(332, 80));
+    await gesture.moveTo(const Offset(338, 110));
     await tester.pump();
 
     expect(reported, 0);
@@ -85,7 +85,7 @@ void main() {
 
     final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
     addTearDown(gesture.removePointer);
-    await gesture.addPointer(location: const Offset(332, 80));
+    await gesture.addPointer(location: const Offset(338, 110));
     await tester.pump();
 
     // In production this widget is only ever given exactly the OS
@@ -109,7 +109,7 @@ void main() {
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       addTearDown(gesture.removePointer);
-      await gesture.addPointer(location: const Offset(332, 80));
+      await gesture.addPointer(location: const Offset(338, 110));
       await tester.pump();
       reportedValues.clear(); // Discard the initial hover-in from ring 0.
 
@@ -162,7 +162,7 @@ void main() {
             accentOverride: null,
             hoveredIndex: 0,
             onHover: (_) {},
-            railLocalRect: const Rect.fromLTWH(300, 50, 64, 200),
+            railLocalRect: const Rect.fromLTWH(300, 50, 76, 288),
             panelLocalRect: const Rect.fromLTWH(40, 50, 240, 168),
             visibleMetrics: visibleMetrics,
           ),
@@ -234,7 +234,7 @@ void main() {
               pinnedIndex: pinnedIndex,
               onHover: (_) {},
               onTapRing: (_) {},
-              railLocalRect: const Rect.fromLTWH(300, 50, 64, 200),
+              railLocalRect: const Rect.fromLTWH(300, 50, 76, 288),
               panelLocalRect: displayed == null
                   ? null
                   : const Rect.fromLTWH(40, 50, 240, 168),
@@ -268,7 +268,7 @@ void main() {
                 hoveredIndex: null,
                 onHover: (_) {},
                 onTapRing: (i) => tapped = i,
-                railLocalRect: const Rect.fromLTWH(300, 50, 64, 200),
+                railLocalRect: const Rect.fromLTWH(300, 50, 76, 288),
                 panelLocalRect: null,
               ),
             ),
@@ -277,7 +277,7 @@ void main() {
       );
 
       // Ring 0 sits near the top of the rail rect (300,50,64,200).
-      await tester.tapAt(const Offset(332, 80));
+      await tester.tapAt(const Offset(338, 110));
       await tester.pump();
 
       expect(tapped, 0);
@@ -302,7 +302,7 @@ void main() {
                   accentOverride: null,
                   hoveredIndex: 0,
                   onHover: (_) {},
-                  railLocalRect: const Rect.fromLTWH(300, 50, 64, 200),
+                  railLocalRect: const Rect.fromLTWH(300, 50, 76, 288),
                   panelLocalRect: const Rect.fromLTWH(40, 50, 240, 168),
                 ),
               ),
@@ -346,7 +346,7 @@ void main() {
                 accentOverride: null,
                 hoveredIndex: 1,
                 onHover: (_) {},
-                railLocalRect: const Rect.fromLTWH(300, 50, 64, 200),
+                railLocalRect: const Rect.fromLTWH(300, 50, 76, 288),
                 panelLocalRect: const Rect.fromLTWH(40, 50, 240, 168),
                 theme: theme,
               ),

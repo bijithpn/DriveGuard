@@ -149,8 +149,13 @@ class SeverityStyle {
 class AppTheme {
   const AppTheme._();
 
-  static ThemeData light() => _buildLight();
-  static ThemeData dark() => _buildDark();
+  // Built once: every MaterialApp rebuild (the dock rebuilds on each animation
+  // frame) used to reconstruct the whole ThemeData, including a seeded
+  // ColorScheme, which is expensive and caused visible jank.
+  static ThemeData? _lightCache;
+  static ThemeData? _darkCache;
+  static ThemeData light() => _lightCache ??= _buildLight();
+  static ThemeData dark() => _darkCache ??= _buildDark();
 
   static ThemeData _buildDark() {
     const seed = Color(0xFF3E7BFA);

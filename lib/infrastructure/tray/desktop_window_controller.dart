@@ -115,7 +115,7 @@ class DesktopWindowController with WindowListener {
         args['snapshot'] = initialSnapshot.toJson();
       }
       _miniWindow = await WindowController.create(
-        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: true),
+        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: false),
       );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Failed opening mini widget window', e);
@@ -240,7 +240,7 @@ class DesktopWindowController with WindowListener {
         args['snapshot'] = initialSnapshot.toJson();
       }
       _edgeDockWindow = await WindowController.create(
-        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: true),
+        WindowConfiguration(arguments: jsonEncode(args), hiddenAtLaunch: false),
       );
     } catch (e) {
       AppLogger.instance.error(_tag, 'Failed opening edge dock window', e);

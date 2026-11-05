@@ -274,6 +274,29 @@ class _AppRootState extends ConsumerState<AppRoot>
           );
     }
     final settings = ref.read(settingsProvider);
+    // Open the floating widget right away instead of after the tray icon and
+    // its device summary are set up - those had nothing to do with it and
+    // added their whole duration to the dock's appearance delay. The calls
+    // further down are idempotent no-ops once this has run.
+    if (settings.edgeDock.enabled) {
+      unawaited(
+        _syncEdgeDockMode(
+          true,
+          settings.edgeDock.edge,
+          accent: settings.edgeDock.accent,
+          opacity: settings.edgeDock.opacity,
+          displayId: settings.edgeDock.displayId,
+          backgroundColor: settings.edgeDock.backgroundColor,
+          textColor: settings.edgeDock.textColor,
+          warningColor: settings.edgeDock.warningColor,
+          criticalColor: settings.edgeDock.criticalColor,
+          visibleMetrics: settings.edgeDock.visibleMetrics,
+          positionOffset: settings.edgeDock.positionOffset,
+        ),
+      );
+    } else if (settings.widget.enabled) {
+      unawaited(_syncWidgetMode(true));
+    }
     if (!settings.showTrayIcon) {
       await _syncWidgetMode(settings.widget.enabled);
       await _syncEdgeDockMode(
@@ -703,21 +726,21 @@ class _AppRootState extends ConsumerState<AppRoot>
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
 
-    ref.listen<bool>(
-      settingsProvider.select((s) => s.widget.enabled),
-      (previous, enabled) {
-        // Only one floating widget at a time: the mini monitor and the
-        // edge dock are alternatives, not layers.
-        if (enabled && ref.read(settingsProvider).edgeDock.enabled) {
-          ref
-              .read(settingsProvider.notifier)
-              .updateWith(
-                (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(enabled: false)),
-              );
-        }
-        _syncWidgetMode(enabled);
-      },
-    );
+    ref.listen<bool>(settingsProvider.select((s) => s.widget.enabled), (
+      previous,
+      enabled,
+    ) {
+      // Only one floating widget at a time: the mini monitor and the
+      // edge dock are alternatives, not layers.
+      if (enabled && ref.read(settingsProvider).edgeDock.enabled) {
+        ref
+            .read(settingsProvider.notifier)
+            .updateWith(
+              (s) => s.copyWith(edgeDock: s.edgeDock.copyWith(enabled: false)),
+            );
+      }
+      _syncWidgetMode(enabled);
+    });
     ref.listen<
       (
         bool,

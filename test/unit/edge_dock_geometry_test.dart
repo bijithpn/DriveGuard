@@ -310,13 +310,16 @@ void main() {
       expect(EdgeDockGeometry.panelHeightFor(40, maxHeight: 300), 300);
     });
 
-    test('fits the real card: header 101 + sep 17 + 2*24 rows + 28 padding', () {
-      // Regression: the card overflowed by ~11px with the old constants.
-      expect(
-        EdgeDockGeometry.panelHeightFor(2),
-        greaterThanOrEqualTo(101 + 17 + 2 * 24 + 28),
-      );
-    });
+    test(
+      'fits the real card: header 101 + sep 17 + 2*24 rows + 28 padding',
+      () {
+        // Regression: the card overflowed by ~11px with the old constants.
+        expect(
+          EdgeDockGeometry.panelHeightFor(2),
+          greaterThanOrEqualTo(101 + 17 + 2 * 24 + 28),
+        );
+      },
+    );
 
     test('top/bottom docks reserve room for the arrow', () {
       expect(

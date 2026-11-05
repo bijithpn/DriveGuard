@@ -191,7 +191,7 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       home: Scaffold(
-        backgroundColor: AppColors.bg1,
+        backgroundColor: Platform.isLinux ? AppColors.bg1 : Colors.transparent,
         body: MiniMonitorView(
           snapshot: _snapshot,
           onExpand: _onExpand,

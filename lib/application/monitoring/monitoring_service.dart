@@ -139,10 +139,18 @@ class MonitoringService {
 
   Future<void> start(AppSettings settings) async {
     _settings = settings;
+    final clock = Stopwatch()..start();
+    void lap(String step) => AppLogger.instance.info(
+      _tag,
+      'start(): $step done at ${clock.elapsedMilliseconds} ms',
+    );
     final saved = await _localState?.loadSentAdvisories();
     if (saved != null) _advisoriesSent.addAll(saved);
+    lap('load advisories');
     await _notifications.initialize();
+    lap('notifier setup');
     await _discoverDevices();
+    lap('device discovery');
     _rescheduleTimers();
     _listenForHotplugEvents();
     _listenForActivity();

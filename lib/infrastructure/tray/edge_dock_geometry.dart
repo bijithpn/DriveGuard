@@ -12,19 +12,23 @@ import '../../domain/enums/ui_enums.dart';
 class EdgeDockGeometry {
   const EdgeDockGeometry._();
 
-  static const double ringDiameter = 40;
+  static const double ringDiameter = 44;
   static const double itemBlockLength =
-      58; // ring (40) + spacing (4) + value label (14)
-  static const double itemSpacing = 14;
-  static const double filletRadius = 18;
+      66; // ring (44) + spacing (6) + value label (16)
+  static const double itemSpacing = 22;
+  static const double filletRadius = 22;
+
+  /// Inner breathing room between the rail body's ends and its first/last
+  /// item (the body itself starts after the concave sweep margin).
+  static const double bodyPadding = 16;
   static const double railPadding = 18;
-  static const double podDiameter = 36;
-  static const double podSpacing = 12;
-  static const double railThickness = 68;
+  static const double podDiameter = 40;
+  static const double podSpacing = 18;
+  static const double railThickness = 76;
   static const double collapsedThickness = 14;
 
   static const double panelWidth = 264;
-  static const double panelGap = 8;
+  static const double panelGap = 10;
 
   // Kept as the fallback used when a caller doesn't pass an explicit
   // content-derived height to panelRectFor (e.g. existing tests) - actual
@@ -67,7 +71,7 @@ class EdgeDockGeometry {
 
   static double railLength(int deviceCount, {bool showPod = true}) {
     final count = deviceCount < 1 ? 1 : deviceCount;
-    return filletRadius * 2 +
+    return (filletRadius + bodyPadding) * 2 +
         count * itemBlockLength +
         (count - 1) * itemSpacing +
         (showPod ? podSpacing + podDiameter : 0);
@@ -209,6 +213,7 @@ class EdgeDockGeometry {
   static Offset ringCenter(Rect rail, ScreenEdge edge, int index) {
     final along =
         filletRadius +
+        bodyPadding +
         ringDiameter / 2 +
         index * (itemBlockLength + itemSpacing);
     if (edge == ScreenEdge.left || edge == ScreenEdge.right) {

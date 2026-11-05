@@ -73,29 +73,25 @@ void main() {
       },
     );
 
-    test('showPod: false computes shorter path than showPod: true', () {
-      const withPod = EdgeDockOrganicPainter(
-        edge: ScreenEdge.left,
-        mainRailLength: 150,
-        podDiameter: 40,
-        podSpacing: 16,
-        showPod: true,
-      );
-
-      const withoutPod = EdgeDockOrganicPainter(
-        edge: ScreenEdge.left,
-        mainRailLength: 150,
-        podDiameter: 40,
-        podSpacing: 16,
-        showPod: false,
-      );
-
-      const size = Size(60, 400);
-      final withPodBounds = withPod.computePath(size).getBounds();
-      final withoutPodBounds = withoutPod.computePath(size).getBounds();
-
-      expect(withoutPodBounds.height, lessThan(withPodBounds.height));
-    });
+    test(
+      'silhouette spans the window it is painted into, with or without pod',
+      () {
+        // The rail body is sized by the window (railLength already accounts
+        // for the pod), so the path must fill the given height either way.
+        for (final showPod in [true, false]) {
+          final painter = EdgeDockOrganicPainter(
+            edge: ScreenEdge.left,
+            mainRailLength: 150,
+            podDiameter: 40,
+            podSpacing: 16,
+            showPod: showPod,
+          );
+          final bounds = painter.computePath(const Size(60, 400)).getBounds();
+          expect(bounds.top, greaterThanOrEqualTo(0));
+          expect(bounds.bottom, closeTo(400, 0.5));
+        }
+      },
+    );
 
     testWidgets('paints correctly onto Canvas', (tester) async {
       const painter = EdgeDockOrganicPainter(
