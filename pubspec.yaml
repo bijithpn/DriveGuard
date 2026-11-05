@@ -57,3 +57,9 @@ flutter_launcher_icons:
   linux:
     generate: true
     image_path: "assets/images/app_logo.png"
+
+# Patched copy: silences 'Invalid engine handle' by not notifying a window whose
+# engine has not started yet (see third_party/desktop_multi_window).
+dependency_overrides:
+  desktop_multi_window:
+    path: third_party/desktop_multi_window

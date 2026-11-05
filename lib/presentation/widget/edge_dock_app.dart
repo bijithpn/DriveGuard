@@ -353,6 +353,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
         rowCount,
         maxHeight: _displaySize.height - 8,
         horizontalDock: _edge == ScreenEdge.top || _edge == ScreenEdge.bottom,
+        hasAlert: _snapshot.alerts.isNotEmpty,
       ),
     );
   }
@@ -566,6 +567,12 @@ class _EdgeDockAppState extends State<EdgeDockApp>
   }
 
   /// Bottom handle: ask the main app to bring its window to the front.
+  void _onQuitProcess(int pid) {
+    unawaited(
+      kEdgeDockChannel.invokeMethod('quit_process', pid).catchError((_) {}),
+    );
+  }
+
   void _onOpenApp() {
     unawaited(kEdgeDockChannel.invokeMethod('open_app').catchError((_) {}));
   }
@@ -611,6 +618,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
           onTapRing: _onTapRing,
           onTapActionPod: _onOpenApp,
           onTapAlert: _onOpenApp,
+          onQuitProcess: _onQuitProcess,
           onArrowKey: _onArrowKey,
           onDragStart: _onDragStart,
           onDragUpdate: _onDragUpdate,

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:screen_retriever/screen_retriever.dart' show Display;
 
 void main() {
+  alertHeightTests();
   const displayPosition = Offset.zero;
   const displaySize = Size(1920, 1080);
 
@@ -517,6 +518,18 @@ void main() {
 
       expect(changed, isFalse);
       expect(tracker.hoveredIndex, isNull);
+    });
+  });
+}
+
+void alertHeightTests() {
+  group('EdgeDockGeometry.panelHeightFor alert', () {
+    test('an active alert adds exactly panelAlertHeight', () {
+      expect(
+        EdgeDockGeometry.panelHeightFor(3, hasAlert: true) -
+            EdgeDockGeometry.panelHeightFor(3),
+        EdgeDockGeometry.panelAlertHeight,
+      );
     });
   });
 }

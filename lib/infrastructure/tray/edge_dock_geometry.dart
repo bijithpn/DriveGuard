@@ -59,6 +59,10 @@ class EdgeDockGeometry {
   static const double panelRowHeight = 24;
   static const double panelMinHeight = 100;
 
+  /// Fixed height of the alert block (gap 8 + 30) the detail card adds below
+  /// its metrics while a memory / heavy-write alert is active.
+  static const double panelAlertHeight = 38;
+
   /// Extra vertical space the speech-bubble arrow steals on top/bottom docks.
   static const double panelArrowInset = DockCardTuning.arrowDepth;
 
@@ -70,12 +74,14 @@ class EdgeDockGeometry {
     int rowCount, {
     double? maxHeight,
     bool horizontalDock = false,
+    bool hasAlert = false,
   }) {
     final rows = rowCount < 0 ? 0 : rowCount;
     var height =
         panelHeaderHeight +
         panelContentVerticalPadding +
         (horizontalDock ? panelArrowInset : 0) +
+        (hasAlert ? panelAlertHeight : 0) +
         (rows > 0 ? panelRowsSeparator + rows * panelRowHeight : 0);
     if (height < panelMinHeight) height = panelMinHeight;
     if (maxHeight != null && height > maxHeight) height = maxHeight;

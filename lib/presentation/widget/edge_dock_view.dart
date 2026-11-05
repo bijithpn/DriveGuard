@@ -150,10 +150,12 @@ class EdgeDockContent extends StatelessWidget {
     this.onMouseEnterDock,
     this.onMouseExitDock,
     this.onTapAlert,
+    this.onQuitProcess,
   });
 
   /// Tapping the alert badge (opens the app, where the app can be quit).
   final VoidCallback? onTapAlert;
+  final ValueChanged<int>? onQuitProcess;
 
   /// The device whose card is rendered, when the host animates it in/out
   /// itself (it must outlive the hover during the exit animation). `null`
@@ -289,6 +291,8 @@ class EdgeDockContent extends StatelessWidget {
                   accentOverride: accentOverride,
                   theme: theme,
                   visibleMetrics: visibleMetrics,
+                  alert: snapshot.alerts.isEmpty ? null : snapshot.alerts.first,
+                  onQuitProcess: onQuitProcess,
                   reducedMotion: reducedMotion,
                   progress: reducedMotion
                       ? (panelProgress > 0 ? 1 : 0)
@@ -1102,7 +1106,14 @@ class _DetailCard extends StatelessWidget {
     this.visibleMetrics = kAllEdgeDockMetrics,
     this.reducedMotion = false,
     this.progress = 1.0,
+    this.alert,
+    this.onQuitProcess,
   });
+
+  /// Active memory / write alert, shown as a fixed-height block under the
+  /// metrics (EdgeDockGeometry.panelAlertHeight accounts for it).
+  final MiniWidgetAlert? alert;
+  final ValueChanged<int>? onQuitProcess;
 
   /// 0..1 enter/exit progress, driven by the host (see EdgeDockApp).
   final double progress;
@@ -1340,6 +1351,14 @@ class _DetailCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (alert != null) ...[
+                    const SizedBox(height: 8),
+                    reveal(
+                      0.4,
+                      1.0,
+                      _AlertRow(alert: alert!, onQuit: onQuitProcess),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1364,6 +1383,73 @@ class _DetailCard extends StatelessWidget {
     ScreenEdge.top => Offset(0, -d),
     ScreenEdge.bottom => Offset(0, d),
   };
+}
+
+/// 30px-tall alert block: warning text plus a one-tap quit for the culprit.
+class _AlertRow extends StatelessWidget {
+  const _AlertRow({required this.alert, this.onQuit});
+
+  final MiniWidgetAlert alert;
+  final ValueChanged<int>? onQuit;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = alert.critical
+        ? const Color(0xFFFF4D4F)
+        : const Color(0xFFFFB020);
+    final pid = alert.culpritPid;
+    final name = alert.culpritName;
+    final canQuit =
+        alert.canQuit && pid != null && name != null && onQuit != null;
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.only(left: 8, right: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              alert.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                height: 1.1,
+              ),
+            ),
+          ),
+          if (canQuit)
+            GestureDetector(
+              onTap: () => onQuit!(pid),
+              child: Container(
+                height: 22,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Quit $name',
+                  maxLines: 1,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DetailRow extends StatelessWidget {
