@@ -115,6 +115,13 @@ class _Found {
   final String artifact;
 }
 
+/// Top-level on purpose: the isolate closure must capture only [roots] and
+/// [maxDepth]. Created inside `ProjectScanner.scan` it also captured that
+/// method's context (progress callbacks -> the controller -> Riverpod
+/// subscriptions) and Isolate.run failed with "object is unsendable".
+Future<List<_Found>> _walkInIsolate(List<String> roots, int maxDepth) =>
+    Isolate.run(() => _walk(roots, maxDepth, 15000));
+
 List<_Found> _walk(List<String> roots, int maxDepth, int budgetMs) {
   final sw = Stopwatch()..start();
   final sep = Platform.pathSeparator;
@@ -205,7 +212,7 @@ class ProjectScanner {
   }) async {
     // The directory walk is the only heavy sequential part: keep it off the
     // UI isolate.
-    final found = await Isolate.run(() => _walk(roots, maxDepth, 15000));
+    final found = await _walkInIsolate(roots, maxDepth);
     final m = measurer ?? await defaultMeasurer();
     final items = <CleanupItem>[];
     var next = 0;

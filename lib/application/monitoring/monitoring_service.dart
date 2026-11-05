@@ -193,10 +193,16 @@ class MonitoringService {
   Timer? _hotplugDebounce;
 
   void _listenForHotplugEvents() {
+    // DiskArbitration replays an "added" event for every disk that already
+    // exists right after subscribing; discovery has just run, so ignore that
+    // burst instead of logging and re-scanning ten times.
+    final replayEndsAt = DateTime.now().add(const Duration(seconds: 3));
     _deviceEventsSub = _backend.watchDeviceEvents().listen(
       (event) {
-        final known = _devices.containsKey(event.deviceId);
-        if (event.kind.name == 'added' && known) return; // startup replay
+        if (event.kind.name == 'added' &&
+            DateTime.now().isBefore(replayEndsAt)) {
+          return;
+        }
         AppLogger.instance.info(
           _tag,
           'Hot-plug event: ${event.kind.name} ${event.deviceId}',

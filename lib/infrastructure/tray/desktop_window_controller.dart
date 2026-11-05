@@ -211,10 +211,7 @@ class DesktopWindowController with WindowListener {
       );
       return true;
     } catch (e) {
-      AppLogger.instance.warning(
-        _tag,
-        'Failed pushing snapshot to mini widget: $e',
-      );
+      _logPushFailure('mini widget', e);
     }
     return false;
   }
@@ -397,12 +394,29 @@ class DesktopWindowController with WindowListener {
       );
       return true;
     } catch (e) {
-      AppLogger.instance.warning(
-        _tag,
-        'Failed pushing snapshot to edge dock: $e',
-      );
+      _logPushFailure('edge dock', e);
     }
     return false;
+  }
+
+  /// A push that races the window's own startup (its channel isn't
+  /// registered yet) is expected - the window asks for a fresh snapshot with
+  /// 'ready' - so only real failures are warnings.
+  void _logPushFailure(String target, Object e) {
+    final startingUp =
+        e.toString().contains('CHANNEL_UNREGISTERED') ||
+        e.toString().contains('NO_HANDLER');
+    if (startingUp) {
+      AppLogger.instance.debug(
+        _tag,
+        'Snapshot for $target not delivered yet: $e',
+      );
+    } else {
+      AppLogger.instance.warning(
+        _tag,
+        'Failed pushing snapshot to $target: $e',
+      );
+    }
   }
 
   Future<void> minimizeToTray() => windowManager.hide();
