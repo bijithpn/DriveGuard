@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:screen_retriever/screen_retriever.dart' show Display;
 
+import '../../core/constants/dock_tuning.dart';
+
 import '../../domain/enums/ui_enums.dart';
 
 /// Pure geometry for the edge-docked hover widget: a rail of per-device
@@ -12,33 +14,33 @@ import '../../domain/enums/ui_enums.dart';
 class EdgeDockGeometry {
   const EdgeDockGeometry._();
 
-  static const double ringDiameter = 44;
+  static const double ringDiameter = DockRailTuning.ringDiameter;
   static const double itemBlockLength =
-      66; // ring (44) + spacing (6) + value label (16)
-  static const double itemSpacing = 22;
+      DockRailTuning.ringDiameter + 22; // ring + gap (6) + value label (16)
+  static const double itemSpacing = DockRailTuning.itemSpacing;
 
   /// Depth of the concave end sweep (how far it reaches into the rail).
-  static const double filletRadius = 26;
+  static const double filletRadius = DockRailTuning.sweepDepth;
 
   /// Length of the end sweep along the screen edge - longer than it is deep,
   /// so the curve is gradual instead of a tight corner.
-  static const double sweepLength = 44;
+  static const double sweepLength = DockRailTuning.sweepLength;
 
   /// Reserved space at each end of the rail, outside the body, where the
   /// concave sweep lives and the move / open handles float on hover.
-  static const double endMargin = 56;
+  static const double endMargin = DockRailTuning.endMargin;
 
   /// Inner breathing room between the rail body's ends and its first/last
   /// item (the body itself starts after the concave sweep margin).
-  static const double bodyPadding = 22;
+  static const double bodyPadding = DockRailTuning.bodyPadding;
   static const double railPadding = 18;
   static const double podDiameter = 40;
   static const double podSpacing = 18;
-  static const double railThickness = 76;
-  static const double collapsedThickness = 14;
+  static const double railThickness = DockRailTuning.thickness;
+  static const double collapsedThickness = DockRailTuning.collapsedThickness;
 
-  static const double panelWidth = 264;
-  static const double panelGap = 10;
+  static const double panelWidth = DockCardTuning.width;
+  static const double panelGap = DockCardTuning.gap;
 
   // Kept as the fallback used when a caller doesn't pass an explicit
   // content-derived height to panelRectFor (e.g. existing tests) - actual
@@ -52,12 +54,13 @@ class EdgeDockGeometry {
   //   25 = 101; a metrics list adds a 17px separator plus 24px per row.
   static const double panelHeaderHeight = 101;
   static const double panelRowsSeparator = 17;
-  static const double panelContentVerticalPadding = 28;
+  static const double panelContentVerticalPadding =
+      2 * DockCardTuning.paddingVertical;
   static const double panelRowHeight = 24;
   static const double panelMinHeight = 100;
 
   /// Extra vertical space the speech-bubble arrow steals on top/bottom docks.
-  static const double panelArrowInset = 8;
+  static const double panelArrowInset = DockCardTuning.arrowDepth;
 
   /// The detail panel's height for a card listing [rowCount] metric rows
   /// below its fixed header (temperature is the header's hero value, not a

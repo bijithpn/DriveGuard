@@ -28,6 +28,8 @@ class EdgeDockOrganicPainter extends CustomPainter {
     this.filletRadius = 18.0,
     this.endMargin,
     this.sweepLength,
+    this.faceRadius = 26.0,
+    this.sweepSmoothness = 0.64,
     this.dockDepth = 52.0,
     this.collapsedDepth = 8.0,
     this.glass = false,
@@ -58,6 +60,12 @@ class EdgeDockOrganicPainter extends CustomPainter {
   /// Length of the concave end sweep along the edge (defaults to
   /// [filletRadius], i.e. a circular quarter). Longer = more gradual.
   final double? sweepLength;
+
+  /// Corner radius of the rounded free side.
+  final double faceRadius;
+
+  /// 0.45 (circular) .. 0.8 (very gradual) - see DockRailTuning.sweepSmoothness.
+  final double sweepSmoothness;
   final double dockDepth;
   final double collapsedDepth;
   final List<BoxShadow>? shadows;
@@ -91,7 +99,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
     final clamped = expansionProgress.clamp(0.0, 1.0);
     final d = collapsedDepth + (dockDepth - collapsedDepth) * clamped;
     final f = math.min(filletRadius, d * 0.45); // concave sweep radius
-    final rc = math.max(0.0, math.min(26.0, d - f)); // convex face radius
+    final rc = math.max(0.0, math.min(faceRadius, d - f)); // convex face radius
     final margin = endMargin ?? filletRadius;
     final yTop = margin;
     final yb = length - margin; // body bottom
@@ -101,7 +109,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
     // Cubic "continuous curvature" blend: handles 64% of the leg length
     // (a circle would use ~45%), which flattens the ends of the curve into
     // the edge and the body for a softer, more gradual transition.
-    const k = 0.64;
+    final k = sweepSmoothness.clamp(0.3, 0.9);
 
     return Path()
       ..moveTo(0, yTop - l)
@@ -241,6 +249,8 @@ class EdgeDockOrganicPainter extends CustomPainter {
         oldDelegate.filletRadius != filletRadius ||
         oldDelegate.endMargin != endMargin ||
         oldDelegate.sweepLength != sweepLength ||
+        oldDelegate.faceRadius != faceRadius ||
+        oldDelegate.sweepSmoothness != sweepSmoothness ||
         oldDelegate.dockDepth != dockDepth ||
         oldDelegate.collapsedDepth != collapsedDepth ||
         oldDelegate.glass != glass ||

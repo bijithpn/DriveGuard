@@ -12,6 +12,7 @@ import '../../domain/enums/ui_enums.dart';
 import '../../infrastructure/tray/edge_dock_geometry.dart'
     show EdgeDockGeometry;
 import '../theme/app_theme.dart';
+import '../../core/constants/dock_tuning.dart';
 import 'dock_icons.dart';
 import 'edge_dock_organic_painter.dart';
 import 'edge_dock_popover_bubble.dart';
@@ -396,16 +397,21 @@ class _Rail extends StatelessWidget {
 
     final shapePainter = EdgeDockOrganicPainter(
       edge: edge,
-      backgroundColor: theme.background.withValues(alpha: 0.90),
-      borderColor: Colors.white.withValues(alpha: 0.16),
-      borderWidth: 1.0,
-      glass: true,
+      backgroundColor: theme.background.withValues(
+        alpha: DockRailTuning.fillOpacity,
+      ),
+      borderColor: Colors.white.withValues(alpha: DockRailTuning.borderOpacity),
+      borderWidth: DockRailTuning.borderWidth,
+      glass: DockRailTuning.glassSheen,
       // The window is exactly the rail's size, so a drop shadow can only
       // be clipped - it showed up as a dark band along the rounded edge.
       shadows: const [],
       mainRailLength: mainRailLength,
       filletRadius: EdgeDockGeometry.filletRadius,
       endMargin: EdgeDockGeometry.endMargin,
+      sweepLength: EdgeDockGeometry.sweepLength,
+      faceRadius: DockRailTuning.faceRadius,
+      sweepSmoothness: DockRailTuning.sweepSmoothness,
       showPod: false,
       dockDepth: EdgeDockGeometry.railThickness,
       collapsedDepth: EdgeDockGeometry.collapsedThickness,
@@ -617,8 +623,8 @@ class _RingItem extends StatelessWidget {
                       // Soft tinted disc instead of a dark fill, so the icon
                       // sits on the glass rather than on a black hole.
                       child: Container(
-                        width: 30,
-                        height: 30,
+                        width: EdgeDockGeometry.ringDiameter * 0.68,
+                        height: EdgeDockGeometry.ringDiameter * 0.68,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: color.withValues(alpha: 0.16),
@@ -626,7 +632,7 @@ class _RingItem extends StatelessWidget {
                         child: Center(
                           child: DockIcon.drive(
                             device.type,
-                            size: 16,
+                            size: EdgeDockGeometry.ringDiameter * 0.36,
                             color: color,
                           ),
                         ),
@@ -710,33 +716,6 @@ class _ShapeClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant _ShapeClipper oldClipper) =>
       oldClipper.painter.expansionProgress != painter.expansionProgress ||
       oldClipper.painter.edge != painter.edge;
-}
-
-/// ============================================================
-///  HINT ARC TUNING  - change these to adjust the two arcs.
-/// ============================================================
-/// The thin arcs drawn beyond each curved end of the rail (they fade out and
-/// the hand / gear button takes over on hover). All values are logical px.
-abstract final class DockArcTuning {
-  /// Length of the arc along the rail's end (the rail is 76 px wide).
-  static const double span = 30;
-
-  /// How far the middle of the arc sags toward the rail body.
-  /// Small = nearly flat line, large = deeper curve.
-  static const double depth = 4;
-
-  /// Line thickness.
-  static const double strokeWidth = 8;
-
-  /// Shifts the arc toward (+) or away from (-) the rail body. 0 centres it
-  /// in the margin between the rail's end and the dock window's edge.
-  static const double shiftTowardBody = 20;
-
-  /// Opacity of the arc's colour (it uses the rail's own fill colour).
-  static const double opacity = 0.9;
-
-  /// Smoothness of the draw-on / flatten animation.
-  static const Duration animation = Duration(milliseconds: 320);
 }
 
 /// The thin curved hint drawn at each end of the rail while its handle is
@@ -1107,17 +1086,24 @@ class _DetailCard extends StatelessWidget {
             child: EdgeDockPopoverBubble(
               edge: edge,
               targetArrowPosition: targetArrowPosition,
-              backgroundColor: theme.background.withValues(alpha: 0.82),
-              borderColor: Colors.white.withValues(alpha: 0.14),
-              borderRadius: 20.0,
-              borderWidth: 1.0,
-              arrowWidth: 8.0,
-              arrowHeight: 16.0,
-              glass: true,
+              backgroundColor: theme.background.withValues(
+                alpha: DockCardTuning.fillOpacity,
+              ),
+              borderColor: Colors.white.withValues(
+                alpha: DockCardTuning.borderOpacity,
+              ),
+              borderRadius: DockCardTuning.cornerRadius,
+              borderWidth: DockCardTuning.borderWidth,
+              arrowWidth: DockCardTuning.arrowDepth,
+              arrowHeight: DockCardTuning.arrowWidth,
+              glass: DockCardTuning.glassSheen,
               // The window is only as big as the card, so a drop shadow would
               // be clipped into a hard grey band under it.
               shadows: const [],
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                horizontal: DockCardTuning.paddingHorizontal,
+                vertical: DockCardTuning.paddingVertical,
+              ),
               // Every block below has a fixed height (see
               // EdgeDockGeometry.panelHeaderHeight) so the window is sized to
               // exactly what is rendered - nothing can overflow.
@@ -1373,7 +1359,7 @@ class _RingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.width / 2 - 2.5;
-    const strokeWidth = 3.6;
+    const strokeWidth = DockRailTuning.ringStroke;
 
     final track = Paint()
       ..color = Colors.white.withValues(alpha: 0.10)
