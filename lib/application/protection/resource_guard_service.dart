@@ -79,7 +79,7 @@ class ResourceGuardService {
   ResourceGuardService({
     required SystemActions actions,
     required NotificationService notifications,
-    required List<StorageDevice> Function() devices,
+    List<StorageDevice> Function()? devices,
     required AppSettings Function() settings,
     ProcessController? processes,
     DateTime Function()? clock,
@@ -87,7 +87,7 @@ class ResourceGuardService {
     this.onMemory,
   }) : _actions = actions,
        _notifications = notifications,
-       _devices = devices,
+       _devices = devices ?? (() => const []),
        _settings = settings,
        _clock = clock ?? DateTime.now,
        processes = processes ?? ProcessController(actions);
@@ -102,12 +102,22 @@ class ResourceGuardService {
 
   final SystemActions _actions;
   final NotificationService _notifications;
-  final List<StorageDevice> Function() _devices;
+  List<StorageDevice> Function() _devices;
   final AppSettings Function() _settings;
   final DateTime Function() _clock;
   final ProcessController processes;
   final Duration baseInterval;
-  final void Function(MemorySnapshot)? onMemory;
+  void Function(MemorySnapshot)? onMemory;
+
+  /// Wired by MonitoringService at start so this service never has to read
+  /// the monitoring provider back (that was a provider cycle).
+  void attach({
+    required List<StorageDevice> Function() devices,
+    void Function(MemorySnapshot)? onMemory,
+  }) {
+    _devices = devices;
+    this.onMemory = onMemory ?? this.onMemory;
+  }
 
   Timer? _timer;
   bool _started = false;

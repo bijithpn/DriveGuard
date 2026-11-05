@@ -165,7 +165,12 @@ class MonitoringService {
     _listenForHotplugEvents();
     _listenForActivity();
     unawaited(_pollHealthAll());
-    _resourceGuard?.start();
+    _resourceGuard
+      ?..attach(
+        devices: () => currentDevices,
+        onMemory: (m) => _thermalProtection?.latestMemory = m,
+      )
+      ..start();
     _started = true;
     AppLogger.instance.info(_tag, 'Monitoring started');
   }
@@ -185,14 +190,22 @@ class MonitoringService {
     );
   }
 
+  Timer? _hotplugDebounce;
+
   void _listenForHotplugEvents() {
     _deviceEventsSub = _backend.watchDeviceEvents().listen(
       (event) {
+        final known = _devices.containsKey(event.deviceId);
+        if (event.kind.name == 'added' && known) return; // startup replay
         AppLogger.instance.info(
           _tag,
           'Hot-plug event: ${event.kind.name} ${event.deviceId}',
         );
-        unawaited(_discoverDevices());
+        _hotplugDebounce?.cancel();
+        _hotplugDebounce = Timer(
+          const Duration(milliseconds: 500),
+          () => unawaited(_discoverDevices()),
+        );
       },
       onError: (Object e) {
         AppLogger.instance.debug(_tag, 'Device event stream error: $e');

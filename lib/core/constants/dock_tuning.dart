@@ -42,7 +42,7 @@ abstract final class DockRailTuning {
 
   /// Length of each end's curve ALONG the screen edge. Longer = a gentler,
   /// wider flare into the screen edge.
-  static const double sweepLength = 44;
+  static const double sweepLength = 64;
 
   /// How far each end's curve reaches INTO the rail. Bigger = deeper flare.
   static const double sweepDepth = 26;

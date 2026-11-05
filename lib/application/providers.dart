@@ -108,10 +108,7 @@ final Provider<ResourceGuardService> resourceGuardProvider =
       final service = ResourceGuardService(
         actions: ref.watch(systemActionsProvider),
         notifications: ref.watch(notificationServiceProvider),
-        devices: () => ref.read(monitoringServiceProvider).currentDevices,
         settings: () => ref.read(settingsProvider),
-        onMemory: (m) =>
-            ref.read(thermalProtectionServiceProvider).latestMemory = m,
       );
       ref.onDispose(service.dispose);
       return service;

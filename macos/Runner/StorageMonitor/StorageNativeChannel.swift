@@ -1,6 +1,7 @@
 import DiskArbitration
 import FlutterMacOS
 import Foundation
+import ServiceManagement
 
 /// Registers and implements the `driveguard/storage_native` MethodChannel
 /// contract (docs/architecture.md "Native data contract") for macOS.
@@ -71,6 +72,11 @@ enum StorageNativeChannel {
 
     case "readTemperature", "getHealth":
       result(nil)
+
+    case "getSensors":
+      // No public IOKit sensor API; an empty list makes the Dart side fall
+      // through to the smartctl backend / single-reading path.
+      result([Any]())
 
     case "getCapacity":
       guard let bsdName = bsdName(from: call) else {
@@ -269,5 +275,76 @@ private final class ActivityStreamHandler: NSObject, FlutterStreamHandler {
   private func bsdName(fromDeviceId id: String) -> String? {
     guard id.hasPrefix("macos-") else { return nil }
     return String(id.dropFirst("macos-".count))
+  }
+}
+
+/// Native side of the `launch_at_startup` Dart package on macOS (the package
+/// ships no macOS plugin; it expects the host app to answer these calls).
+/// macOS 13+ uses SMAppService; older systems fall back to a per-user
+/// LaunchAgent plist so the feature works on every supported macOS version.
+enum LaunchAtStartupChannel {
+  private static var agentLabel: String {
+    (Bundle.main.bundleIdentifier ?? "driveguard") + ".launchatlogin"
+  }
+
+  private static var agentURL: URL {
+    FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent("Library/LaunchAgents/\(agentLabel).plist")
+  }
+
+  private static func isEnabled() -> Bool {
+    if #available(macOS 13.0, *) {
+      return SMAppService.mainApp.status == .enabled
+    }
+    return FileManager.default.fileExists(atPath: agentURL.path)
+  }
+
+  private static func setEnabled(_ enable: Bool) throws {
+    if #available(macOS 13.0, *) {
+      if enable {
+        try SMAppService.mainApp.register()
+      } else {
+        try SMAppService.mainApp.unregister()
+      }
+      return
+    }
+    if enable {
+      let plist: [String: Any] = [
+        "Label": agentLabel,
+        "ProgramArguments": [Bundle.main.executablePath ?? ""],
+        "RunAtLoad": true,
+      ]
+      let data = try PropertyListSerialization.data(
+        fromPropertyList: plist, format: .xml, options: 0)
+      try FileManager.default.createDirectory(
+        at: agentURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try data.write(to: agentURL, options: .atomic)
+    } else if FileManager.default.fileExists(atPath: agentURL.path) {
+      try FileManager.default.removeItem(at: agentURL)
+    }
+  }
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterMethodChannel(
+      name: "launch_at_startup",
+      binaryMessenger: registrar.messenger
+    )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "launchAtStartupIsEnabled":
+        result(isEnabled())
+      case "launchAtStartupSetEnabled":
+        let args = call.arguments as? [String: Any]
+        let enable = args?["setEnabledValue"] as? Bool ?? false
+        do {
+          try setEnabled(enable)
+          result(nil)
+        } catch {
+          result(FlutterError(code: "LOGIN_ITEM", message: error.localizedDescription, details: nil))
+        }
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
   }
 }

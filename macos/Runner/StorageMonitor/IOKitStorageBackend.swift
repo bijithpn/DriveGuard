@@ -222,12 +222,71 @@ final class IOKitStorageBackend {
         haveAny = true
       }
     }
-    let total = totalSize(ofWholeBsdName: wholeBsdName)
-    return Capacity(
-      totalBytes: total,
-      usedBytes: haveAny ? usedSum : nil,
-      freeBytes: haveAny ? freeSum : nil
-    )
+    var total = totalSize(ofWholeBsdName: wholeBsdName)
+    if haveAny {
+      if (total ?? 0) == 0 { total = usedSum + freeSum }
+      return Capacity(totalBytes: total, usedBytes: usedSum, freeBytes: freeSum)
+    }
+    // No partition of this disk is mounted itself: on APFS the volumes live
+    // on a synthesized container disk whose physical store is one of this
+    // disk's partitions. Every volume of a container reports the same
+    // container-wide total/free, so read it once from any such volume.
+    if let apfs = apfsContainerCapacity(backedBy: wholeBsdName) {
+      return Capacity(
+        totalBytes: total ?? apfs.total,
+        usedBytes: max(0, apfs.total - apfs.free),
+        freeBytes: apfs.free
+      )
+    }
+    return Capacity(totalBytes: total, usedBytes: nil, freeBytes: nil)
+  }
+
+  /// Container-wide (total, free) of a mounted volume whose IOKit provider
+  /// chain reaches a partition of [wholeBsdName]; nil when none is found.
+  private func apfsContainerCapacity(backedBy wholeBsdName: String) -> (total: Int64, free: Int64)? {
+    guard let session = DASessionCreate(kCFAllocatorDefault) else { return nil }
+    let urls = FileManager.default.mountedVolumeURLs(
+      includingResourceValuesForKeys: nil, options: []) ?? []
+    for url in urls {
+      guard let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
+        let bsd = DADiskGetBSDName(disk).map({ String(cString: $0) }),
+        providerChainContains(bsdPrefix: wholeBsdName + "s", fromBsdName: bsd)
+      else { continue }
+      if let v = try? url.resourceValues(forKeys: [
+        .volumeTotalCapacityKey, .volumeAvailableCapacityKey,
+      ]), let t = v.volumeTotalCapacity, let f = v.volumeAvailableCapacity {
+        return (Int64(t), Int64(f))
+      }
+    }
+    return nil
+  }
+
+  private func providerChainContains(bsdPrefix: String, fromBsdName bsd: String) -> Bool {
+    guard let match = IOBSDNameMatching(kIOMasterPortDefault, 0, bsd) else { return false }
+    let start = IOServiceGetMatchingService(kIOMasterPortDefault, match)
+    guard start != 0 else { return false }
+    var iterator: io_iterator_t = 0
+    guard
+      IORegistryEntryCreateIterator(
+        start, kIOServicePlane,
+        IOOptionBits(kIORegistryIterateRecursively | kIORegistryIterateParents), &iterator
+      ) == KERN_SUCCESS
+    else {
+      IOObjectRelease(start)
+      return false
+    }
+    defer {
+      IOObjectRelease(iterator)
+      IOObjectRelease(start)
+    }
+    var entry = IOIteratorNext(iterator)
+    while entry != 0 {
+      let name = ioProperty(entry, "BSD Name") as? String
+      IOObjectRelease(entry)
+      if let name, name.hasPrefix(bsdPrefix) { return true }
+      entry = IOIteratorNext(iterator)
+    }
+    return false
   }
 
   /// Reads the whole disk's `IOBlockStorageDriver` "Statistics" dictionary -

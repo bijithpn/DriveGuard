@@ -24,10 +24,11 @@ class StorageCapacity {
   );
 
   double? get usagePercent {
-    if (totalBytes == null || usedBytes == null || totalBytes == 0) {
-      return null;
-    }
-    return (usedBytes! / totalBytes!) * 100;
+    final total = totalBytes;
+    if (total == null || total == 0) return null;
+    final used = usedBytes ?? (freeBytes == null ? null : total - freeBytes!);
+    if (used == null) return null;
+    return (used / total) * 100;
   }
 
   bool get isValid =>

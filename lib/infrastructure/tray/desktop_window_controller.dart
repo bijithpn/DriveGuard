@@ -151,7 +151,14 @@ class DesktopWindowController with WindowListener {
       } catch (_) {}
       return;
     }
-    await _closeStrayWindows(dock: false);
+    final liveMini = await _closeStrayWindows(dock: false);
+    if (liveMini.isNotEmpty) {
+      _miniWindow = liveMini.first;
+      try {
+        await _miniWindow!.show();
+      } catch (_) {}
+      return;
+    }
     try {
       final args = widgetSettings.toJson();
       if (initialSnapshot != null) {
@@ -247,7 +254,15 @@ class DesktopWindowController with WindowListener {
   /// showing their last snapshot - alive; the next open then stacked a second
   /// window on top of the stale one ("multiple widgets"). Anything of the
   /// right kind that exists before we create ours is, by definition, stray.
-  Future<void> _closeStrayWindows({required bool dock}) async {
+  ///
+  /// Returns the strays that are STILL alive after giving them time to shut
+  /// down. The caller must reuse one of those instead of creating another
+  /// window: a channel allows only two engines, so a new window created while
+  /// an old one is still registered fails with CHANNEL_LIMIT_REACHED and ends
+  /// up as an orphan.
+  Future<List<WindowController>> _closeStrayWindows({
+    required bool dock,
+  }) async {
     try {
       final self = await WindowController.fromCurrentEngine();
       bool isStray(WindowController w) {
@@ -266,21 +281,24 @@ class DesktopWindowController with WindowListener {
           await channel.invokeMethod('close');
         } catch (_) {}
       }
-      if (strays.isEmpty) return;
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      strays = (await WindowController.getAll()).where(isStray).toList();
-      for (final w in strays) {
-        try {
-          await w.hide();
-        } catch (_) {}
+      if (strays.isEmpty) return const [];
+      // Wait (up to ~3s) for the stray engines to actually unregister.
+      for (var i = 0; i < 15 && strays.isNotEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        strays = (await WindowController.getAll()).where(isStray).toList();
       }
       AppLogger.instance.info(
         _tag,
-        'Closed stray ${dock ? 'edge dock' : 'widget'} window(s) left over '
-        'from a previous run',
+        strays.isEmpty
+            ? 'Closed stray ${dock ? 'edge dock' : 'widget'} window(s) left '
+                  'over from a previous run'
+            : 'Stray ${dock ? 'edge dock' : 'widget'} window did not close; '
+                  'reusing it',
       );
+      return strays;
     } catch (e) {
       AppLogger.instance.debug(_tag, 'Stray window cleanup failed: $e');
+      return const [];
     }
   }
 
@@ -313,7 +331,14 @@ class DesktopWindowController with WindowListener {
       } catch (_) {}
       return;
     }
-    await _closeStrayWindows(dock: true);
+    final liveDock = await _closeStrayWindows(dock: true);
+    if (liveDock.isNotEmpty) {
+      _edgeDockWindow = liveDock.first;
+      try {
+        await _edgeDockWindow!.show();
+      } catch (_) {}
+      return;
+    }
     try {
       final args = <String, dynamic>{
         'mode': 'edgeDock',
