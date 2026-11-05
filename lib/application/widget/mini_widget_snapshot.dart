@@ -116,17 +116,77 @@ class MiniWidgetDeviceSnapshot {
   );
 }
 
+/// A memory / heavy-write alert as shown in the floating windows.
+class MiniWidgetAlert {
+  const MiniWidgetAlert({
+    required this.id,
+    required this.title,
+    required this.critical,
+    this.culpritName,
+    this.culpritPid,
+    this.canQuit = false,
+  });
+
+  final String id;
+  final String title;
+  final bool critical;
+  final String? culpritName;
+  final int? culpritPid;
+
+  /// True when the app may quit [culpritName] without admin rights.
+  final bool canQuit;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'critical': critical,
+    'culpritName': culpritName,
+    'culpritPid': culpritPid,
+    'canQuit': canQuit,
+  };
+
+  factory MiniWidgetAlert.fromJson(Map<String, dynamic> json) =>
+      MiniWidgetAlert(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        critical: json['critical'] as bool? ?? false,
+        culpritName: json['culpritName'] as String?,
+        culpritPid: (json['culpritPid'] as num?)?.toInt(),
+        canQuit: json['canQuit'] as bool? ?? false,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is MiniWidgetAlert &&
+      id == other.id &&
+      title == other.title &&
+      critical == other.critical &&
+      culpritName == other.culpritName &&
+      culpritPid == other.culpritPid &&
+      canQuit == other.canQuit;
+
+  @override
+  int get hashCode =>
+      Object.hash(id, title, critical, culpritName, culpritPid, canQuit);
+}
+
 class MiniWidgetSnapshot {
-  const MiniWidgetSnapshot({required this.devices, required this.compact});
+  const MiniWidgetSnapshot({
+    required this.devices,
+    required this.compact,
+    this.alerts = const [],
+  });
 
   final List<MiniWidgetDeviceSnapshot> devices;
   final bool compact;
+  final List<MiniWidgetAlert> alerts;
 
   static const empty = MiniWidgetSnapshot(devices: [], compact: false);
 
   Map<String, dynamic> toJson() => {
     'devices': devices.map((d) => d.toJson()).toList(),
     'compact': compact,
+    'alerts': alerts.map((a) => a.toJson()).toList(),
   };
 
   factory MiniWidgetSnapshot.fromJson(Map<String, dynamic> json) =>
@@ -138,6 +198,9 @@ class MiniWidgetSnapshot {
             )
             .toList(),
         compact: json['compact'] as bool? ?? false,
+        alerts: ((json['alerts'] as List?) ?? const [])
+            .map((a) => MiniWidgetAlert.fromJson(a as Map<String, dynamic>))
+            .toList(),
       );
 
   @override
@@ -146,8 +209,13 @@ class MiniWidgetSnapshot {
     if (other is! MiniWidgetSnapshot || runtimeType != other.runtimeType) {
       return false;
     }
-    if (compact != other.compact || devices.length != other.devices.length) {
+    if (compact != other.compact ||
+        devices.length != other.devices.length ||
+        alerts.length != other.alerts.length) {
       return false;
+    }
+    for (var i = 0; i < alerts.length; i++) {
+      if (alerts[i] != other.alerts[i]) return false;
     }
     for (var i = 0; i < devices.length; i++) {
       if (devices[i] != other.devices[i]) return false;
@@ -156,5 +224,6 @@ class MiniWidgetSnapshot {
   }
 
   @override
-  int get hashCode => Object.hash(compact, Object.hashAll(devices));
+  int get hashCode =>
+      Object.hash(compact, Object.hashAll(devices), Object.hashAll(alerts));
 }

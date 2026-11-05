@@ -385,7 +385,11 @@ class ResourceGuardService {
     if (!_settings().notificationsEnabled) return;
     final body = StringBuffer(alert.detail);
     final c = alert.culprit;
-    if (c != null) body.write('\nOpen DriveGuard to quit ${c.name}.');
+    if (c != null) {
+      body.write(
+        '\nQuit ${c.name} from the DriveGuard widget, dock or dashboard.',
+      );
+    }
     try {
       await _notifications.showAdvisory(
         id: id,

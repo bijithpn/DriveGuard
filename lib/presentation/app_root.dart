@@ -9,6 +9,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../application/protection/process_controller.dart';
+import '../application/protection/thermal_models.dart';
 import '../application/providers.dart';
 import '../application/settings/app_settings.dart' show kAllEdgeDockMetrics;
 import '../application/widget/mini_widget_snapshot.dart';
@@ -161,6 +163,9 @@ class _AppRootState extends ConsumerState<AppRoot>
   Future<void> _onNotificationClicked(String deviceId) async {
     await windowManager.show();
     await windowManager.focus();
+    // Advisory notifications (memory / heavy writes) carry no drive: the
+    // dashboard banner is where the offending app can be quit.
+    if (deviceId.isEmpty) return;
     rootNavigatorKey.currentState?.push(
       MaterialPageRoute<void>(
         builder: (_) => DeviceDetailsScreen(deviceId: deviceId),
@@ -220,11 +225,30 @@ class _AppRootState extends ConsumerState<AppRoot>
           await windowManager.show();
           await windowManager.focus();
         }
+      case 'quit_process':
+        await _quitAlertCulprit(call.arguments);
       case 'ready':
         await widget.windowController.showMiniWindow();
         await _pushSnapshotToMiniWindowIfActive(force: true);
     }
     return null;
+  }
+
+  /// Quits the app named in an alert, on request from a floating window.
+  /// Only the pid of a CURRENT alert's culprit is honoured, and only when it
+  /// can be quit without admin rights; everything else is ignored.
+  Future<void> _quitAlertCulprit(Object? args) async {
+    final pid = args is int ? args : int.tryParse('$args');
+    if (pid == null) return;
+    final guard = ref.read(resourceGuardProvider);
+    for (final a in guard.current) {
+      final c = a.culprit;
+      if (c == null || c.pid != pid) continue;
+      if (guard.processes.accessFor(c) != KillAccess.own) return;
+      await guard.processes.quit(c);
+      await guard.refreshSoon();
+      return;
+    }
   }
 
   Future<dynamic> _handleEdgeDockChannelCall(MethodCall call) async {
@@ -234,6 +258,8 @@ class _AppRootState extends ConsumerState<AppRoot>
       case 'open_app':
         await windowManager.show();
         await windowManager.focus();
+      case 'quit_process':
+        await _quitAlertCulprit(call.arguments);
       case 'position_changed':
         // The user finished dragging the dock along its edge - persist
         // where it ended up so the next open restores it. The drag itself
@@ -536,9 +562,22 @@ class _AppRootState extends ConsumerState<AppRoot>
         ),
       );
     }
+    final guard = ref.read(resourceGuardProvider);
+    final alerts = guard.current.map((a) {
+      final c = a.culprit;
+      return MiniWidgetAlert(
+        id: a.id,
+        title: a.title,
+        critical: a.severity == ResourceSeverity.critical,
+        culpritName: c?.name,
+        culpritPid: c?.pid,
+        canQuit: c != null && guard.processes.accessFor(c) == KillAccess.own,
+      );
+    }).toList();
     return MiniWidgetSnapshot(
       devices: snapshotDevices,
       compact: settings.widget.compact,
+      alerts: alerts,
     );
   }
 
@@ -713,6 +752,69 @@ class _AppRootState extends ConsumerState<AppRoot>
     if (state == AppLifecycleState.resumed) {
       unawaited(_syncUiActivity());
       ref.read(monitoringServiceProvider).reinitializeAfterResume();
+      unawaited(_recoverFloatingWindowsAfterResume());
+    }
+  }
+
+  bool _recoveringWindows = false;
+
+  /// After sleep the floating windows' engines can be gone or unreachable.
+  /// Probe each active one with a snapshot; any that doesn't answer is torn
+  /// down and re-opened through the normal (serialised) sync path, whose
+  /// stray-window handling waits for the old engine to unregister first.
+  Future<void> _recoverFloatingWindowsAfterResume() async {
+    if (_recoveringWindows) return;
+    _recoveringWindows = true;
+    try {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      final settings = ref.read(settingsProvider);
+
+      if (ref.read(widgetModeActiveProvider)) {
+        await _pushSnapshotToMiniWindowIfActive(force: true);
+        if (_lastPushedSnapshot == null) {
+          AppLogger.instance.info(
+            _tag,
+            'Mini widget lost after resume - reopening',
+          );
+          widget.windowController.clearMiniWindow();
+          ref.read(widgetModeActiveProvider.notifier).state = false;
+          await _syncWidgetMode(true);
+        }
+      }
+
+      if (ref.read(edgeDockActiveProvider)) {
+        await _pushSnapshotToEdgeDockIfActive(force: true);
+        if (_lastPushedEdgeDockSnapshot == null) {
+          AppLogger.instance.info(
+            _tag,
+            'Edge dock lost after resume - reopening',
+          );
+          widget.windowController.clearEdgeDockWindow();
+          ref.read(edgeDockActiveProvider.notifier).state = false;
+          final d = settings.edgeDock;
+          await _syncEdgeDockMode(
+            true,
+            d.edge,
+            accent: d.accent,
+            opacity: d.opacity,
+            displayId: d.displayId,
+            backgroundColor: d.backgroundColor,
+            textColor: d.textColor,
+            warningColor: d.warningColor,
+            criticalColor: d.criticalColor,
+            visibleMetrics: d.visibleMetrics,
+            positionOffset: d.positionOffset,
+          );
+        }
+      }
+    } catch (e) {
+      AppLogger.instance.warning(
+        _tag,
+        'Window recovery after resume failed: $e',
+      );
+    } finally {
+      _recoveringWindows = false;
     }
   }
 
@@ -931,6 +1033,11 @@ class _AppRootState extends ConsumerState<AppRoot>
         if (ctx != null && ctx.mounted) await showThermalShutdownDialog(ctx);
         _thermalDialogOpen = false;
       }();
+    });
+
+    ref.listen(resourceAlertsProvider, (previous, next) {
+      _pushSnapshotToMiniWindowIfActive();
+      _pushSnapshotToEdgeDockIfActive();
     });
 
     ref.listen(activityProvider, (previous, next) {

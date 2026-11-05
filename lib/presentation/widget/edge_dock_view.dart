@@ -149,7 +149,11 @@ class EdgeDockContent extends StatelessWidget {
     this.panelProgress = 1.0,
     this.onMouseEnterDock,
     this.onMouseExitDock,
+    this.onTapAlert,
   });
+
+  /// Tapping the alert badge (opens the app, where the app can be quit).
+  final VoidCallback? onTapAlert;
 
   /// The device whose card is rendered, when the host animates it in/out
   /// itself (it must outlive the hover during the exit animation). `null`
@@ -252,6 +256,14 @@ class EdgeDockContent extends StatelessWidget {
                 expansionProgress: expansionProgress,
               ),
             ),
+            if (snapshot.alerts.isNotEmpty)
+              _AlertBadge(
+                alert: snapshot.alerts.first,
+                count: snapshot.alerts.length,
+                railRect: railLocalRect,
+                edge: edge,
+                onTap: onTapAlert,
+              ),
             if (displayed != null &&
                 panelRect != null &&
                 displayed < devices.length &&
@@ -284,6 +296,65 @@ class EdgeDockContent extends StatelessWidget {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Small warning pill pinned to the rail's leading corner while a memory /
+/// heavy-write alert is active. Tapping it opens the app.
+class _AlertBadge extends StatelessWidget {
+  const _AlertBadge({
+    required this.alert,
+    required this.count,
+    required this.railRect,
+    required this.edge,
+    this.onTap,
+  });
+
+  final MiniWidgetAlert alert;
+  final int count;
+  final Rect railRect;
+  final ScreenEdge edge;
+  final VoidCallback? onTap;
+
+  static const double _size = 18;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = alert.critical
+        ? const Color(0xFFFF4D4F)
+        : const Color(0xFFFFB020);
+    final name = alert.culpritName;
+    final message = name == null ? alert.title : '${alert.title} - $name';
+    return Positioned(
+      left: railRect.left + 2,
+      top: railRect.top + 2,
+      width: _size,
+      height: _size,
+      child: Tooltip(
+        message: message,
+        child: GestureDetector(
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.8)),
+            ),
+            child: Center(
+              child: Text(
+                count > 1 ? '$count' : '!',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

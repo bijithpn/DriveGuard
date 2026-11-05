@@ -220,6 +220,9 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
           snapshot: _snapshot,
           onExpand: _onExpand,
           onClose: _onClose,
+          onQuitProcess: (pid) => unawaited(
+            kWidgetChannel.invokeMethod('quit_process', pid).catchError((_) {}),
+          ),
         ),
       ),
     );

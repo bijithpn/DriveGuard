@@ -610,6 +610,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
           onHover: _onHover,
           onTapRing: _onTapRing,
           onTapActionPod: _onOpenApp,
+          onTapAlert: _onOpenApp,
           onArrowKey: _onArrowKey,
           onDragStart: _onDragStart,
           onDragUpdate: _onDragUpdate,

@@ -14,9 +14,11 @@ class MiniMonitorView extends StatefulWidget {
     required this.snapshot,
     required this.onExpand,
     this.onClose,
+    this.onQuitProcess,
   });
 
   final MiniWidgetSnapshot snapshot;
+  final ValueChanged<int>? onQuitProcess;
   final VoidCallback onExpand;
   final VoidCallback? onClose;
 
@@ -90,6 +92,12 @@ class _MiniMonitorViewState extends State<MiniMonitorView> {
                     : null,
               ),
             ),
+            if (widget.snapshot.alerts.isNotEmpty)
+              _AlertStrip(
+                alert: widget.snapshot.alerts.first,
+                extra: widget.snapshot.alerts.length - 1,
+                onQuit: widget.onQuitProcess,
+              ),
             if (devices.isEmpty)
               Expanded(
                 child: Center(child: _EmptyBody(compact: compact)),
@@ -110,6 +118,66 @@ class _MiniMonitorViewState extends State<MiniMonitorView> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Memory / heavy-write warning with a one-tap quit for the offending app.
+class _AlertStrip extends StatelessWidget {
+  const _AlertStrip({required this.alert, required this.extra, this.onQuit});
+
+  final MiniWidgetAlert alert;
+  final int extra;
+  final ValueChanged<int>? onQuit;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = alert.critical ? AppColors.critical : AppColors.warning;
+    final pid = alert.culpritPid;
+    final name = alert.culpritName;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      padding: const EdgeInsets.fromLTRB(8, 5, 4, 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.memory_rounded, size: 14, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              extra > 0 ? '${alert.title} (+$extra)' : alert.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
+              ),
+            ),
+          ),
+          if (alert.canQuit && pid != null && name != null && onQuit != null)
+            TextButton(
+              onPressed: () => onQuit!(pid),
+              style: TextButton.styleFrom(
+                foregroundColor: color,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 24),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Quit $name',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10.5),
+              ),
+            ),
+        ],
       ),
     );
   }
