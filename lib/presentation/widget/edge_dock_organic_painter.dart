@@ -26,6 +26,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
     this.expansionProgress = 1.0,
     this.showPod = true,
     this.filletRadius = 18.0,
+    this.endMargin,
     this.dockDepth = 52.0,
     this.collapsedDepth = 8.0,
     this.glass = false,
@@ -48,6 +49,10 @@ class EdgeDockOrganicPainter extends CustomPainter {
   final double expansionProgress;
   final bool showPod;
   final double filletRadius;
+
+  /// Reserved length at each end of the rail that the body does not cover.
+  /// Defaults to [filletRadius].
+  final double? endMargin;
   final double dockDepth;
   final double collapsedDepth;
   final List<BoxShadow>? shadows;
@@ -82,8 +87,9 @@ class EdgeDockOrganicPainter extends CustomPainter {
     final d = collapsedDepth + (dockDepth - collapsedDepth) * clamped;
     final f = math.min(filletRadius, d * 0.45); // concave sweep radius
     final rc = math.max(0.0, math.min(26.0, d - f)); // convex face radius
-    final yTop = filletRadius;
-    final yb = length - filletRadius; // body bottom
+    final margin = endMargin ?? filletRadius;
+    final yTop = margin;
+    final yb = length - margin; // body bottom
     return Path()
       ..moveTo(0, yTop - f)
       ..arcToPoint(
@@ -228,6 +234,7 @@ class EdgeDockOrganicPainter extends CustomPainter {
         oldDelegate.expansionProgress != expansionProgress ||
         oldDelegate.showPod != showPod ||
         oldDelegate.filletRadius != filletRadius ||
+        oldDelegate.endMargin != endMargin ||
         oldDelegate.dockDepth != dockDepth ||
         oldDelegate.collapsedDepth != collapsedDepth ||
         oldDelegate.glass != glass ||

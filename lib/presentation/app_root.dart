@@ -229,6 +229,9 @@ class _AppRootState extends ConsumerState<AppRoot>
     switch (call.method) {
       case 'ready':
         await _pushSnapshotToEdgeDockIfActive(force: true);
+      case 'open_app':
+        await windowManager.show();
+        await windowManager.focus();
       case 'position_changed':
         // The user finished dragging the dock along its edge - persist
         // where it ended up so the next open restores it. The drag itself

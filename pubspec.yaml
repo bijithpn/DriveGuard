@@ -25,6 +25,7 @@ dependencies:
   path_provider: ^2.1.5
   uuid: ^4.5.1
   crypto: ^3.0.3
+  flutter_svg: ^2.3.2
 
 dev_dependencies:
   flutter_test:
@@ -38,6 +39,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/svgs/
   fonts:
     - family: Manrope
       fonts:

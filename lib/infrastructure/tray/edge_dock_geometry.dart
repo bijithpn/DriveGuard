@@ -18,9 +18,13 @@ class EdgeDockGeometry {
   static const double itemSpacing = 22;
   static const double filletRadius = 22;
 
+  /// Reserved space at each end of the rail, outside the body, where the
+  /// concave sweep lives and the move / open handles float on hover.
+  static const double endMargin = 44;
+
   /// Inner breathing room between the rail body's ends and its first/last
   /// item (the body itself starts after the concave sweep margin).
-  static const double bodyPadding = 16;
+  static const double bodyPadding = 22;
   static const double railPadding = 18;
   static const double podDiameter = 40;
   static const double podSpacing = 18;
@@ -69,9 +73,9 @@ class EdgeDockGeometry {
     return height;
   }
 
-  static double railLength(int deviceCount, {bool showPod = true}) {
+  static double railLength(int deviceCount, {bool showPod = false}) {
     final count = deviceCount < 1 ? 1 : deviceCount;
-    return (filletRadius + bodyPadding) * 2 +
+    return (endMargin + bodyPadding) * 2 +
         count * itemBlockLength +
         (count - 1) * itemSpacing +
         (showPod ? podSpacing + podDiameter : 0);
@@ -212,7 +216,7 @@ class EdgeDockGeometry {
   /// The screen-space center of the [index]th device's ring within [rail].
   static Offset ringCenter(Rect rail, ScreenEdge edge, int index) {
     final along =
-        filletRadius +
+        endMargin +
         bodyPadding +
         ringDiameter / 2 +
         index * (itemBlockLength + itemSpacing);

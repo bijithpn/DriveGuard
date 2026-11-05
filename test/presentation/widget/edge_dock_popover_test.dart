@@ -5,6 +5,7 @@ import 'package:driveguard/domain/enums/storage_enums.dart';
 import 'package:driveguard/domain/enums/ui_enums.dart';
 import 'package:driveguard/infrastructure/tray/edge_dock_geometry.dart';
 import 'package:driveguard/presentation/widget/edge_dock_popover_bubble.dart';
+import 'package:driveguard/presentation/widget/dock_icons.dart';
 import 'package:driveguard/presentation/widget/edge_dock_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -99,7 +100,11 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(EdgeDockPopoverBubble),
-          matching: find.byIcon(Icons.memory_rounded),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DockIcon &&
+                w.asset == DockAssets.driveFor(StorageDeviceType.nvme),
+          ),
         ),
         findsOneWidget,
       );
@@ -147,7 +152,11 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(EdgeDockPopoverBubble),
-          matching: find.byIcon(Icons.storage_rounded),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DockIcon &&
+                w.asset == DockAssets.driveFor(StorageDeviceType.ssd),
+          ),
         ),
         findsOneWidget,
       );

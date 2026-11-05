@@ -69,7 +69,7 @@ void main() {
     await tester.pump();
 
     // The first ring sits near the top of the rail rect (300,50,64,200).
-    await gesture.moveTo(const Offset(338, 110));
+    await gesture.moveTo(const Offset(338, 138));
     await tester.pump();
 
     expect(reported, 0);
@@ -85,7 +85,7 @@ void main() {
 
     final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
     addTearDown(gesture.removePointer);
-    await gesture.addPointer(location: const Offset(338, 110));
+    await gesture.addPointer(location: const Offset(338, 138));
     await tester.pump();
 
     // In production this widget is only ever given exactly the OS
@@ -109,7 +109,7 @@ void main() {
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       addTearDown(gesture.removePointer);
-      await gesture.addPointer(location: const Offset(338, 110));
+      await gesture.addPointer(location: const Offset(338, 138));
       await tester.pump();
       reportedValues.clear(); // Discard the initial hover-in from ring 0.
 
@@ -277,7 +277,7 @@ void main() {
       );
 
       // Ring 0 sits near the top of the rail rect (300,50,64,200).
-      await tester.tapAt(const Offset(338, 110));
+      await tester.tapAt(const Offset(338, 138));
       await tester.pump();
 
       expect(tapped, 0);

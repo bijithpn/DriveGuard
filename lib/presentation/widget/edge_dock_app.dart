@@ -118,7 +118,8 @@ class _EdgeDockAppState extends State<EdgeDockApp>
 
     _expansionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 240),
+      duration: const Duration(milliseconds: 320),
+      reverseDuration: const Duration(milliseconds: 240),
     );
     _expansionAnimation =
         CurvedAnimation(
@@ -543,6 +544,11 @@ class _EdgeDockAppState extends State<EdgeDockApp>
     }
   }
 
+  /// Bottom handle: ask the main app to bring its window to the front.
+  void _onOpenApp() {
+    unawaited(kEdgeDockChannel.invokeMethod('open_app').catchError((_) {}));
+  }
+
   void _onDragEnd() {
     if (!_dragging) return;
     _dragging = false;
@@ -582,6 +588,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
           pinnedIndex: _pinnedIndex,
           onHover: _onHover,
           onTapRing: _onTapRing,
+          onTapActionPod: _onOpenApp,
           onArrowKey: _onArrowKey,
           onDragStart: _onDragStart,
           onDragUpdate: _onDragUpdate,

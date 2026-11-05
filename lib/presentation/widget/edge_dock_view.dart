@@ -12,6 +12,7 @@ import '../../domain/enums/ui_enums.dart';
 import '../../infrastructure/tray/edge_dock_geometry.dart'
     show EdgeDockGeometry;
 import '../theme/app_theme.dart';
+import 'dock_icons.dart';
 import 'edge_dock_organic_painter.dart';
 import 'edge_dock_popover_bubble.dart';
 
@@ -347,12 +348,6 @@ class _Rail extends StatelessWidget {
         count * EdgeDockGeometry.itemBlockLength +
         (count - 1) * EdgeDockGeometry.itemSpacing;
 
-    final pod = _BottomActionPod(
-      theme: theme,
-      reducedMotion: reducedMotion,
-      onTap: onTapActionPod,
-    );
-
     final animatedItems = <Widget>[];
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
@@ -360,7 +355,10 @@ class _Rail extends StatelessWidget {
         animatedItems.add(item);
         continue;
       }
-      final staggerDelay = (i * 0.05).clamp(0.0, 0.3);
+      // Content waits until the rail's shape has grown enough to hold it
+      // (and, in reverse, is gone before the shape shrinks) - revealing and
+      // dismissing are driven by the same progress, so they stay in sync.
+      final staggerDelay = (0.4 + i * 0.05).clamp(0.4, 0.65);
       final itemProgress = reducedMotion
           ? (expansionProgress > 0.0 ? 1.0 : 0.0)
           : ((expansionProgress - staggerDelay) / (1.0 - staggerDelay)).clamp(
@@ -396,53 +394,28 @@ class _Rail extends StatelessWidget {
       );
     }
 
-    Widget animatedPod = pod;
-    if (expansionProgress < 1.0) {
-      final podProgress = reducedMotion
-          ? (expansionProgress > 0.0 ? 1.0 : 0.0)
-          : ((expansionProgress - 0.15) / 0.85).clamp(0.0, 1.0);
-      final curvedPodProgress = Curves.easeOutCubic.transform(podProgress);
-      final podSlideDistance = 14.0 * (1.0 - curvedPodProgress);
-      Offset podSlideOffset;
-      switch (edge) {
-        case ScreenEdge.left:
-          podSlideOffset = Offset(-podSlideDistance, 0);
-        case ScreenEdge.right:
-          podSlideOffset = Offset(podSlideDistance, 0);
-        case ScreenEdge.top:
-          podSlideOffset = Offset(0, -podSlideDistance);
-        case ScreenEdge.bottom:
-          podSlideOffset = Offset(0, podSlideDistance);
-      }
-      animatedPod = Transform.translate(
-        offset: podSlideOffset,
-        child: Opacity(
-          opacity: curvedPodProgress,
-          child: IgnorePointer(ignoring: curvedPodProgress < 0.5, child: pod),
-        ),
-      );
-    }
+    final shapePainter = EdgeDockOrganicPainter(
+      edge: edge,
+      backgroundColor: theme.background.withValues(alpha: 0.90),
+      borderColor: Colors.white.withValues(alpha: 0.16),
+      borderWidth: 1.0,
+      glass: true,
+      // The window is exactly the rail's size, so a drop shadow can only
+      // be clipped - it showed up as a dark band along the rounded edge.
+      shadows: const [],
+      mainRailLength: mainRailLength,
+      filletRadius: EdgeDockGeometry.filletRadius,
+      endMargin: EdgeDockGeometry.endMargin,
+      showPod: false,
+      dockDepth: EdgeDockGeometry.railThickness,
+      collapsedDepth: EdgeDockGeometry.collapsedThickness,
+      expansionProgress: expansionProgress,
+    );
 
     final content = CustomPaint(
-      painter: EdgeDockOrganicPainter(
-        edge: edge,
-        backgroundColor: theme.background.withValues(alpha: 0.90),
-        borderColor: Colors.white.withValues(alpha: 0.16),
-        borderWidth: 1.0,
-        glass: true,
-        // The window is exactly the rail's size, so a drop shadow can only
-        // be clipped - it showed up as a dark band along the rounded edge.
-        shadows: const [],
-        mainRailLength: mainRailLength,
-        podDiameter: EdgeDockGeometry.podDiameter,
-        podSpacing: EdgeDockGeometry.podSpacing,
-        filletRadius: EdgeDockGeometry.filletRadius,
-        showPod: true,
-        dockDepth: EdgeDockGeometry.railThickness,
-        collapsedDepth: EdgeDockGeometry.collapsedThickness,
-        expansionProgress: expansionProgress,
-      ),
-      child: ClipRect(
+      painter: shapePainter,
+      child: ClipPath(
+        clipper: _ShapeClipper(shapePainter),
         child: Container(
           // Content sits inside the body: past the concave sweep margin
           // (filletRadius) plus the body's own inner padding, centered on
@@ -450,13 +423,11 @@ class _Rail extends StatelessWidget {
           padding: vertical
               ? const EdgeInsets.symmetric(
                   vertical:
-                      EdgeDockGeometry.filletRadius +
-                      EdgeDockGeometry.bodyPadding,
+                      EdgeDockGeometry.endMargin + EdgeDockGeometry.bodyPadding,
                 )
               : const EdgeInsets.symmetric(
                   horizontal:
-                      EdgeDockGeometry.filletRadius +
-                      EdgeDockGeometry.bodyPadding,
+                      EdgeDockGeometry.endMargin + EdgeDockGeometry.bodyPadding,
                 ),
           alignment: vertical ? Alignment.topCenter : Alignment.centerLeft,
           child: vertical
@@ -469,8 +440,6 @@ class _Rail extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: _withSpacing(animatedItems, vertical: true),
                       ),
-                      const SizedBox(height: EdgeDockGeometry.podSpacing),
-                      animatedPod,
                     ],
                   ),
                 )
@@ -484,8 +453,6 @@ class _Rail extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: _withSpacing(animatedItems, vertical: false),
                       ),
-                      const SizedBox(width: EdgeDockGeometry.podSpacing),
-                      animatedPod,
                     ],
                   ),
                 ),
@@ -493,21 +460,39 @@ class _Rail extends StatelessWidget {
       ),
     );
 
-    if (onDragUpdate == null) return content;
-    // The grip is drawn *over* the rail rather than taking its own layout
-    // space in the Column/Row above - the rail's measured size (and every
-    // EdgeDockGeometry calculation) stays exactly what it was without
-    // drag-to-reposition, so there's no risk of it silently drifting out
-    // of sync with the geometry math the way the fixed-height detail panel
-    // once did. Dragging starts from the rail's own background/padding,
-    // not from a ring, so it never competes with a ring's tap-to-pin.
+    // The two curved ends of the rail are interactive "handles". They sit
+    // *over* the rail instead of in its layout flow, so the rail's measured
+    // size (and every EdgeDockGeometry calculation) never depends on them.
+    // Top/start end: a move handle (drag the whole dock along the edge).
+    // Bottom/end: opens the DriveGuard window. Both fade in on hover.
+    final handlesVisible = expansionProgress >= 0.9;
+    const zone = EdgeDockGeometry.endMargin;
+
+    // The zone is the reserved margin at one end of the rail, *outside* the
+    // body: the button floats there, beyond the curved end, like the demo.
+    Widget handleZone({required bool start, required Widget button}) {
+      return Positioned(
+        top: vertical ? (start ? 0 : null) : 0,
+        bottom: vertical ? (start ? null : 0) : 0,
+        left: vertical ? 0 : (start ? 0 : null),
+        right: vertical ? 0 : (start ? null : 0),
+        width: vertical ? null : zone,
+        height: vertical ? zone : null,
+        child: IgnorePointer(
+          ignoring: !handlesVisible,
+          child: Center(child: button),
+        ),
+      );
+    }
+
     return Stack(
       children: [
-        MouseRegion(
-          cursor: vertical
-              ? SystemMouseCursors.resizeUpDown
-              : SystemMouseCursors.resizeLeftRight,
-          child: GestureDetector(
+        // Dragging also works from the rail's own padding (never from a ring,
+        // so it doesn't compete with a ring's tap-to-pin).
+        if (onDragUpdate == null)
+          content
+        else
+          GestureDetector(
             behavior: HitTestBehavior.opaque,
             onPanStart: (_) => onDragStart?.call(),
             onPanUpdate: (d) =>
@@ -515,23 +500,33 @@ class _Rail extends StatelessWidget {
             onPanEnd: (_) => onDragEnd?.call(),
             child: content,
           ),
-        ),
-        Positioned(
-          top: vertical ? 4 : null,
-          left: vertical ? 0 : 4,
-          right: vertical ? 0 : null,
-          bottom: vertical ? null : 0,
-          child: IgnorePointer(
-            child: Align(
-              alignment: Alignment.center,
-              child: Icon(
-                vertical
-                    ? Icons.drag_indicator_rounded
-                    : Icons.drag_handle_rounded,
-                size: 12,
-                color: theme.mutedText.withValues(alpha: 0.6),
-              ),
+        if (onDragUpdate != null)
+          handleZone(
+            start: true,
+            button: _EdgeHandleButton(
+              asset: DockAssets.hand,
+              label: 'Move dock',
+              theme: theme,
+              reducedMotion: reducedMotion,
+              cursor: SystemMouseCursors.grab,
+              outward: vertical ? AxisDirection.down : AxisDirection.right,
+              presence: ((expansionProgress - 0.6) / 0.4),
+              onPanStart: onDragStart,
+              onPanUpdate: (d) => onDragUpdate!(vertical ? d.dy : d.dx),
+              onPanEnd: onDragEnd,
             ),
+          ),
+        handleZone(
+          start: false,
+          button: _EdgeHandleButton(
+            icon: Icons.settings_rounded,
+            label: 'Open DriveGuard',
+            theme: theme,
+            reducedMotion: reducedMotion,
+            cursor: SystemMouseCursors.click,
+            outward: vertical ? AxisDirection.up : AxisDirection.left,
+            presence: ((expansionProgress - 0.6) / 0.4),
+            onTap: onTapActionPod,
           ),
         ),
       ],
@@ -628,10 +623,12 @@ class _RingItem extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: color.withValues(alpha: 0.16),
                         ),
-                        child: Icon(
-                          _DetailCard._deviceIcon(device.type),
-                          size: 16,
-                          color: color,
+                        child: Center(
+                          child: DockIcon.drive(
+                            device.type,
+                            size: 16,
+                            color: color,
+                          ),
                         ),
                       ),
                     ),
@@ -698,71 +695,225 @@ class _EmptyRingItem extends StatelessWidget {
   }
 }
 
-class _BottomActionPod extends StatefulWidget {
-  const _BottomActionPod({
-    required this.theme,
-    required this.reducedMotion,
-    this.onTap,
-  });
+/// Clips the rail's content to the rail's own animated silhouette, so
+/// nothing (ring circles, labels) can ever paint outside the background
+/// while it is still growing in - or already shrinking out.
+class _ShapeClipper extends CustomClipper<Path> {
+  _ShapeClipper(this.painter);
 
-  final EdgeDockTheme theme;
-  final bool reducedMotion;
-  final VoidCallback? onTap;
+  final EdgeDockOrganicPainter painter;
 
   @override
-  State<_BottomActionPod> createState() => _BottomActionPodState();
+  Path getClip(Size size) => painter.computePath(size);
+
+  @override
+  bool shouldReclip(covariant _ShapeClipper oldClipper) =>
+      oldClipper.painter.expansionProgress != painter.expansionProgress ||
+      oldClipper.painter.edge != painter.edge;
 }
 
-class _BottomActionPodState extends State<_BottomActionPod> {
+/// The thin curved hint drawn at each end of the rail while its handle is
+/// hidden, so there is something to find with the pointer. [outward] is the
+/// direction the arc bulges (away from the rail body).
+class _ArcHintPainter extends CustomPainter {
+  _ArcHintPainter({required this.outward, required this.color});
+
+  final AxisDirection outward;
+  final Color color;
+
+  /// Same radius as the rail's concave end sweep, so the hint reads as part of
+  /// the same outline instead of a differently-curved decoration.
+  static const double radius = EdgeDockGeometry.filletRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.4
+      ..strokeCap = StrokeCap.butt;
+    final w = size.width;
+    final h = size.height;
+    const r = Radius.circular(radius);
+    final path = Path();
+    switch (outward) {
+      case AxisDirection.up:
+        path
+          ..moveTo(0, h)
+          ..arcToPoint(Offset(w, h), radius: r);
+      case AxisDirection.down:
+        path
+          ..moveTo(0, 0)
+          ..arcToPoint(Offset(w, 0), radius: r, clockwise: false);
+      case AxisDirection.left:
+        path
+          ..moveTo(w, 0)
+          ..arcToPoint(Offset(w, h), radius: r, clockwise: false);
+      case AxisDirection.right:
+        path
+          ..moveTo(0, 0)
+          ..arcToPoint(Offset(0, h), radius: r);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArcHintPainter old) =>
+      old.outward != outward || old.color != color;
+}
+
+/// A round glass button that floats beyond a curved end of the rail and only
+/// appears while the pointer is over that end. It rises out of the rail
+/// (fade + scale) and stays up for the whole drag once grabbed.
+class _EdgeHandleButton extends StatefulWidget {
+  const _EdgeHandleButton({
+    required this.label,
+    required this.theme,
+    required this.reducedMotion,
+    required this.cursor,
+    required this.outward,
+    this.presence = 1,
+    this.icon,
+    this.asset,
+    this.onTap,
+    this.onPanStart,
+    this.onPanUpdate,
+    this.onPanEnd,
+  }) : assert(icon != null || asset != null);
+
+  final IconData? icon;
+  final String? asset;
+  final String label;
+  final EdgeDockTheme theme;
+  final bool reducedMotion;
+  final MouseCursor cursor;
+  final AxisDirection outward;
+
+  /// 0..1: how far the rail itself has revealed - fades the resting arc hint
+  /// in with the rail so it never shows before the background does.
+  final double presence;
+  final VoidCallback? onTap;
+  final VoidCallback? onPanStart;
+  final ValueChanged<Offset>? onPanUpdate;
+  final VoidCallback? onPanEnd;
+
+  @override
+  State<_EdgeHandleButton> createState() => _EdgeHandleButtonState();
+}
+
+class _EdgeHandleButtonState extends State<_EdgeHandleButton> {
   bool _hovered = false;
+  bool _grabbed = false;
+  bool _pressed = false;
+
+  bool get _active => _hovered || _grabbed;
 
   @override
   Widget build(BuildContext context) {
-    final scaleDuration = widget.reducedMotion
+    final duration = widget.reducedMotion
         ? Duration.zero
-        : const Duration(milliseconds: 150);
-
+        : const Duration(milliseconds: 220);
+    final iconColor = widget.theme.text;
     return MouseRegion(
+      cursor: _grabbed ? SystemMouseCursors.grabbing : widget.cursor,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap == null
+        onTap: widget.onTap,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onPanStart: widget.onPanStart == null
             ? null
-            : () {
-                Focus.of(context).requestFocus();
-                widget.onTap!();
+            : (_) {
+                setState(() => _grabbed = true);
+                widget.onPanStart!();
+              },
+        onPanUpdate: widget.onPanUpdate == null
+            ? null
+            : (d) => widget.onPanUpdate!(d.delta),
+        onPanEnd: widget.onPanEnd == null
+            ? null
+            : (_) {
+                setState(() => _grabbed = false);
+                widget.onPanEnd!();
               },
         child: Semantics(
           button: true,
-          label: 'Settings',
-          hint: 'Open settings and dock actions',
-          child: AnimatedScale(
-            scale: _hovered ? 1.12 : 1.0,
-            duration: scaleDuration,
-            curve: Curves.easeOutCubic,
-            child: Container(
-              width: EdgeDockGeometry.podDiameter,
-              height: EdgeDockGeometry.podDiameter,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _hovered
-                    ? widget.theme.text.withValues(alpha: 0.12)
-                    : widget.theme.background.withValues(alpha: 0.6),
-                border: Border.all(
-                  color: _hovered
-                      ? widget.theme.text.withValues(alpha: 0.3)
-                      : Colors.white.withValues(alpha: 0.12),
-                  width: 1.0,
+          label: widget.label,
+          child: SizedBox(
+            // Generous hit area; the visible disc is smaller.
+            width: 52,
+            height: 40,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Resting hint: a faint arc, replaced by the button on hover.
+                IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _active ? 0 : widget.presence.clamp(0.0, 1.0),
+                    duration: duration,
+                    curve: Curves.easeOut,
+                    child: SizedBox(
+                      width:
+                          widget.outward == AxisDirection.up ||
+                              widget.outward == AxisDirection.down
+                          ? 28
+                          : 6,
+                      height:
+                          widget.outward == AxisDirection.up ||
+                              widget.outward == AxisDirection.down
+                          ? 6
+                          : 28,
+                      child: CustomPaint(
+                        painter: _ArcHintPainter(
+                          outward: widget.outward,
+                          // Exactly the rail's fill, so the hint is visibly the same
+                          // surface as the dock.
+                          color: widget.theme.background.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.tune_rounded,
-                  size: 16,
-                  color: _hovered ? widget.theme.text : widget.theme.mutedText,
+                Center(
+                  child: AnimatedOpacity(
+                    opacity: _active ? 1 : 0,
+                    duration: duration,
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedScale(
+                      scale: _pressed ? 0.92 : (_active ? 1 : 0.6),
+                      duration: duration,
+                      curve: Curves.easeOutBack,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color.alphaBlend(
+                            Colors.white.withValues(
+                              alpha: _grabbed ? 0.22 : 0.14,
+                            ),
+                            widget.theme.background.withValues(alpha: 0.92),
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.22),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: widget.asset != null
+                            ? DockIcon(
+                                widget.asset!,
+                                size: 17,
+                                color: iconColor,
+                              )
+                            : Icon(widget.icon, size: 17, color: iconColor),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -890,11 +1041,7 @@ class _DetailCard extends StatelessWidget {
                       height: 22,
                       child: Row(
                         children: [
-                          Icon(
-                            _deviceIcon(device.type),
-                            size: 16,
-                            color: color,
-                          ),
+                          DockIcon.drive(device.type, size: 16, color: color),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -1059,12 +1206,6 @@ class _DetailCard extends StatelessWidget {
     ScreenEdge.right => Alignment.centerRight,
     ScreenEdge.top => Alignment.topCenter,
     ScreenEdge.bottom => Alignment.bottomCenter,
-  };
-
-  static IconData _deviceIcon(StorageDeviceType type) => switch (type) {
-    StorageDeviceType.nvme => Icons.memory_rounded,
-    StorageDeviceType.ssd => Icons.storage_rounded,
-    _ => Icons.album_rounded,
   };
 
   /// Small slide toward the card's resting position, from the dock side.

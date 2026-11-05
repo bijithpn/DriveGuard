@@ -1,3 +1,4 @@
+import 'dock_icons.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -131,13 +132,9 @@ class _SingleDeviceCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                device.type == StorageDeviceType.nvme
-                    ? Icons.memory_rounded
-                    : device.type == StorageDeviceType.ssd
-                    ? Icons.storage_rounded
-                    : Icons.album_rounded,
-                size: 13,
+              DockIcon.drive(
+                device.type,
+                size: 14,
                 color: AppColors.textSecondary,
               ),
               const SizedBox(width: 5),

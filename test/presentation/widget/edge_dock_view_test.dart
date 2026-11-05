@@ -1,3 +1,4 @@
+import 'package:driveguard/presentation/widget/dock_icons.dart';
 import 'package:driveguard/application/widget/mini_widget_snapshot.dart';
 import 'package:driveguard/domain/enums/storage_enums.dart';
 import 'package:driveguard/domain/enums/ui_enums.dart';
@@ -85,9 +86,30 @@ void main() {
         expect(find.text('58°C'), findsOneWidget);
         expect(find.text('35°C'), findsOneWidget);
 
-        expect(find.byIcon(Icons.memory_rounded), findsOneWidget); // NVMe
-        expect(find.byIcon(Icons.storage_rounded), findsOneWidget); // SSD
-        expect(find.byIcon(Icons.album_rounded), findsOneWidget); // HDD
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is DockIcon &&
+                w.asset == DockAssets.driveFor(StorageDeviceType.nvme),
+          ),
+          findsOneWidget,
+        ); // NVMe
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is DockIcon &&
+                w.asset == DockAssets.driveFor(StorageDeviceType.ssd),
+          ),
+          findsOneWidget,
+        ); // SSD
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is DockIcon &&
+                w.asset == DockAssets.driveFor(StorageDeviceType.hdd),
+          ),
+          findsOneWidget,
+        ); // HDD
       },
     );
 
@@ -126,52 +148,47 @@ void main() {
     });
   });
 
-  group('Bottom Action Pod', () {
-    testWidgets('renders action pod with settings icon', (tester) async {
+  group('Rail end handles', () {
+    testWidgets('has no settings button in the rail any more', (tester) async {
       await tester.pumpWidget(testHarness());
-
-      expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.tune_rounded), findsNothing);
     });
 
-    testWidgets('tapping action pod triggers onTapActionPod callback', (
+    testWidgets('open-app handle is hidden until hovered, then fades in', (
       tester,
     ) async {
-      var actionTapped = false;
-      await tester.pumpWidget(
-        testHarness(onTapActionPod: () => actionTapped = true),
+      await tester.pumpWidget(testHarness());
+
+      AnimatedOpacity opacity() => tester.widget<AnimatedOpacity>(
+        find.ancestor(
+          of: find.byIcon(Icons.settings_rounded),
+          matching: find.byType(AnimatedOpacity),
+        ),
       );
-
-      final podFinder = find.byIcon(Icons.tune_rounded);
-      expect(podFinder, findsOneWidget);
-
-      await tester.tap(podFinder);
-      await tester.pumpAndSettle();
-
-      expect(actionTapped, isTrue);
-    });
-
-    testWidgets('action pod responds to mouse hover with scale transition', (
-      tester,
-    ) async {
-      await tester.pumpWidget(testHarness());
+      expect(opacity().opacity, 0);
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       addTearDown(gesture.removePointer);
       await gesture.addPointer(location: Offset.zero);
       await tester.pump();
-
-      final podCenter = tester.getCenter(find.byIcon(Icons.tune_rounded));
-      await gesture.moveTo(podCenter);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 150));
-
-      final podScaleFinder = find.ancestor(
-        of: find.byIcon(Icons.tune_rounded),
-        matching: find.byType(AnimatedScale),
+      await gesture.moveTo(
+        tester.getCenter(find.byIcon(Icons.settings_rounded)),
       );
-      expect(podScaleFinder, findsOneWidget);
-      final scaleWidget = tester.widget<AnimatedScale>(podScaleFinder);
-      expect(scaleWidget.scale, greaterThan(1.0));
+      await tester.pump();
+
+      expect(opacity().opacity, 1);
+    });
+
+    testWidgets('tapping the open-app handle calls onTapActionPod', (
+      tester,
+    ) async {
+      var tapped = false;
+      await tester.pumpWidget(testHarness(onTapActionPod: () => tapped = true));
+
+      await tester.tap(find.byIcon(Icons.settings_rounded));
+      await tester.pumpAndSettle();
+
+      expect(tapped, isTrue);
     });
   });
 
@@ -231,34 +248,33 @@ void main() {
       },
     );
 
-    testWidgets(
-      'expanded state (expansionProgress == 1.0) renders all rings and pod',
-      (tester) async {
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              backgroundColor: Colors.transparent,
-              body: EdgeDockContent(
-                snapshot: testSnapshot,
-                edge: ScreenEdge.left,
-                accentOverride: null,
-                hoveredIndex: null,
-                onHover: (_) {},
-                railLocalRect: const Rect.fromLTWH(0, 0, 76, 380),
-                panelLocalRect: null,
-                isExpanded: true,
-                expansionProgress: 1.0,
-              ),
+    testWidgets('expanded state (expansionProgress == 1.0) renders all rings', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: EdgeDockContent(
+              snapshot: testSnapshot,
+              edge: ScreenEdge.left,
+              accentOverride: null,
+              hoveredIndex: null,
+              onHover: (_) {},
+              railLocalRect: const Rect.fromLTWH(0, 0, 76, 380),
+              panelLocalRect: null,
+              isExpanded: true,
+              expansionProgress: 1.0,
             ),
           ),
-        );
+        ),
+      );
 
-        expect(find.text('42°C'), findsOneWidget);
-        expect(find.text('58°C'), findsOneWidget);
-        expect(find.text('35°C'), findsOneWidget);
-        expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
-      },
-    );
+      expect(find.text('42°C'), findsOneWidget);
+      expect(find.text('58°C'), findsOneWidget);
+      expect(find.text('35°C'), findsOneWidget);
+      expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
+    });
 
     testWidgets(
       'triggers onMouseEnterDock and onMouseExitDock on dock boundary',
