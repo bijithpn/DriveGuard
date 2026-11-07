@@ -191,6 +191,36 @@ class MonitoringService {
   }
 
   Timer? _hotplugDebounce;
+  final List<Timer> _settleTimers = [];
+
+  /// Polls a newly discovered/reconnected device right away, discarding
+  /// throttle and failure-streak state left over from before it went away.
+  Future<void> _pollFresh(String id) async {
+    _lastPolledAt.remove(id);
+    _lastHealthPolledAt.remove(id);
+    _nullReadStreak.remove(id);
+    _rejectedStreak.remove(id);
+    _healthUnavailableStreak.remove(id);
+    await Future.wait([_pollOne(id), _pollHealthOne(id)]);
+    if (!_disposed) _emit();
+  }
+
+  /// Re-polls devices that are connected but still without a good reading.
+  Future<void> _repollUnsettled() async {
+    if (_disposed || _paused) return;
+    final ids = _devices.entries
+        .where(
+          (e) =>
+              e.value.monitoringStatus != MonitoringStatus.disconnected &&
+              (e.value.monitoringStatus != MonitoringStatus.active ||
+                  e.value.health.status == DeviceHealthStatus.unknown ||
+                  e.value.health.status == DeviceHealthStatus.unavailable),
+        )
+        .map((e) => e.key)
+        .toList();
+    if (ids.isEmpty) return;
+    await Future.wait(ids.map(_pollFresh));
+  }
 
   void _listenForHotplugEvents() {
     // DiskArbitration replays an "added" event for every disk that already
@@ -212,6 +242,24 @@ class MonitoringService {
           const Duration(milliseconds: 500),
           () => unawaited(_discoverDevices()),
         );
+        if (event.kind.name == 'added') {
+          // A freshly attached drive (especially behind a USB bridge) often
+          // isn't ready for SMART/sysfs reads for a few seconds; retry
+          // whatever hasn't produced data yet instead of waiting a full
+          // polling interval.
+          for (final t in _settleTimers) {
+            t.cancel();
+          }
+          _settleTimers.clear();
+          for (final delay in const [3, 8, 20]) {
+            _settleTimers.add(
+              Timer(
+                Duration(seconds: delay),
+                () => unawaited(_repollUnsettled()),
+              ),
+            );
+          }
+        }
       },
       onError: (Object e) {
         AppLogger.instance.debug(_tag, 'Device event stream error: $e');
@@ -348,7 +396,7 @@ class MonitoringService {
           _tag,
           'Discovered new device: ${device.type.name} ${device.interfaceType.name}',
         );
-        unawaited(_pollOne(device.id));
+        unawaited(_pollFresh(device.id));
       } else if (existing.monitoringStatus == MonitoringStatus.disconnected) {
         _devices[device.id] = device.copyWith(
           primaryTemperature: existing.primaryTemperature,
@@ -356,7 +404,7 @@ class MonitoringService {
         );
         _disconnectedOnce.remove(device.id);
         AppLogger.instance.info(_tag, 'Device reconnected: ${device.id}');
-        unawaited(_pollOne(device.id));
+        unawaited(_pollFresh(device.id));
       }
     }
 
@@ -1317,6 +1365,10 @@ class MonitoringService {
     _pollTimer?.cancel();
     _discoveryTimer?.cancel();
     _healthTimer?.cancel();
+    _hotplugDebounce?.cancel();
+    for (final t in _settleTimers) {
+      t.cancel();
+    }
     await _deviceEventsSub?.cancel();
     await _activitySub?.cancel();
     await _devicesController.close();

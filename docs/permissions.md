@@ -19,11 +19,15 @@ reports exactly what failed if that doesn't work (section 23).
 ## Linux
 
 - Reading `/sys/block/*` metadata needs no special permission.
-- `smartctl -a` on a raw block device typically requires root or membership in the `disk`
-  group. If access is denied, the specific device shows `permissionDenied` with the
-  `smartctl` error text — other devices keep working.
-- `nvme smart-log` has similar requirements on some distributions; hwmon (`/sys/class/nvme`)
-  values are usually readable by any user.
+- Reading SMART/NVMe health through `smartctl` needs more than `disk` group membership:
+  the kernel requires `CAP_SYS_ADMIN` for NVMe admin commands and `CAP_SYS_RAWIO` for
+  USB-bridged drives. `scripts/install_linux.sh` runs, once (needs sudo):
+  `sudo setcap cap_sys_admin,cap_sys_rawio+ep "$(readlink -f "$(command -v smartctl)")"`
+  and, on apt systems, installs `/etc/apt/apt.conf.d/99-driveguard-smartctl` to re-apply it
+  after `smartmontools` upgrades. DriveGuard itself never runs as root.
+- Without it, the affected device shows `permissionDenied` (never a guessed health value);
+  other devices keep working. Re-run the `setcap` command above if it ever reverts.
+- NVMe health falls back to `smartctl` when `nvme smart-log` is denied or missing.
 
 ## Windows
 

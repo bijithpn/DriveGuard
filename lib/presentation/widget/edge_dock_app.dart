@@ -226,9 +226,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
           TitleBarStyle.hidden,
           windowButtonVisibility: false,
         ),
-        windowManager.setBackgroundColor(
-          Platform.isLinux ? AppColors.bg1 : Colors.transparent,
-        ),
+        windowManager.setBackgroundColor(Colors.transparent),
         windowManager.setAlwaysOnTop(true),
         windowManager.setSkipTaskbar(true),
         windowManager.setResizable(false),

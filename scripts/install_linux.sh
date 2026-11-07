@@ -79,7 +79,11 @@ BUNDLE="$(ls -d build/linux/*/release/bundle 2>/dev/null | head -1 || true)"
 [[ -n "$BUNDLE" && -x "$BUNDLE/driveguard" ]] || die "Build finished but bundle/driveguard was not found."
 
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
-PREFIX="$DATA_HOME/driveguard"
+# Keep the bundle away from $DATA_HOME/driveguard: that is the app's own data dir
+# (getApplicationSupportDirectory), where it creates a "driveguard/" folder for its
+# database. Installing the bundle there collides with the executable and gets wiped.
+PREFIX="$DATA_HOME/driveguard-app"
+LEGACY="$DATA_HOME/driveguard"
 BIN_DIR="$HOME/.local/bin"
 APPS_DIR="$DATA_HOME/applications"
 ICON_DIR="$DATA_HOME/icons/hicolor/512x512/apps"
@@ -89,6 +93,14 @@ if pgrep -x driveguard >/dev/null 2>&1; then
   log "Closing the running copy..."
   pkill -x driveguard || true
   sleep 1
+fi
+
+# Remove bundle files left by older versions of this script, but keep app data.
+if [[ -f "$LEGACY/driveguard" ]]; then
+  rm -f "$LEGACY/driveguard"
+  rm -rf "$LEGACY/lib"
+  [[ -d "$LEGACY/data/flutter_assets" ]] && rm -rf "$LEGACY/data/flutter_assets" "$LEGACY/data/icudtl.dat"
+  rmdir "$LEGACY/data" 2>/dev/null || true
 fi
 
 log "Installing to $PREFIX ..."
@@ -109,6 +121,28 @@ Terminal=false
 Categories=System;Monitor;
 DESKTOP
 update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+
+# Disk access: reading SMART/NVMe health needs more than the "disk" group - the kernel
+# requires CAP_SYS_ADMIN (NVMe admin commands) and CAP_SYS_RAWIO (USB bridges) for
+# smartctl. Grant exactly those two capabilities to smartctl only (one-time, needs sudo;
+# the app itself never runs as root), and re-apply them after smartmontools upgrades.
+if [[ $EUID -ne 0 ]] && ! command -v sudo >/dev/null; then
+  log "sudo unavailable; skipping disk-access setup (see docs/permissions.md)."
+elif command -v smartctl >/dev/null && command -v setcap >/dev/null; then
+  SMARTCTL_REAL="$(readlink -f "$(command -v smartctl)")"
+  CAPS="cap_sys_admin,cap_sys_rawio+ep"
+  if ! getcap "$SMARTCTL_REAL" 2>/dev/null | grep -q cap_sys_rawio; then
+    log "Granting smartctl disk access ($CAPS) (needs sudo)..."
+    $SUDO setcap "$CAPS" "$SMARTCTL_REAL" \
+      || log "Could not set capabilities; run: sudo setcap $CAPS $SMARTCTL_REAL"
+  fi
+  if command -v apt-get >/dev/null && [[ ! -f /etc/apt/apt.conf.d/99-driveguard-smartctl ]]; then
+    printf 'DPkg::Post-Invoke { "f=$(readlink -f /usr/sbin/smartctl); [ -x \"$f\" ] && /usr/sbin/setcap %s \"$f\" 2>/dev/null || true"; };\n' "$CAPS" \
+      | $SUDO tee /etc/apt/apt.conf.d/99-driveguard-smartctl >/dev/null || true
+  fi
+else
+  log "smartctl/setcap not found; disk health may show 'permission required' (see docs/permissions.md)."
+fi
 
 log "Installed: $PREFIX"
 if [[ $LAUNCH -eq 1 && -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then

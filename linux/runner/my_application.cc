@@ -101,6 +101,18 @@ static void my_application_activate(GApplication* application) {
           if (GTK_IS_WINDOW(window)) {
             gtk_window_set_default_size(GTK_WINDOW(window), 290, 250);
             gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+            // Transparent window (needed for the edge dock's organic shape).
+            // The visual must be set before the window is realized. The
+            // mini widget paints its own opaque background, so it is
+            // unaffected.
+            GdkScreen* screen = gtk_widget_get_screen(window);
+            GdkVisual* rgba = gdk_screen_get_rgba_visual(screen);
+            if (rgba != nullptr && gdk_screen_is_composited(screen)) {
+              gtk_widget_set_visual(window, rgba);
+              gtk_widget_set_app_paintable(window, TRUE);
+              GdkRGBA clear = {0, 0, 0, 0};
+              fl_view_set_background_color(view, &clear);
+            }
           }
           gtk_widget_realize(GTK_WIDGET(view));
         }

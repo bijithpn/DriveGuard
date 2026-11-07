@@ -381,12 +381,58 @@ class LinuxStorageMonitor extends StorageMonitor {
     return sensors;
   }
 
+  /// NVMe health via `smartctl -j` (used when nvme-cli is missing or lacks the
+  /// privileges to query the controller). Returns unavailable, never a guess.
+  Future<DeviceHealth> _nvmeHealthViaSmartctl(String sysName) async {
+    if (!await SafeProcessRunner.instance.exists('smartctl')) {
+      return DeviceHealth.unavailable;
+    }
+    try {
+      final result = await SafeProcessRunner.instance.run('smartctl', [
+        '-a',
+        '-j',
+        '/dev/$sysName',
+      ], requireZeroExit: false);
+      final json = jsonDecode(result.stdout) as Map<String, dynamic>;
+      final log =
+          json['nvme_smart_health_information_log'] as Map<String, dynamic>?;
+      if (log == null || log['critical_warning'] == null) {
+        return DeviceHealth.unavailable;
+      }
+      final cw = (log['critical_warning'] as num).toInt();
+      final passed =
+          (json['smart_status'] as Map<String, dynamic>?)?['passed'] as bool?;
+      return DeviceHealth(
+        status: passed == false
+            ? DeviceHealthStatus.critical
+            : (cw == 0
+                  ? DeviceHealthStatus.healthy
+                  : DeviceHealthStatus.warning),
+        percentageUsed: (log['percentage_used'] as num?)?.toInt(),
+        availableSparePercent: (log['available_spare'] as num?)?.toInt(),
+        availableSpareThreshold: (log['available_spare_threshold'] as num?)
+            ?.toInt(),
+        criticalWarning: cw.toString(),
+        mediaErrors: (log['media_errors'] as num?)?.toInt(),
+        powerCycles: (log['power_cycles'] as num?)?.toInt(),
+        powerOnHours: (log['power_on_hours'] as num?)?.toInt(),
+        unsafeShutdowns: (log['unsafe_shutdowns'] as num?)?.toInt(),
+        dataUnitsRead: (log['data_units_read'] as num?)?.toInt(),
+        dataUnitsWritten: (log['data_units_written'] as num?)?.toInt(),
+        smartPassed: passed,
+      );
+    } catch (e) {
+      AppLogger.instance.debug(_tag, 'smartctl nvme health failed: $e');
+      return DeviceHealth.unavailable;
+    }
+  }
+
   @override
   Future<DeviceHealth?> getHealth(String deviceId) async {
     final sysName = _sysName(deviceId);
     if (sysName.startsWith('nvme')) {
       final hasTool = await SafeProcessRunner.instance.exists('nvme');
-      if (!hasTool) return DeviceHealth.unavailable;
+      if (!hasTool) return _nvmeHealthViaSmartctl(sysName);
       try {
         final result = await SafeProcessRunner.instance.run('nvme', [
           'smart-log',
@@ -395,6 +441,16 @@ class LinuxStorageMonitor extends StorageMonitor {
           'json',
         ], requireZeroExit: false);
         final json = jsonDecode(result.stdout) as Map<String, dynamic>;
+        // nvme-cli prints {"error": "..."} (exit 0) when it can't open or
+        // query the device. That is not a health verdict; never map it to
+        // "warning".
+        if (json['error'] != null || json['critical_warning'] == null) {
+          AppLogger.instance.debug(
+            _tag,
+            'nvme health unavailable: ${json['error'] ?? 'no critical_warning'}',
+          );
+          return await _nvmeHealthViaSmartctl(sysName);
+        }
         return DeviceHealth(
           status: (json['critical_warning'] as num?) == 0
               ? DeviceHealthStatus.healthy
@@ -415,7 +471,7 @@ class LinuxStorageMonitor extends StorageMonitor {
         );
       } catch (e) {
         AppLogger.instance.debug(_tag, 'nvme health read failed: $e');
-        return DeviceHealth.unavailable;
+        return _nvmeHealthViaSmartctl(sysName);
       }
     }
 
