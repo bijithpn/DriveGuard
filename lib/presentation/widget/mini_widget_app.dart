@@ -128,6 +128,7 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
         await windowManager.setBackgroundColor(AppColors.bg1);
       }
       await windowManager.setAlwaysOnTop(alwaysOnTop);
+      await windowManager.setSkipTaskbar(true);
       if (!Platform.isLinux) {
         await windowManager.setHasShadow(false);
       }

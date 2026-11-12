@@ -7,7 +7,6 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'application/incidents/heartbeat_service.dart';
 import 'application/incidents/startup_recovery_service.dart';
@@ -112,8 +111,7 @@ Future<bool> _acquireSingleInstanceLock() async {
     );
     server.listen((socket) {
       socket.destroy();
-      unawaited(windowManager.show());
-      unawaited(windowManager.focus());
+      unawaited(showMainWindow());
     });
     return true;
   } on SocketException {

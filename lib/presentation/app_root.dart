@@ -23,7 +23,7 @@ import '../domain/enums/ui_enums.dart';
 import '../infrastructure/native/native_widget_bridge.dart';
 import '../infrastructure/tray/app_tray_service.dart';
 import '../infrastructure/tray/desktop_window_controller.dart'
-    show kEdgeDockChannel, kWidgetChannel, kWidgetHeartbeat;
+    show kEdgeDockChannel, kWidgetChannel, kWidgetHeartbeat, showMainWindow;
 import 'components/device_presentation.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'device_details/device_details_screen.dart';
@@ -161,8 +161,7 @@ class _AppRootState extends ConsumerState<AppRoot>
   }
 
   Future<void> _onNotificationClicked(String deviceId) async {
-    await windowManager.show();
-    await windowManager.focus();
+    await showMainWindow();
     // Advisory notifications (memory / heavy writes) carry no drive: the
     // dashboard banner is where the offending app can be quit.
     if (deviceId.isEmpty) return;
@@ -196,8 +195,7 @@ class _AppRootState extends ConsumerState<AppRoot>
               .read(settingsProvider.notifier)
               .updateWith((s) => s.copyWith(widget: updated));
         }
-        await windowManager.show();
-        await windowManager.focus();
+        await showMainWindow();
       case 'widget_closed':
         _lastPushedSnapshot = null;
         widget.windowController.clearMiniWindow();
@@ -222,8 +220,7 @@ class _AppRootState extends ConsumerState<AppRoot>
         final isMainVisible = await windowManager.isVisible();
         final settings = ref.read(settingsProvider);
         if (!isMainVisible && (!settings.showTrayIcon || _tray == null)) {
-          await windowManager.show();
-          await windowManager.focus();
+          await showMainWindow();
         }
       case 'quit_process':
         await _quitAlertCulprit(call.arguments);
@@ -256,8 +253,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       case 'ready':
         await _pushSnapshotToEdgeDockIfActive(force: true);
       case 'open_app':
-        await windowManager.show();
-        await windowManager.focus();
+        await showMainWindow();
       case 'quit_process':
         await _quitAlertCulprit(call.arguments);
       case 'position_changed':
@@ -358,8 +354,7 @@ class _AppRootState extends ConsumerState<AppRoot>
 
     final tray = AppTrayService(
       onOpenDashboard: () async {
-        await windowManager.show();
-        await windowManager.focus();
+        await showMainWindow();
       },
       onPauseResume: () {
         final currentSettings = ref.read(settingsProvider);
@@ -372,8 +367,7 @@ class _AppRootState extends ConsumerState<AppRoot>
             );
       },
       onOpenSettings: () async {
-        await windowManager.show();
-        await windowManager.focus();
+        await showMainWindow();
         rootNavigatorKey.currentState?.push(
           MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
         );
@@ -381,8 +375,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       onRescan: () => ref.read(monitoringServiceProvider).rescan(),
       onQuit: _quitApp,
       onOpenStorageSense: () async {
-        await windowManager.show();
-        await windowManager.focus();
+        await showMainWindow();
         final nav = rootNavigatorKey.currentState;
         if (nav != null) goToSection(nav, AppSection.storage);
       },
@@ -1026,8 +1019,7 @@ class _AppRootState extends ConsumerState<AppRoot>
       _thermalDialogOpen = true;
       () async {
         try {
-          await windowManager.show();
-          await windowManager.focus();
+          await showMainWindow();
         } catch (_) {}
         final ctx = rootNavigatorKey.currentContext;
         if (ctx != null && ctx.mounted) await showThermalShutdownDialog(ctx);

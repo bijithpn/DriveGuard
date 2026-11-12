@@ -228,7 +228,9 @@ class _EdgeDockAppState extends State<EdgeDockApp>
         windowManager.setBackgroundColor(Colors.transparent),
         windowManager.setAlwaysOnTop(true),
         windowManager.setSkipTaskbar(true),
-        windowManager.setResizable(false),
+        // GTK ignores programmatic resizes of a non-resizable window, which
+        // would freeze the dock at its first size on Linux.
+        if (!Platform.isLinux) windowManager.setResizable(false),
         windowManager.setOpacity(_opacity).catchError((Object e) {
           AppLogger.instance.debug(_tag, 'setOpacity failed: $e');
         }),
@@ -250,7 +252,7 @@ class _EdgeDockAppState extends State<EdgeDockApp>
       // Show as soon as the bounds are set - one call is enough;
       // windowManager.show() already orders the window front.
       try {
-        await windowManager.show();
+        await windowManager.show(inactive: true);
       } catch (_) {}
       unawaited(widget.controller.show().catchError((_) {}));
       // Some macOS versions drop the fullscreen-auxiliary collection

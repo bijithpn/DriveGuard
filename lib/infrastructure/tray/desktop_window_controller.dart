@@ -19,6 +19,14 @@ const kWidgetMinimumSize = Size(260, 220);
 const kWidgetHeartbeat = Duration(seconds: 2);
 const kWidgetOrphanTimeout = Duration(seconds: 30);
 
+/// Brings the dashboard up from hidden OR minimised. show() alone leaves a
+/// minimised window minimised on Windows, Linux and macOS.
+Future<void> showMainWindow() async {
+  if (await windowManager.isMinimized()) await windowManager.restore();
+  await windowManager.show();
+  await windowManager.focus();
+}
+
 class DesktopWindowController with WindowListener {
   static const _tag = 'DesktopWindowController';
   static const Size _defaultDashboardSize = Size(1100, 760);
@@ -420,11 +428,6 @@ class DesktopWindowController with WindowListener {
   }
 
   Future<void> minimizeToTray() => windowManager.hide();
-
-  Future<void> restoreFromTray() async {
-    await windowManager.show();
-    await windowManager.focus();
-  }
 
   Future<bool> isVisible() => windowManager.isVisible();
 }

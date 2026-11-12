@@ -101,6 +101,8 @@ static void my_application_activate(GApplication* application) {
           if (GTK_IS_WINDOW(window)) {
             gtk_window_set_default_size(GTK_WINDOW(window), 290, 250);
             gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+            // Show on every workspace, like macOS's all-Spaces behaviour.
+            gtk_window_stick(GTK_WINDOW(window));
             // Transparent window (needed for the edge dock's organic shape).
             // The visual must be set before the window is realized. The
             // mini widget paints its own opaque background, so it is
