@@ -29,6 +29,8 @@ void main() {
 
     // A StreamController / Zone-bound closure cannot be sent to an isolate.
     final controller = StreamController<int>();
+    // close() only completes once a listener has drained the stream.
+    controller.stream.listen((_) {});
     addTearDown(controller.close);
     final scanner = ProjectScanner(minBytes: 0, measurer: _FakeMeasurer());
     await scanner.scan(

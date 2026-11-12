@@ -114,6 +114,13 @@ static void my_application_activate(GApplication* application) {
               gtk_widget_set_app_paintable(window, TRUE);
               GdkRGBA clear = {0, 0, 0, 0};
               fl_view_set_background_color(view, &clear);
+            } else {
+              // No compositor: transparency is impossible, so back the
+              // Flutter surface with the app's dark surface colour (bg1)
+              // instead of black.
+              GdkRGBA solid;
+              gdk_rgba_parse(&solid, "#13161B");
+              fl_view_set_background_color(view, &solid);
             }
           }
           gtk_widget_realize(GTK_WIDGET(view));

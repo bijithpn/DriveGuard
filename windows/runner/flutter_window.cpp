@@ -1,9 +1,60 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <shobjidl_core.h>
 
 #include "flutter/generated_plugin_registrant.h"
 #include "desktop_multi_window/desktop_multi_window_plugin.h"
+
+namespace {
+
+// Floating windows (edge dock, mini widget) should follow the user across
+// virtual desktops like they do across macOS Spaces. Windows has no public
+// "pin to all desktops" call, so poll: when such a window is not on the
+// current desktop, move it to the desktop of any visible window that is.
+struct DesktopProbe {
+  IVirtualDesktopManager* manager;
+  HWND self;
+  GUID desktop;
+  bool found;
+};
+
+BOOL CALLBACK FindCurrentDesktop(HWND hwnd, LPARAM param) {
+  auto* probe = reinterpret_cast<DesktopProbe*>(param);
+  if (hwnd == probe->self || !::IsWindowVisible(hwnd) || ::IsIconic(hwnd)) {
+    return TRUE;
+  }
+  BOOL on_current = FALSE;
+  if (SUCCEEDED(probe->manager->IsWindowOnCurrentVirtualDesktop(
+          hwnd, &on_current)) &&
+      on_current &&
+      SUCCEEDED(probe->manager->GetWindowDesktopId(hwnd, &probe->desktop))) {
+    probe->found = true;
+    return FALSE;
+  }
+  return TRUE;
+}
+
+void CALLBACK FollowVirtualDesktop(HWND child, UINT, UINT_PTR, DWORD) {
+  static IVirtualDesktopManager* manager = [] {
+    IVirtualDesktopManager* m = nullptr;
+    ::CoCreateInstance(__uuidof(VirtualDesktopManager), nullptr, CLSCTX_ALL,
+                       IID_PPV_ARGS(&m));
+    return m;
+  }();
+  HWND window = ::GetAncestor(child, GA_ROOT);
+  if (!manager || !window || !::IsWindowVisible(window)) return;
+  BOOL on_current = TRUE;
+  if (FAILED(manager->IsWindowOnCurrentVirtualDesktop(window, &on_current)) ||
+      on_current) {
+    return;
+  }
+  DesktopProbe probe{manager, window, {}, false};
+  ::EnumWindows(FindCurrentDesktop, reinterpret_cast<LPARAM>(&probe));
+  if (probe.found) manager->MoveWindowToDesktop(window, probe.desktop);
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -39,6 +90,8 @@ bool FlutterWindow::OnCreate() {
     auto *flutter_view_controller =
         reinterpret_cast<flutter::FlutterViewController *>(controller);
     RegisterPlugins(flutter_view_controller->engine());
+    ::SetTimer(flutter_view_controller->view()->GetNativeWindow(), 1, 250,
+               FollowVirtualDesktop);
   });
 
   SetChildContent(flutter_controller_->view()->GetNativeWindow());

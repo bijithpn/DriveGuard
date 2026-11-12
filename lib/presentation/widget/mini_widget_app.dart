@@ -122,11 +122,7 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
         TitleBarStyle.hidden,
         windowButtonVisibility: false,
       );
-      if (!Platform.isLinux) {
-        await windowManager.setBackgroundColor(Colors.transparent);
-      } else {
-        await windowManager.setBackgroundColor(AppColors.bg1);
-      }
+      await windowManager.setBackgroundColor(Colors.transparent);
       await windowManager.setAlwaysOnTop(alwaysOnTop);
       await windowManager.setSkipTaskbar(true);
       if (!Platform.isLinux) {
@@ -216,7 +212,7 @@ class _MiniWidgetAppState extends State<MiniWidgetApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       home: Scaffold(
-        backgroundColor: Platform.isLinux ? AppColors.bg1 : Colors.transparent,
+        backgroundColor: Colors.transparent,
         body: MiniMonitorView(
           snapshot: _snapshot,
           onExpand: _onExpand,
