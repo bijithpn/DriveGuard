@@ -57,9 +57,8 @@ if (\$null -eq \$disk) { exit 2 }
   // it lives in the legacy root\wmi MSStorageDriver_FailurePredictData
   // class, keyed by PNPDeviceID rather than disk index. Matched via Win32_
   // DiskDrive as the join key, same $rawId-as-Index pattern used by the
-  // Win32_DiskDrive fallback below. See
-  // docs/superpowers/specs/2026-09-09-smart-attributes-design.md - this
-  // path is unverified on real Windows hardware.
+  // Win32_DiskDrive fallback below. This path is unverified on real Windows
+  // hardware.
   static String _ataAttributesScript(String deviceId) =>
       '''
 try {

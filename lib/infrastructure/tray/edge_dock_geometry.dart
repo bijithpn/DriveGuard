@@ -9,8 +9,7 @@ import '../../domain/enums/ui_enums.dart';
 /// Pure geometry for the edge-docked hover widget: a rail of per-device
 /// ring indicators docked to a screen edge, plus a detail panel that
 /// appears beside whichever ring is hovered. Kept free of window_manager/
-/// screen_retriever so it's unit-testable without a real window. See
-/// docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
+/// screen_retriever so it's unit-testable without a real window.
 class EdgeDockGeometry {
   const EdgeDockGeometry._();
 

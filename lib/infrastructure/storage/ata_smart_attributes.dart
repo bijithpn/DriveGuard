@@ -1,5 +1,5 @@
 /// Shared ATA/SATA SMART attribute extraction, used by every platform's
-/// storage monitor. See docs/superpowers/specs/2026-09-09-smart-attributes-design.md.
+/// storage monitor.
 class AtaSmartExtras {
   const AtaSmartExtras({
     this.reallocatedSectorCount,

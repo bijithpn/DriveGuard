@@ -40,7 +40,7 @@ class DeviceHealth {
   final bool? smartPassed;
 
   // ATA/SATA SMART attributes (ids 5, 196, 197, 198) not covered by the NVMe
-  // health log above. See docs/superpowers/specs/2026-09-09-smart-attributes-design.md.
+  // health log above.
   final int? reallocatedSectorCount;
   final int? reallocatedEventCount;
   final int? currentPendingSectorCount;

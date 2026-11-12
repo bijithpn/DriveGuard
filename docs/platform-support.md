@@ -46,8 +46,7 @@ spec ("do not fake cross-platform support").
   position via `screen_retriever` and repositions a frameless always-on-top window via
   `window_manager.setBounds`. Built and verified opening/closing on macOS only; DPI
   scaling, multi-monitor edge cases (it targets the primary display only), and
-  always-on-top z-order behavior on Windows/Linux are unverified — see
-  docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
+  always-on-top z-order behavior on Windows/Linux are unverified.
 - True OS sleep/resume detection uses Flutter's `AppLifecycleState.resumed` as a
   best-effort proxy, not a native power-notification API — see troubleshooting.md.
 - Linux notifications show no icon: `local_notifier`'s Linux plugin calls libnotify's

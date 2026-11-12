@@ -81,8 +81,7 @@ class WidgetSettings {
 
 /// A slim, always-on-top strip docked flush to a screen edge that expands
 /// into a compact panel on hover. Independent of [WidgetSettings]'s mini
-/// monitor window. See
-/// docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
+/// monitor window.
 /// All optional detail-panel rows, shown by default (matches the original
 /// always-shown behavior).
 const kAllEdgeDockMetrics = <EdgeDockMetric>{

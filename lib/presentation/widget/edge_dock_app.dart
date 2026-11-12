@@ -20,8 +20,7 @@ import 'edge_dock_view.dart';
 
 /// Window entry point for the edge-docked hover widget: a rail of
 /// per-device ring indicators docked to a screen edge, each expanding a
-/// detail card on hover. See
-/// docs/superpowers/specs/2026-09-09-edge-dock-widget-design.md.
+/// detail card on hover.
 class EdgeDockApp extends StatefulWidget {
   const EdgeDockApp({
     super.key,
